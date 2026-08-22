@@ -1,0 +1,9 @@
+node_modules/
+packages/*/dist/
+packages/*/dist-lib/
+packages/*/dist-element/
+coverage/
+*.tsbuildinfo
+.vite/
+.DS_Store
+*.log
