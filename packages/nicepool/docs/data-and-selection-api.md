@@ -56,7 +56,7 @@ the presentation theme without changing serialized workspace state.
 
 ## NiceGUI boundary
 
-`nicegui_demo.py` demonstrates the intended Python boundary. It converts pandas
-missing values to JSON `null`, serves the built Custom Element from NiceGUI,
-and exchanges data, state, and selection only through public element methods
-and custom events. The Python host does not prepare plots or own selection.
+Python clients use `NicePoolWebView` from the `nicewidgets` package. The adapter
+converts pandas missing values, serves the bundled Custom Element, and exchanges
+data, state, and selection only through public element methods and custom
+events. Python hosts do not prepare plots or own selection.
