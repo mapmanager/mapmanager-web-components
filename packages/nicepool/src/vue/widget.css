@@ -33,6 +33,7 @@
 .nicepool-plot-active { outline-color: var(--np-active); }
 .nicepool-plot-active::after { content: ''; position: absolute; z-index: 5; inset: 0; box-sizing: border-box; border: 3px solid var(--np-active); pointer-events: none; }
 .nicepool-plot-number { position: absolute; z-index: 2; top: 5px; left: 7px; color: var(--np-muted); font-size: 11px; font-weight: 700; pointer-events: none; }
+.nicepool-plot-empty { position: absolute; z-index: 3; inset: 50% auto auto 50%; width: min(420px, calc(100% - 48px)); margin: 0; padding: 10px 12px; transform: translate(-50%, -50%); border: 1px solid var(--np-border); border-radius: 6px; color: var(--np-text); background: var(--np-controls); text-align: center; pointer-events: none; }
 .nicepool-plot { position: absolute; inset: 0; }
 .nicepool-theme-dark .modebar { background: rgba(17, 24, 39, 0.88) !important; }
 .nicepool-theme-dark .modebar-btn path { fill: #d1d5db !important; }
@@ -50,6 +51,12 @@
 .nicepool-summary-panel { background: var(--np-controls); border-top: 1px solid var(--np-border); color: var(--np-text); font-size: var(--nicepool-control-font-size); }
 .nicepool-summary-panel > summary { padding: 5px 8px; cursor: pointer; user-select: none; }
 .nicepool-summary-content { padding: 0 8px 8px; }
+.nicepool-table-tabs { display: flex; gap: 4px; margin-bottom: 6px; border-bottom: 1px solid var(--np-border); }
+.nicepool-table-tabs button, .nicepool-table-pagination button { min-height: 24px; border: 1px solid var(--np-input-border); border-radius: 4px 4px 0 0; padding: 2px 7px; background: var(--np-input); color: inherit; font: inherit; }
+.nicepool-table-tabs .nicepool-table-tab-active { border-bottom-color: var(--np-active); box-shadow: inset 0 -2px var(--np-active); }
+.nicepool-table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 5px; color: var(--np-muted); }
+.nicepool-table-pagination span { margin-right: auto; }
+.nicepool-table-pagination button { border-radius: 4px; }
 .nicepool-summary-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: var(--np-muted); }
 .nicepool-summary-actions button { min-height: 24px; border: 1px solid var(--np-input-border); border-radius: 4px; padding: 2px 6px; background: var(--np-input); color: inherit; font: inherit; }
 .nicepool-summary-actions label { display: inline-flex; align-items: center; gap: 4px; }

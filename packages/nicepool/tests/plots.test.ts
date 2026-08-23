@@ -148,4 +148,20 @@ describe('plot preparation and summaries', () => {
     expect(specification.layout.xaxis).toMatchObject({ showline: false, showticklabels: false, showgrid: true })
     expect(specification.layout.yaxis).toMatchObject({ showline: false, showticklabels: false, showgrid: false })
   })
+
+  it('keeps click hit-testing active when visible hover labels are disabled', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const data = prepareScatter(dataset, {
+      ...defaultPlotState(dataset),
+      xColumn: 'x',
+      yColumn: 'y',
+      showHover: false,
+    })
+    const specification = buildPlotlySpecification(
+      data,
+      { primaryRowId: null, selectedRowIds: [] },
+    )
+    expect(specification.layout.hovermode).toBe('closest')
+    expect(specification.traces[0]).toMatchObject({ hoverinfo: 'none' })
+  })
 })

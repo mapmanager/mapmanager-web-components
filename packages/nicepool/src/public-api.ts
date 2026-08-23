@@ -3,6 +3,7 @@ export { prepareDistribution, prepareHistogram, preparePlotData, prepareScatter,
 export { buildPlotlySpecification, rowIdsFromPlotlyEvent } from './plots/plotly'
 export { summarizePlot } from './plots/summary'
 export { formatPlotSummaryToTsv } from './plots/summary-format'
+export { describeEmptyPlot } from './plots/diagnostics'
 export * from './plots/types'
 export { default as NicePoolWidget } from './vue/NicePoolWidget.vue'
 export { NicePoolElement } from './element/NicePoolElement'

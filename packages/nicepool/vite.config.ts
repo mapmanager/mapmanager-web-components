@@ -4,5 +4,5 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   base: './',
   plugins: [vue()],
-  test: { environment: 'node' },
+  test: { environment: 'node', exclude: ['e2e/**', 'node_modules/**', 'dist*/**'] },
 })

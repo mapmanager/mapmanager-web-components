@@ -75,7 +75,9 @@ onMounted(() => {
   window.addEventListener('keyup', keyChanged)
   window.addEventListener('blur', resetModifiers)
   resizeObserver = new ResizeObserver(() => {
-    if (plotly && host.value) void plotly.Plots.resize(host.value)
+    if (plotly && host.value) {
+      plotly.Plots.resize(host.value)
+    }
   })
   if (host.value) resizeObserver.observe(host.value)
   void render()

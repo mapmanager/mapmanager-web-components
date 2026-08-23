@@ -30,9 +30,8 @@ function pointTrace(
   points: readonly PreparedPoint[],
   selection: NicePoolSelection,
   pointSize: number,
+  showHover: boolean,
 ): Plotly.Data {
-  // Plotly supports selected/unselected marker styles for scatter traces, but
-  // @types/plotly.js does not currently expose both properties on Data.
   return {
     type: 'scattergl',
     mode: 'markers',
@@ -44,7 +43,9 @@ function pointTrace(
     marker: { size: pointSize },
     selected: { marker: { size: pointSize + 4, color: '#f97316' } },
     unselected: { marker: { opacity: selection.selectedRowIds.length ? 0.28 : 0.9 } },
-    hovertemplate: 'row=%{customdata[0]}<br>x=%{x}<br>y=%{y}<extra>%{fullData.name}</extra>',
+    ...(showHover
+      ? { hovertemplate: 'row=%{customdata[0]}<br>x=%{x}<br>y=%{y}<extra>%{fullData.name}</extra>' }
+      : { hoverinfo: 'none' }),
   } as unknown as Plotly.Data
 }
 
@@ -147,7 +148,9 @@ export function buildPlotlySpecification(
   else if (data.type === 'histogram' || data.type === 'cumulativeHistogram') traces = histogramTraces(data)
   else {
     traces = data.state.showRaw
-      ? groupedPoints(data.points).map(([name, points]) => pointTrace(name, points, selection, data.state.pointSize))
+      ? groupedPoints(data.points).map(([name, points]) => pointTrace(
+          name, points, selection, data.state.pointSize, data.state.showHover,
+        ))
       : []
     if (data.type === 'swarm') traces.push(...swarmOverlays(data, theme))
   }
@@ -176,7 +179,9 @@ export function buildPlotlySpecification(
     dragmode: data.type === 'scatter' || data.type === 'swarm' ? 'lasso' : 'zoom',
     selectionrevision: JSON.stringify(selection.selectedRowIds),
     showlegend: data.state.showLegend,
-    hovermode: data.state.showHover ? 'closest' : false,
+    // Plotly click events use its point-picking/hover pipeline. Keep that
+    // pipeline active and suppress only the visible label at trace level.
+    hovermode: 'closest',
     legend: legendLayout(data.state.legendPosition),
     uirevision: 'nicepool',
     xaxis: data.type === 'swarm'
