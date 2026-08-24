@@ -1,6 +1,10 @@
 import { getChannelStats, loadOmeZarr } from '@vivjs/loaders'
 
+import { defaultChannelColor } from './channel-luts'
+import type { ViewerLayout } from './layout-panes'
 import { parseOmeContrast, parseOmeScale } from './ome-metadata'
+import { loadOmeZarrPlaneIfSmall } from './ome-zarr-loader'
+import { OrientedPixelSource, type InnerPixelSource } from './oriented-pixel-source'
 import { transposedShape } from './orientation'
 import {
   clampCounts,
@@ -9,8 +13,6 @@ import {
   planeHeight,
   planeWidth,
 } from './plane'
-import { loadOmeZarrPlaneIfSmall } from './ome-zarr-loader'
-import { OrientedPixelSource, type InnerPixelSource } from './oriented-pixel-source'
 import { TiledPlanePixelSource } from './tile-source'
 import type {
   ImageSource,
@@ -57,18 +59,25 @@ export class ImageViewerEngine {
   generation = 0
   loaded: LoadedImage | null = null
   rois: Roi[] = []
+  selectedRoiId: string | null = null
   xyOverlays: XyOverlay[] = []
   error: string | null = null
-  layout: 'side' | 'stack' | 'single' | 'composite' = 'single'
+  layout: ViewerLayout = 'single'
   axesVisible = true
+  channelColors: [number, number, number][] = []
+  channelContrast: [number, number][] = []
   #planeSource: PlaneSource | null = null
+  #roiSerial = 0
 
   async setSource(source: ImageSource, signal?: AbortSignal): Promise<LoadedImage> {
     const generation = this.generation + 1
     this.generation = generation
     this.error = null
     this.rois = []
+    this.selectedRoiId = null
     this.xyOverlays = []
+    this.channelColors = []
+    this.channelContrast = []
     this.#planeSource = null
     try {
       const loaded =
@@ -77,6 +86,10 @@ export class ImageViewerEngine {
           : await this.#loadOmeZarr(source, generation, signal)
       if (generation !== this.generation) throw abortError()
       this.loaded = loaded
+      this.channelColors = Array.from({ length: loaded.channelCount }, (_, index) =>
+        defaultChannelColor(index),
+      )
+      this.channelContrast = Array.from({ length: loaded.channelCount }, () => [...loaded.contrast])
       return loaded
     } catch (reason) {
       if (generation === this.generation) {
@@ -103,6 +116,54 @@ export class ImageViewerEngine {
 
   setRois(rois: readonly Roi[]): void {
     this.rois = [...rois]
+    if (this.selectedRoiId && !this.rois.some((roi) => roi.id === this.selectedRoiId)) {
+      this.selectedRoiId = null
+    }
+  }
+
+  nextRoiId(): string {
+    this.#roiSerial += 1
+    return `roi-${this.#roiSerial}`
+  }
+
+  addRoi(roi: Roi): Roi {
+    if (this.rois.some((item) => item.id === roi.id)) {
+      throw new Error(`duplicate ROI: ${roi.id}`)
+    }
+    this.rois = [...this.rois, roi]
+    this.selectedRoiId = roi.id
+    return roi
+  }
+
+  removeRoi(id: string): void {
+    this.rois = this.rois.filter((roi) => roi.id !== id)
+    if (this.selectedRoiId === id) this.selectedRoiId = null
+  }
+
+  selectRoi(id: string | null): void {
+    if (id !== null && !this.rois.some((roi) => roi.id === id)) {
+      throw new Error(`unknown ROI: ${id}`)
+    }
+    this.selectedRoiId = id
+  }
+
+  setChannelColor(channel: number, rgb: [number, number, number]): void {
+    this.#requireChannel(channel)
+    this.channelColors[channel] = [...rgb]
+  }
+
+  setChannelContrast(channel: number, contrast: [number, number]): void {
+    this.#requireChannel(channel)
+    const low = Math.min(contrast[0], contrast[1])
+    const high = Math.max(contrast[0], contrast[1])
+    this.channelContrast[channel] = [low, high]
+  }
+
+  #requireChannel(channel: number): void {
+    if (!this.loaded) throw new Error('no image is loaded')
+    if (!Number.isInteger(channel) || channel < 0 || channel >= this.loaded.channelCount) {
+      throw new Error(`invalid channel: ${channel}`)
+    }
   }
 
   setXyOverlays(overlays: readonly XyOverlay[]): void {
@@ -140,6 +201,7 @@ export class ImageViewerEngine {
     })
     const contrast = contrastLimits(raster.data)
     this.loaded = { ...this.loaded, contrast }
+    this.channelContrast[this.loaded.selection.c] = [...contrast]
     return contrast
   }
 

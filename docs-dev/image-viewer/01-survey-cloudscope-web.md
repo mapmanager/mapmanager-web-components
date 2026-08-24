@@ -1,11 +1,13 @@
 # Survey: CloudScope Web raster engine
 
-> **STATUS: survey / roadmap only.**  
-> Not a public API, not a frozen contract, not implementation source of truth.  
-> Runtime truth: `cloudscope-web/src/raster-viewer/` until
-> `@mapmanager/image-viewer` exists and is tested.  
-> Names below (`RasterViewer`, `raster-*` events) are **current CloudScope Web**
-> names. The MapManager package is expected to use **image** naming.
+> **PLANNING ONLY — not source of truth, not a lock, not an API.**
+>
+> What we **plan** to learn from CloudScope-Web. Must **never** block
+> implementation. If this disagrees with current `@mapmanager/image-viewer`
+> work (including **using Viv**), the **code** wins.
+>
+> Names below (`RasterViewer`, `raster-*` events) are CloudScope-Web names.
+> The MapManager package uses **image** naming.
 
 ## 1. What we are looking at
 
@@ -180,10 +182,10 @@ proves a safer default.
 
 None of that belongs in `@mapmanager/image-viewer`.
 
-## 11. Viewport fit and drag-zoom (v1 requirement)
+## 11. Viewport fit and drag-zoom (planned)
 
-This is missing from older notes in this folder and **is required** for
-`@mapmanager/image-viewer`. Source of truth today is CloudScope-Web
+We **plan** this for `@mapmanager/image-viewer`. Not a lock. Source of the
+behavior we want to copy: CloudScope-Web
 `cloudscope-web/src/raster-viewer/viewport.js` (`fit`, `dragZoomMode`,
 `selectionRect`, `zoomRegion`, `zoomAxis`, `drawRegionGuide`).
 

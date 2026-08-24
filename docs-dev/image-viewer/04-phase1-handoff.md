@@ -1,5 +1,12 @@
 # Image viewer Phase 1 handoff — 2026-08-24
 
+> **HISTORICAL PLANNING NOTE — not source of truth, not a lock.**
+>
+> Dated diary of a stop on 2026-08-24. Must **never** block current
+> implementation. Architecture sentences below (including “revert zarrita
+> plane” / “Viv is future”) are **not** rules. Runtime truth is
+> `packages/image-viewer/` as it exists now.
+
 Stopped on purpose after ~100 minutes stuck on a simple OME-Zarr load.
 This is a resume note, not a public API and not a ticket report.
 

@@ -1,18 +1,21 @@
 # Image viewer — survey and roadmap
 
-> **STATUS: survey / roadmap only.**  
-> These files are planning notes for a future `@mapmanager/image-viewer`
-> package. They are **not** a public API, **not** a frozen contract, and
-> **not** implementation source of truth.  
-> Until that package exists and is tested, the only runtime truth is the
-> CloudScope Web engine at `cloudscope-web/src/raster-viewer/`.  
-> Implementation may diverge from every statement below.
+> **PLANNING ONLY — not source of truth, not a lock, not an API.**
+>
+> These files say what we **plan to build** in `@mapmanager/image-viewer`
+> (`mapmanager-web-components`). They must **never** block implementation.
+> If this text disagrees with current work (including **using Viv**), the
+> **code** in `packages/image-viewer/` wins. Do not treat an old sentence
+> here as a veto.
+>
+> CloudScope-Web `cloudscope-web/src/raster-viewer/` is the UX we plan to
+> match. It is a reference, not a second source of truth.
 
 ## What this folder is
 
-Planning material so we can lift the **CloudScope Web raster engine** into
-`mapmanager-web-components` as a reusable **image viewer**, with standalone
-demos, then later thin clients in CloudScope Web and CloudScope App.
+Planning material for a reusable **image viewer** in `mapmanager-web-components`:
+CloudScope-Web raster UX, Viv for HTTP OME-Zarr pyramids, standalone demos,
+then later thin clients in CloudScope-Web and CloudScope-App.
 
 ## Package name (proposed)
 
@@ -25,45 +28,31 @@ CloudScope / NiceWidgets names stay until those repos consume the package.
 
 | File | Purpose |
 |---|---|
-| [01-survey-cloudscope-web.md](./01-survey-cloudscope-web.md) | How the current CloudScope Web engine works (init, planes, events, adapters) |
-| [02-gui-ux-and-layers.md](./02-gui-ux-and-layers.md) | Toolbar / gestures and the canvas layer stack (pixels, ROI, XY overlay) |
-| [03-package-and-demos.md](./03-package-and-demos.md) | Target package shape, required APIs, standalone demos, consumer order |
-| [04-phase1-handoff.md](./04-phase1-handoff.md) | 2026-08-24 stop: what shipped, OME-Zarr blocker, how to resume |
+| [01-survey-cloudscope-web.md](./01-survey-cloudscope-web.md) | How CloudScope-Web’s engine works (reference, not a lock) |
+| [02-gui-ux-and-layers.md](./02-gui-ux-and-layers.md) | Toolbar / gestures / layers we **plan** to implement |
+| [03-package-and-demos.md](./03-package-and-demos.md) | Package shape, planned APIs, demos |
+| [04-phase1-handoff.md](./04-phase1-handoff.md) | Dated diary of a 2026-08-24 stop — **historical**, not architecture law |
 
-## Locked for this roadmap (still not a spec)
+## Planning intent (not a lock)
 
-- **Lift source:** `cloudscope-web/src/raster-viewer/` (JS engine + CSS + modules).
-- **Do not lift:** `ImageViewer.vue` (AcqStore / OME-Zarr / time-link adapter).
-- **NiceGUI pattern:** `cloudscope-app` + `nicewidgets` `RasterViewerWidget`
-  show how a Python client will *use* the finished Custom Element. They do not
-  own the JS we copy.
-- **NicePool pattern:** `@mapmanager/nicepool` package layout + how
-  **CloudScope Web** consumes it (`NicePoolPanel.vue`). Do not confuse that
-  with the separate Python NicePool inside `nicewidgets`.
-- **v1 data model:** the *client* loads 2D planes (`loadPlane`). No OME-Zarr
-  or NumPy inside the package.
-- **Required v1 APIs:** ROI (including CRUD + local/delegated host modes) and
-  in-image XY overlays (canvas, not Plotly).
-- **Required v1 viewport:** square vs non-square **home fill** and
-  **click+drag zoom** from `cloudscope-web/src/raster-viewer/viewport.js`
-  ([02](./02-gui-ux-and-layers.md) §3). Not optional chrome.
-- **Not in this package:** Plotly, analysis plot panels, AcqStore, zarrita,
-  NumPy HTTP sources, [Viv](https://github.com/hms-dbmi/viv) / chunked OME-Zarr
-  streaming (future viewer, separate effort).
+What we **plan** to do. None of this forbids a later product decision.
 
-## Suggested consumer order (after the package is real)
+- **UX reference:** CloudScope-Web `cloudscope-web/src/raster-viewer/`.
+- **Do not copy into this package:** CloudScope-Web `ImageViewer.vue` (AcqStore adapter).
+- **HTTP images:** Viv in **this** package (pyramids). Single-level small YX may decode one plane into RAM.
+- **Planned APIs:** ROI (CRUD, local/delegated), in-image XY overlays (canvas, not Plotly), viewport home-fill and click+drag zoom ([02](./02-gui-ux-and-layers.md) §3).
+- **Stay out of this package:** Plotly analysis plots, AcqStore models, CloudScope-App Python.
 
-1. Fully working, tested `@mapmanager/image-viewer` + standalone demos in this
-   repo (same bar as NicePool).
-2. CloudScope Web replaces vendored `src/raster-viewer/`.
-3. NiceWidgets thin adapter (Custom Element host), analogous to `NicePoolWebView`.
-4. CloudScope App keeps its view; swap import/config only.
+## Suggested consumer order (after the package is trusted)
 
-## Banner for every file in this folder
+1. Working, tested `@mapmanager/image-viewer` + standalone demos in this repo.
+2. CloudScope-Web replaces vendored `src/raster-viewer/`.
+3. NiceWidgets thin Custom Element host.
+4. CloudScope-App swaps widget import/config only.
 
-Copy this block at the top of any new note added here:
+## Banner for any new note in this folder
 
 ```text
-STATUS: survey / roadmap only. Not API. Not source of truth.
-Runtime truth: cloudscope-web/src/raster-viewer/ until @mapmanager/image-viewer ships.
+PLANNING ONLY. Not source of truth. Not a lock. Must not block implementation.
+Code: packages/image-viewer/. UX reference: cloudscope-web/src/raster-viewer/.
 ```

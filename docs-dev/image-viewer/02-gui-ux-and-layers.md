@@ -1,14 +1,15 @@
 # GUI / UX inventory and canvas layers
 
-> **STATUS: survey / roadmap only.**  
-> Not a public API, not a frozen contract, not implementation source of truth.  
-> This is an inventory of **current CloudScope Web engine chrome**
-> (`cloudscope-web/src/raster-viewer/`) plus which of that chrome
-> `ImageViewer.vue` turns on.  
-> `@mapmanager/image-viewer` should cover this surface (and may regroup
-> controls) but is not required to clone CSS pixel-for-pixel.  
-> **Exception:** §3 (home fill + click+drag zoom) **is** a v1 requirement.
-> The previous one-line “elongated drag → axis-lock” note was incomplete.
+> **PLANNING ONLY — not source of truth, not a lock, not an API.**
+>
+> What we **plan** to implement for chrome and gestures. Must **never** block
+> implementation. If this disagrees with current code (including **using Viv**),
+> the **code** in `packages/image-viewer/` wins.
+>
+> Inventory of CloudScope-Web chrome (`cloudscope-web/src/raster-viewer/`)
+> plus what `ImageViewer.vue` turns on. We plan to cover this surface (CSS
+> need not match pixel-for-pixel). §3 is planned viewport behavior, not a
+> legal lock.
 
 **Plotly is not part of this inventory.** In-image traces are canvas overlays
 (`xy-plot-overlay.js`). App-level analysis plots (`XYPlot.vue` / Plotly) are a
@@ -26,7 +27,7 @@ order):
 | 2 | ROI overlay (rect, line segment, handles) | `roi-overlay.js` | Yes when editing / select |
 | — | Axis ticks / labels | `viewport.js` (same bitmap canvas gutters) | No |
 
-**v1 requirement:** the public API must let a host drive layers 0, 1, and 2
+**Planned:** the public API should let a host drive layers 0, 1, and 2
 independently: set planes + display, add/update/hide XY plots, and ROI CRUD
 (local or delegated).
 
@@ -117,12 +118,12 @@ stacked), not on the top strip.
 Ignore when focus is in an editable control. Only the last pointer-activated
 viewer instance handles layout/reset keys.
 
-## 3. Viewport fit and gestures (v1 requirement)
+## 3. Viewport fit and gestures (planned)
 
-This section is a **requirement** for `@mapmanager/image-viewer`, not optional
-inventory. Match CloudScope-Web `cloudscope-web/src/raster-viewer/viewport.js`.
-Compare **display** width vs height (after orientation). Do not implement a
-“min short side” zoom-in instead of stretch-fill.
+We **plan** to match CloudScope-Web `viewport.js` here. This is not a lock
+and not source of truth. Compare **display** width vs height (after
+orientation). Do not implement a “min short side” zoom-in instead of
+stretch-fill.
 
 ### 3.1 Home / fill (`fit`)
 

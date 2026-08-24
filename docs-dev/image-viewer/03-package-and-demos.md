@@ -1,12 +1,10 @@
 # Package sketch and standalone demos
 
-> **STATUS: survey / roadmap only.**  
-> Not a public API, not a frozen contract, not implementation source of truth.  
-> Folder names, export paths, and Custom Element tags below are
-> **recommendations** for `@mapmanager/image-viewer`. The implementing PR may
-> change them. Do not treat this file as the package README or as a substitute
-> for `cloudscope-web/src/raster-viewer/` until the package exists and
-> `npm run check` in `mapmanager-web-components` is green.
+> **PLANNING ONLY — not source of truth, not a lock, not an API.**
+>
+> What we **plan** for package layout and demos. Must **never** block
+> implementation. If this disagrees with current work (including **using Viv**),
+> the **code** in `packages/image-viewer/` wins.
 
 ## 1. Goal
 
@@ -39,12 +37,12 @@ npm name.
 (avoids colliding with generic `image-viewer`). Override only if NicePool’s
 registered tag convention disagrees when we implement.
 
-**Dependency rule (same as this repo’s AGENTS.md):** no CloudScope, no
-AcqStore, no zarrita, no NumPy, no Python adapters inside the package.
+**Dependency note (planning):** this package should not import CloudScope-App,
+AcqStore, or Python. It **does** use Viv and may use zarrita for HTTP OME-Zarr.
 
-## 3. Required v1 public surface (intent, not signatures)
+## 3. Planned public surface (intent, not signatures)
 
-The implementing work **must** expose, in some typed form:
+We **plan** to expose, in some typed form:
 
 ### 3.1 Session / data
 
@@ -83,15 +81,16 @@ Match CloudScope-Web `cloudscope-web/src/raster-viewer/viewport.js`. See
 - Wheel multiplies both scales by the same factor. Shift+drag pans.
   Double-click restores home.
 
+HTTP OME-Zarr in `@mapmanager/image-viewer` uses **Viv**. Pyramids use Viv
+tiles. A single-level small YX plane may decode into RAM (1024-pixel tiles).
+
 ### 3.5 Out of v1 (explicit)
 
 | Out | Why |
 |---|---|
 | Plotly | Not used by the raster engine; analysis plots are a different widget |
-| OME-Zarr / zarrita | Client loader (CloudScope Web) |
 | NumPy / HTTP `data_url` server | NiceWidgets adapter |
 | AcqStore models | Client |
-| [Viv](https://github.com/hms-dbmi/viv) / chunked mosaic streaming | **Future** MapManager viewer, new effort |
 | Packed RGB file decoder | Composite is LUT blend of scalar channels |
 
 ## 4. Dual ingest without two engines
@@ -154,16 +153,17 @@ Order is a recommendation; PRs may split differently.
 Sliding-Z MIP: keep in demo loaders in slice 3–4; do not block on unifying
 Python vs JS MIP.
 
-## 7. Future: Viv / OME-Zarr streaming
+## 7. Viv / HTTP OME-Zarr (in this package)
 
-A later MapManager component may stream chunked/mosaic OME-Zarr via
-[Viv](https://github.com/hms-dbmi/viv) (WebGL, pyramid, deck.gl layers).
+`@mapmanager/image-viewer` **uses Viv** for HTTP OME-Zarr pyramids. That is
+current work, not a later separate viewer. This folder must not be read as
+“Viv is out of scope.”
 
-That is **not** an evolution of `loadPlane` in disguise. It is a different
-renderer and data path. v1 stays CPU/canvas + client-supplied 2D planes so
-NiceGUI in-memory NumPy and CloudScope Web zarrita-per-plane both work.
+Single-level small YX (no pyramid) may decode one plane into RAM and tile at
+1024 for the GPU. Pyramids stay on Viv tiles.
 
-These roadmap files should not be updated as if Viv were in scope.
+In-memory YX/CYX/ZCYX planes remain a second ingest path (synthetics, later
+NiceGUI arrays).
 
 ## 8. Docs after implementation
 

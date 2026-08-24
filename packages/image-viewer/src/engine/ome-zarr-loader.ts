@@ -100,6 +100,18 @@ export function planeFitsInMemory(height: number, width: number): boolean {
 }
 
 /**
+ * Decode one YX plane in RAM only when there is no pyramid and the plane is small.
+ * Pyramids (`datasets.length > 1`) stay on Viv tiles.
+ */
+export function shouldLoadOmeZarrAsPlane(
+  datasetCount: number,
+  height: number,
+  width: number,
+): boolean {
+  return datasetCount === 1 && planeFitsInMemory(height, width)
+}
+
+/**
  * Load the finest YX plane when it fits in memory; otherwise `null` (use Viv tiles).
  *
  * Does not down-pick a coarser pyramid level. A large finest plane stays on the
@@ -115,7 +127,8 @@ export async function loadOmeZarrPlaneIfSmall(
   const metadata = await fetchRootMetadata(zarrUrl, signal)
   const first = metadata.attributes?.ome?.multiscales?.[0]?.datasets?.[0]
   const axes = metadata.attributes?.ome?.multiscales?.[0]?.axes
-  if (!first || !axes?.length) return null
+  const datasets = metadata.attributes?.ome?.multiscales?.[0]?.datasets
+  if (!first || !axes?.length || !datasets) return null
   const arrayMeta = await fetchJson<OmeArrayMetadata>(
     new URL(`${zarrUrl.href.replace(/\/$/, '')}/${first.path}/zarr.json`),
     signal,
@@ -123,10 +136,13 @@ export async function loadOmeZarrPlaneIfSmall(
   if (!Array.isArray(arrayMeta.shape) || typeof arrayMeta.data_type !== 'string') return null
   const dims = arrayMeta.dimension_names ?? axes.map(({ name }) => name)
   if (dims.length !== arrayMeta.shape.length) return null
-  if (!planeFitsInMemory(
-    axisSize(dims, arrayMeta.shape, 'y'),
-    axisSize(dims, arrayMeta.shape, 'x'),
-  )) {
+  if (
+    !shouldLoadOmeZarrAsPlane(
+      datasets.length,
+      axisSize(dims, arrayMeta.shape, 'y'),
+      axisSize(dims, arrayMeta.shape, 'x'),
+    )
+  ) {
     return null
   }
   return loadOmeZarrPlane(href, id, indices, signal)

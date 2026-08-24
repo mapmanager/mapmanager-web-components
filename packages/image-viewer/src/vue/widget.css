@@ -18,6 +18,28 @@
   font-size: 0.82rem;
 }
 
+.mm-image-viewer-toolbar button {
+  color: #e2e8f0;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.mm-image-viewer-toolbar button.active {
+  border-color: #38bdf8;
+}
+
+.mm-image-viewer-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mm-image-viewer-toolbar input[type='number'] {
+  width: 5.5rem;
+}
+
 .mm-image-viewer-toolbar label {
   display: flex;
   gap: 6px;
@@ -44,6 +66,16 @@
   flex: 1;
   min-height: 0;
   background: #000;
+  touch-action: none;
+}
+
+.mm-image-viewer-guide {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 1px solid rgb(56 189 248 / 90%);
+  background: rgb(56 189 248 / 18%);
 }
 
 .mm-image-viewer-stage canvas {

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { collectionChildUrl } from '../sample-paths'
 import { parseOmeScale } from '../src/engine/ome-metadata'
-import { planeFitsInMemory, zarrJsonUrl } from '../src/engine/ome-zarr-loader'
+import { planeFitsInMemory, shouldLoadOmeZarrAsPlane, zarrJsonUrl } from '../src/engine/ome-zarr-loader'
+import { AXIS_LOCK_PIXELS, dragZoomMode, guideRect, selectionRect } from '../src/engine/drag-zoom'
 import {
   displayToSource,
   sourceToDisplay,
@@ -15,6 +16,8 @@ import { SYNTHETIC_SHAPE, syntheticPlaneSource } from '../src/engine/synthetic'
 import { TILE_SIZE, TiledPlanePixelSource, tileCount } from '../src/engine/tile-source'
 import { homeZoom } from '../src/engine/view-fit'
 import { ImageViewerEngine } from '../src/engine/viewer-engine'
+import { defaultChannelColor, LUT_ORDER, lutNameFromRgb } from '../src/engine/channel-luts'
+import { paneChannels, panePixelSize, paneViews } from '../src/engine/layout-panes'
 
 describe('synthetic layouts', () => {
   it('builds YX, CYX, and ZCYX with y,x last', () => {
@@ -85,6 +88,31 @@ describe('planeFitsInMemory', () => {
     expect(planeFitsInMemory(30000, 14)).toBe(true)
     expect(planeFitsInMemory(512, 512)).toBe(true)
     expect(planeFitsInMemory(1501, 1000)).toBe(false)
+  })
+})
+
+describe('shouldLoadOmeZarrAsPlane', () => {
+  it('decodes single-level small YX and leaves pyramids to Viv', () => {
+    expect(shouldLoadOmeZarrAsPlane(1, 30000, 14)).toBe(true)
+    expect(shouldLoadOmeZarrAsPlane(6, 512, 512)).toBe(false)
+    expect(shouldLoadOmeZarrAsPlane(1, 1501, 1000)).toBe(false)
+  })
+})
+
+describe('dragZoomMode', () => {
+  it('uses region zoom for square images and axis lock otherwise', () => {
+    expect(dragZoomMode(512, 512, { x: 0, y: 0 }, { x: 2, y: 2 })).toBe('pending')
+    expect(dragZoomMode(512, 512, { x: 0, y: 0 }, { x: AXIS_LOCK_PIXELS, y: 1 })).toBe('region')
+    expect(dragZoomMode(30000, 14, { x: 0, y: 0 }, { x: 20, y: 2 })).toBe('x')
+    expect(dragZoomMode(30000, 14, { x: 0, y: 0 }, { x: 2, y: 20 })).toBe('y')
+  })
+
+  it('forces a square rubber-band when display width equals height', () => {
+    const box = selectionRect(512, 512, { width: 200, height: 200 }, { x: 10, y: 10 }, { x: 50, y: 20 })
+    expect(box.width).toBe(box.height)
+    expect(box.width).toBe(40)
+    const xBand = guideRect('x', { left: 10, top: 20, width: 30, height: 5 }, { width: 200, height: 100 })
+    expect(xBand).toEqual({ left: 10, top: 0, width: 30, height: 100 })
   })
 })
 
@@ -220,5 +248,43 @@ describe('collectionChildUrl', () => {
     expect(collectionChildUrl('/__dev_collection__/', 'acq_images/acq_image_340/reference')).toBe(
       '/__dev_collection__/acq_images/acq_image_340/reference/',
     )
+  })
+})
+
+describe('channel LUTs', () => {
+  it('defaults two channels to green then magenta, never gray', () => {
+    expect(defaultChannelColor(0)).toEqual([0, 220, 80])
+    expect(defaultChannelColor(1)).toEqual([255, 0, 220])
+    expect(LUT_ORDER).not.toContain('gray')
+    expect(lutNameFromRgb([255, 0, 220])).toBe('magenta')
+  })
+})
+
+describe('layout panes', () => {
+  it('splits side and stack into one view per channel', () => {
+    expect(paneViews('single', 2)).toHaveLength(1)
+    expect(paneViews('composite', 2)).toHaveLength(1)
+    expect(paneViews('side', 2).map((pane) => pane.id)).toEqual(['pane-0', 'pane-1'])
+    expect(paneViews('stack', 2).map((pane) => pane.y)).toEqual(['0%', '50%'])
+    expect(paneChannels('single', 2, 1)).toEqual([1])
+    expect(paneChannels('side', 2, 0)).toEqual([0, 1])
+    expect(paneChannels('composite', 2, 0)).toEqual([0, 1])
+    expect(panePixelSize('side', 2, 400, 200)).toEqual({ width: 200, height: 200 })
+    expect(panePixelSize('stack', 2, 400, 200)).toEqual({ width: 400, height: 100 })
+  })
+})
+
+describe('ROI add/delete', () => {
+  it('adds, selects, and deletes without edit handles', async () => {
+    const engine = new ImageViewerEngine()
+    await engine.setSource(syntheticPlaneSource('CYX', [2, 16, 24]))
+    const rect = engine.addRoi({ id: engine.nextRoiId(), kind: 'rect', x0: 1, y0: 1, x1: 4, y1: 5 })
+    expect(engine.selectedRoiId).toBe(rect.id)
+    engine.addRoi({ id: engine.nextRoiId(), kind: 'line', x0: 0, y0: 0, x1: 3, y1: 3 })
+    expect(engine.rois).toHaveLength(2)
+    engine.selectRoi(rect.id)
+    engine.removeRoi(rect.id)
+    expect(engine.rois).toHaveLength(1)
+    expect(engine.selectedRoiId).toBeNull()
   })
 })
