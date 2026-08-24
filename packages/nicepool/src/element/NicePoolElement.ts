@@ -25,6 +25,7 @@ export class NicePoolElement extends HTMLElement {
   #app: App<Element> | null = null
   #widget = ref<(ComponentPublicInstance & WidgetApi) | null>(null)
   #pendingDataset: DatasetInput | null = null
+  #pendingState: NicePoolState | null = null
 
   connectedCallback(): void {
     if (this.#app) return
@@ -73,7 +74,14 @@ export class NicePoolElement extends HTMLElement {
     if (this.#pendingDataset) {
       const dataset = this.#pendingDataset
       this.#pendingDataset = null
-      queueMicrotask(() => this.#widget.value?.setData(dataset))
+      queueMicrotask(() => {
+        this.#widget.value?.setData(dataset)
+        if (this.#pendingState) {
+          const state = this.#pendingState
+          this.#pendingState = null
+          this.#widget.value?.setState(state)
+        }
+      })
     }
   }
 
@@ -85,6 +93,7 @@ export class NicePoolElement extends HTMLElement {
 
   /** Replace data and reset selection, plot state, filters, and derived views. */
   setData(input: DatasetInput): void {
+    this.#pendingState = null
     if (!this.#widget.value) {
       this.#pendingDataset = input
       return
@@ -96,7 +105,13 @@ export class NicePoolElement extends HTMLElement {
     this.#widget.value?.setSelection(selection)
   }
 
-  setState(state: NicePoolState): void { this.#widget.value?.setState(state) }
+  setState(state: NicePoolState): void {
+    if (!this.#widget.value) {
+      this.#pendingState = state
+      return
+    }
+    this.#widget.value.setState(state)
+  }
   getState(): NicePoolState {
     if (!this.#widget.value) throw new Error('NicePool element is not connected')
     return this.#widget.value.getState()

@@ -366,8 +366,8 @@ onBeforeUnmount(() => {
             </div>
             <div class="nicepool-summary-table-scroll">
               <table>
-                <thead><tr><th v-for="column in rawTableColumns" :key="column">{{ column }}</th></tr></thead>
-                <tbody><tr v-for="(row, rowIndex) in visibleRawRows" :key="String(row[engine.dataset.rowIdColumn] ?? rowIndex)"><td v-for="column in rawTableColumns" :key="column">{{ displaySummaryValue(row[column]) }}</td></tr></tbody>
+                <thead><tr><th>#</th><th v-for="column in rawTableColumns" :key="column">{{ column }}</th></tr></thead>
+                <tbody><tr v-for="(row, rowIndex) in visibleRawRows" :key="String(row[engine.dataset.rowIdColumn] ?? rowIndex)"><td>{{ rawTablePage * rawTablePageSize + rowIndex + 1 }}</td><td v-for="column in rawTableColumns" :key="column">{{ displaySummaryValue(row[column]) }}</td></tr></tbody>
               </table>
             </div>
           </div>
