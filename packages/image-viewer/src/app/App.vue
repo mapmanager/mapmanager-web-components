@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import { syntheticPlaneSource } from '../engine/synthetic'
-import type { ImageSource } from '../engine/types'
+import type { ImageSource, XyOverlay } from '../engine/types'
 import ImageViewerWidget from '../vue/ImageViewerWidget.vue'
 
 type DemoKind = 'YX' | 'CYX' | 'ZCYX' | 'kymo' | 'reference'
@@ -14,6 +14,7 @@ interface WidgetApi {
     sourceWidth: number
     sourceHeight: number
   } | null>
+  setXyOverlays: (overlays: readonly XyOverlay[]) => void
 }
 
 const widget = ref<WidgetApi | null>(null)
@@ -33,9 +34,41 @@ function sourceFor(kind: DemoKind): ImageSource {
   return syntheticPlaneSource(kind)
 }
 
+/**
+ * Constant source-X, varying source-Y. After transpose that is a horizontal
+ * line in display (display x = source y, display y = source x).
+ */
+function demoScanOverlay(sourceWidth: number, sourceHeight: number): XyOverlay {
+  const column = Math.floor(sourceWidth / 2)
+  const x: number[] = []
+  const y: number[] = []
+  const step = Math.max(1, Math.floor(sourceHeight / 80))
+  for (let row = 0; row < sourceHeight; row += step) {
+    x.push(column)
+    y.push(row)
+  }
+  const last = sourceHeight - 1
+  if (y[y.length - 1] !== last) {
+    x.push(column)
+    y.push(last)
+  }
+  return { id: 'demo-scan', x, y }
+}
+
 async function load(kind: DemoKind): Promise<void> {
   demo.value = kind
-  await widget.value?.setSource(sourceFor(kind))
+  const api = widget.value
+  if (!api) return
+  const info = await api.setSource(sourceFor(kind))
+  if (!info) {
+    api.setXyOverlays([])
+    return
+  }
+  if (kind === 'kymo' || kind === 'reference') {
+    api.setXyOverlays([])
+    return
+  }
+  api.setXyOverlays([demoScanOverlay(info.sourceWidth, info.sourceHeight)])
 }
 
 onMounted(() => {

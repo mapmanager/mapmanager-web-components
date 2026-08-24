@@ -45,6 +45,29 @@ export function transposedShape(sourceHeight: number, sourceWidth: number): Disp
 }
 
 /**
+ * Map source-axis calibration onto display X/Y after transpose.
+ *
+ * Display X is source Y; display Y is source X. Same as CloudScope-Web
+ * `transposedAxes`.
+ *
+ * Args:
+ *   xAxis: Source column axis (`dx` along source x).
+ *   yAxis: Source row axis (`dy` along source y).
+ *
+ * Returns:
+ *   Display-axis calibration used for tick labels.
+ */
+export function transposedAxes(
+  xAxis: { label: string; unit: string; step: number },
+  yAxis: { label: string; unit: string; step: number },
+): {
+  x: { label: string; unit: string; step: number }
+  y: { label: string; unit: string; step: number }
+} {
+  return { x: { ...yAxis }, y: { ...xAxis } }
+}
+
+/**
  * Reorder one source-YX plane into display XY. This is the only pixel shuffle.
  *
  * Args:

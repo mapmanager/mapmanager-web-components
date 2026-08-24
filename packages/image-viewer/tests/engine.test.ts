@@ -8,15 +8,18 @@ import {
   displayToSource,
   sourceToDisplay,
   transposePlane,
+  transposedAxes,
   transposedShape,
 } from '../src/engine/orientation'
 import { OrientedPixelSource } from '../src/engine/oriented-pixel-source'
 import { extractYxPlane, downsamplePlaneHalf, planePyramidSources } from '../src/engine/plane'
+import { autoRange, histogramBarFraction } from '../src/engine/contrast-range'
+import { niceStep, niceTickValues, physicalToPlotX, physicalToPlotY } from '../src/engine/axis-ticks'
 import { SYNTHETIC_SHAPE, syntheticPlaneSource } from '../src/engine/synthetic'
 import { TILE_SIZE, TiledPlanePixelSource, tileCount } from '../src/engine/tile-source'
 import { homeZoom, visibleDisplayRect, defaultRectDisplay, defaultLineDisplay } from '../src/engine/view-fit'
 import { ImageViewerEngine } from '../src/engine/viewer-engine'
-import { defaultChannelColor, LUT_ORDER, lutNameFromRgb } from '../src/engine/channel-luts'
+import { defaultChannelColor, LUT_ORDER, lutNameFromRgb, vivColormapForPane } from '../src/engine/channel-luts'
 import { paneChannels, paneSlots } from '../src/engine/layout-panes'
 
 describe('synthetic layouts', () => {
@@ -299,11 +302,17 @@ describe('collectionChildUrl', () => {
 })
 
 describe('channel LUTs', () => {
-  it('defaults two channels to green then magenta, never gray', () => {
+  it('defaults two channels to green then magenta; dropdown includes gray/fire/viridis/magma', () => {
     expect(defaultChannelColor(0)).toEqual([0, 220, 80])
     expect(defaultChannelColor(1)).toEqual([255, 0, 220])
-    expect(LUT_ORDER).not.toContain('gray')
+    expect(LUT_ORDER).toEqual(expect.arrayContaining(['gray', 'fire', 'viridis', 'magma']))
     expect(lutNameFromRgb([255, 0, 220])).toBe('magenta')
+    expect(vivColormapForPane('gray', 1)).toBe('greys')
+    expect(vivColormapForPane('fire', 1)).toBe('hot')
+    expect(vivColormapForPane('viridis', 1)).toBe('viridis')
+    expect(vivColormapForPane('magma', 1)).toBe('magma')
+    expect(vivColormapForPane('gray', 2)).toBeNull()
+    expect(vivColormapForPane('green', 1)).toBeNull()
   })
 })
 
@@ -347,5 +356,61 @@ describe('ROI add/delete', () => {
     engine.removeRoi(rect.id)
     expect(engine.rois).toHaveLength(1)
     expect(engine.selectedRoiId).toBeNull()
+  })
+})
+
+describe('display axes and contrast auto', () => {
+  it('swaps source x/y calibration onto display axes after transpose', () => {
+    const display = transposedAxes(
+      { label: 'line', unit: 'µm', step: 0.2 },
+      { label: 'time', unit: 's', step: 0.001 },
+    )
+    expect(display.x).toEqual({ label: 'time', unit: 's', step: 0.001 })
+    expect(display.y).toEqual({ label: 'line', unit: 'µm', step: 0.2 })
+  })
+
+  it('places nice ticks in physical units, not pixel indexes', () => {
+    expect(niceStep(0, 10, 5)).toBe(2)
+    expect(niceTickValues(0, 10, 5)).toEqual([0, 2, 4, 6, 8, 10])
+  })
+
+  it('puts physical 0 at the plot bottom and follows a shifted Y window', () => {
+    const plot = { top: 0, height: 100 }
+    expect(physicalToPlotY(0, 0, 10, plot)).toBe(100)
+    expect(physicalToPlotY(10, 0, 10, plot)).toBe(0)
+    expect(physicalToPlotY(5, 5, 15, plot)).toBe(100)
+    expect(physicalToPlotY(15, 5, 15, plot)).toBe(0)
+    expect(physicalToPlotX(0, 0, 10, { left: 0, width: 100 })).toBe(0)
+    expect(physicalToPlotX(10, 0, 10, { left: 0, width: 100 })).toBe(100)
+  })
+
+  it('maps a constant-source-X scan path to a horizontal display line', () => {
+    expect(sourceToDisplay(12, 0)).toEqual({ x: 0, y: 12 })
+    expect(sourceToDisplay(12, 40)).toEqual({ x: 40, y: 12 })
+  })
+
+  it('autoscales contrast from plane samples and keeps caller axis labels', async () => {
+    const source = syntheticPlaneSource('YX', [16, 24])
+    source.xAxis = { label: 'line', unit: 'µm', step: 0.5 }
+    source.yAxis = { label: 'time', unit: 'ms', step: 2 }
+    const engine = new ImageViewerEngine()
+    await engine.setSource(source)
+    expect(engine.loaded?.xLabel).toBe('time')
+    expect(engine.loaded?.xUnit).toBe('ms')
+    expect(engine.loaded?.xStep).toBe(2)
+    expect(engine.loaded?.yLabel).toBe('line')
+    expect(engine.loaded?.yStep).toBe(0.5)
+    engine.setSourceAxes(
+      { label: 'col', unit: 'px', step: 1 },
+      { label: 'row', unit: 'px', step: 1 },
+    )
+    expect(engine.loaded?.xLabel).toBe('row')
+    expect(engine.loaded?.yLabel).toBe('col')
+    const auto = await engine.autoChannelContrast(0)
+    expect(auto[1]).toBeGreaterThan(auto[0])
+    expect(engine.channelContrast[0]).toEqual(auto)
+    expect(autoRange([0, 1, 2, 3, 4, 100])).toHaveLength(2)
+    expect(histogramBarFraction(0, 10, false)).toBe(0)
+    expect(histogramBarFraction(9, 10, true)).toBeGreaterThan(0)
   })
 })

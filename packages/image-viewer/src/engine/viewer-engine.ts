@@ -1,11 +1,12 @@
 import { getChannelStats, loadOmeZarr } from '@vivjs/loaders'
 
+import { autoRange, histogramForValues, type Histogram } from './contrast-range'
 import { defaultChannelColor } from './channel-luts'
 import type { ViewerLayout } from './layout-panes'
 import { parseOmeContrast, parseOmeScale } from './ome-metadata'
 import { loadOmeZarrPlaneIfSmall } from './ome-zarr-loader'
 import { OrientedPixelSource, type InnerPixelSource } from './oriented-pixel-source'
-import { transposedShape } from './orientation'
+import { transposedAxes, transposedShape } from './orientation'
 import {
   clampCounts,
   clampSelection,
@@ -13,6 +14,7 @@ import {
   planeHeight,
   planePyramidSources,
   planeWidth,
+  samplePlaneValues,
 } from './plane'
 import { TILE_SIZE, TiledPlanePixelSource } from './tile-source'
 import type {
@@ -22,6 +24,7 @@ import type {
   Roi,
   ViewWindow,
   XyOverlay,
+  AxisCalibration,
 } from './types'
 import { vivSelection } from './viv-selection'
 
@@ -69,6 +72,7 @@ export class ImageViewerEngine {
   channelContrast: [number, number][] = []
   #planeSource: PlaneSource | null = null
   #roiSerial = 0
+  #histograms = new Map<number, Histogram | null>()
 
   async setSource(source: ImageSource, signal?: AbortSignal): Promise<LoadedImage> {
     const generation = this.generation + 1
@@ -80,6 +84,7 @@ export class ImageViewerEngine {
     this.channelColors = []
     this.channelContrast = []
     this.#planeSource = null
+    this.#histograms.clear()
     try {
       const loaded =
         source.kind === 'plane'
@@ -112,6 +117,7 @@ export class ImageViewerEngine {
       { t: this.loaded.tCount, c: this.loaded.channelCount, z: this.loaded.zCount },
     )
     this.loaded = { ...this.loaded, selection: next }
+    this.#histograms.clear()
     return next
   }
 
@@ -158,6 +164,63 @@ export class ImageViewerEngine {
     const low = Math.min(contrast[0], contrast[1])
     const high = Math.max(contrast[0], contrast[1])
     this.channelContrast[channel] = [low, high]
+  }
+
+  /**
+   * Apply source-row/column calibration. Display axes swap (transpose).
+   *
+   * Args:
+   *   xAxis: Source column axis (`dx` along source x).
+   *   yAxis: Source row axis (`dy` along source y).
+   *
+   * Raises:
+   *   Error: If no image is loaded or a step is not positive.
+   */
+  setSourceAxes(xAxis: AxisCalibration, yAxis: AxisCalibration): void {
+    if (!this.loaded) throw new Error('no image is loaded')
+    if (!(xAxis.step > 0) || !(yAxis.step > 0)) throw new Error('axis step must be positive')
+    const display = transposedAxes(xAxis, yAxis)
+    this.loaded = {
+      ...this.loaded,
+      xLabel: display.x.label,
+      xUnit: display.x.unit,
+      xStep: display.x.step,
+      yLabel: display.y.label,
+      yUnit: display.y.unit,
+      yStep: display.y.step,
+    }
+  }
+
+  async planeSamples(channel: number): Promise<number[]> {
+    this.#requireChannel(channel)
+    const loaded = this.loaded
+    if (!loaded) throw new Error('no image is loaded')
+    if (this.#planeSource) {
+      return samplePlaneValues(this.#planeSource, { ...loaded.selection, c: channel })
+    }
+    const source = loaded.loaders[0] as InnerPixelSource | undefined
+    if (!source || typeof source.getRaster !== 'function') return []
+    const raster = await source.getRaster({
+      selection: vivSelection(loaded.labels, { ...loaded.selection, c: channel }),
+    })
+    return sampledList(raster.data)
+  }
+
+  async autoChannelContrast(channel: number): Promise<[number, number]> {
+    const samples = await this.planeSamples(channel)
+    const range = autoRange(samples)
+    this.setChannelContrast(channel, range)
+    return range
+  }
+
+  async channelHistogram(channel: number): Promise<Histogram | null> {
+    this.#requireChannel(channel)
+    const cached = this.#histograms.get(channel)
+    if (cached !== undefined) return cached
+    const samples = await this.planeSamples(channel)
+    const histogram = histogramForValues(samples)
+    this.#histograms.set(channel, histogram)
+    return histogram
   }
 
   #requireChannel(channel: number): void {
@@ -234,6 +297,10 @@ export class ImageViewerEngine {
     throwIfAborted(signal)
     if (generation !== this.generation) throw abortError()
     const display = transposedShape(sourceHeight, sourceWidth)
+    const displayAxes = transposedAxes(
+      source.xAxis ?? { label: 'x', unit: 'px', step: 1 },
+      source.yAxis ?? { label: 'y', unit: 'px', step: 1 },
+    )
     return {
       generation,
       sourceId: source.id,
@@ -249,12 +316,12 @@ export class ImageViewerEngine {
       contrast,
       labels: [...source.labels],
       dtype: finest.dtype,
-      xLabel: source.yAxis?.label ?? 'y',
-      xUnit: source.yAxis?.unit ?? 'px',
-      xStep: source.yAxis?.step ?? 1,
-      yLabel: source.xAxis?.label ?? 'x',
-      yUnit: source.xAxis?.unit ?? 'px',
-      yStep: source.xAxis?.step ?? 1,
+      xLabel: displayAxes.x.label,
+      xUnit: displayAxes.x.unit,
+      xStep: displayAxes.x.step,
+      yLabel: displayAxes.y.label,
+      yUnit: displayAxes.y.unit,
+      yStep: displayAxes.y.step,
       loaders,
     }
   }
@@ -301,6 +368,10 @@ export class ImageViewerEngine {
     const sourceWidth = axisSize(labels, sourceShape, 'x')
     const sourceHeight = axisSize(labels, sourceShape, 'y')
     const display = transposedShape(sourceHeight, sourceWidth)
+    const displayAxes = transposedAxes(
+      { label: 'x', unit: scale.xUnit, step: scale.x },
+      { label: 'y', unit: scale.yUnit, step: scale.y },
+    )
     return {
       generation,
       sourceId: source.id,
@@ -316,12 +387,12 @@ export class ImageViewerEngine {
       contrast,
       labels,
       dtype: String(finest.dtype ?? 'Uint16'),
-      xLabel: 'y',
-      xUnit: scale.yUnit,
-      xStep: scale.y,
-      yLabel: 'x',
-      yUnit: scale.xUnit,
-      yStep: scale.x,
+      xLabel: displayAxes.x.label,
+      xUnit: displayAxes.x.unit,
+      xStep: displayAxes.x.step,
+      yLabel: displayAxes.y.label,
+      yUnit: displayAxes.y.unit,
+      yStep: displayAxes.y.step,
       loaders,
     }
   }
@@ -385,6 +456,16 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 function abortError(): Error {
   return new DOMException('The operation was aborted.', 'AbortError')
+}
+
+function sampledList(data: ArrayLike<number>, maxSamples = 120_000): number[] {
+  const samples: number[] = []
+  const step = Math.max(1, Math.floor(data.length / Math.max(1, maxSamples)))
+  for (let index = 0; index < data.length; index += step) {
+    const value = Number(data[index])
+    if (Number.isFinite(value)) samples.push(value)
+  }
+  return samples
 }
 
 function resolveSourceUrl(url: string): string {

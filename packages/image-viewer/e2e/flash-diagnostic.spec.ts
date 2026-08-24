@@ -124,7 +124,7 @@ test('CYX rAF fill around wheel then double-click home', async ({ page }, testIn
 test('CYX side layout creates two independent pane canvases', async ({ page }) => {
   await waitForCyx(page)
   await expect(page.locator('.mm-image-viewer-stage canvas')).toHaveCount(1)
-  await page.getByLabel('Layout').selectOption('side')
+  await page.getByRole('radio', { name: 'Side by side' }).click()
   await expect(page.locator('.mm-image-pane')).toHaveCount(2)
   await expect(page.locator('.mm-image-viewer-stage canvas')).toHaveCount(2)
 })

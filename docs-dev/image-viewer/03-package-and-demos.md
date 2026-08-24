@@ -158,11 +158,16 @@ Python vs JS MIP.
 Code in `packages/image-viewer/` wins. Do not restart slices 1–4.
 
 **Shipped:** NicePool-like package; Viv `MultiscaleImageLayer`; in-memory
-YX/CYX/ZCYX; **N independent `ImagePane` decks** for side/stack (not one
-canvas `viewIds` split); LUT on each pane header (green then magenta, no
-gray); drag-zoom + wheel + double-click home; **Add rect/line** as default
-insert; select + delete; ROI **edit deferred**; **dyadic in-memory pyramid**
-for large planes (Viv background `ImageLayer` can cover home).
+YX/CYX/ZCYX; **N independent `ImagePane` decks** for side/stack; LUT on each
+pane header (green then magenta **defaults**; dropdown also has gray / fire /
+viridis / magma — colormaps on one-channel panes); drag-zoom + wheel +
+double-click home; **Add rect/line** as default insert; select + delete; ROI
+**edit deferred**; dyadic in-memory pyramid; **layout icon radios**;
+**contrast histogram popover** (Auto + log Y); **axis ticks** from caller
+label/unit/step (`dx`/`dy`), Y ticks unprojected so 0 is at the bottom after
+flip-Y; **viewer-options hamburger** (Axes, ROIs, Channel Toolbars, ROI
+Toolbar, Reset view); **demo XY overlay** on synthetic loads (constant
+source-X scan → horizontal display line).
 
 **Hard rules still in force:**
 
@@ -176,10 +181,10 @@ for large planes (Viv background `ImageLayer` can cover home).
 
 **Next slices (KISS, one at a time):**
 
-1. Demo polish that already has engine hooks: XY overlay in the demo,
-   composite smoke (Z slider on ZCYX is already in the toolbar).
+1. Demo polish: composite smoke, copy-view.
 2. ROI edit (handles) using the pointer-draw notes in 05.
-3. Host-facing delegated ROI / richer chrome only when a consumer ticket asks.
+3. Host-facing delegated ROI / sliding-Z MIP only when a consumer ticket
+   asks.
 
 ## 7. Viv / HTTP OME-Zarr (in this package)
 

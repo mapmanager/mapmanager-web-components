@@ -46,6 +46,123 @@
   align-items: center;
 }
 
+.mm-layout-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.mm-icon-radio {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.mm-icon-radio:has(input:checked) {
+  border-color: #38bdf8;
+  background: rgb(56 189 248 / 18%);
+  color: #38bdf8;
+}
+
+.mm-icon-radio input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.mm-icon-radio svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mm-options-menu {
+  position: relative;
+}
+
+.mm-options-menu summary {
+  display: grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #e2e8f0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mm-options-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.mm-options-menu summary svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mm-options-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 5px);
+  left: 0;
+  display: grid;
+  min-width: 170px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 55%);
+}
+
+.mm-options-menu:not([open]) .mm-options-panel {
+  display: none;
+}
+
+.mm-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mm-menu-action {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mm-image-viewer-toolbar .mm-menu-action {
+  color: #94a3b8;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.mm-menu-action svg {
+  width: 15px;
+  height: 15px;
+}
+
 .mm-image-viewer-copy {
   display: block;
   box-sizing: border-box;
@@ -107,14 +224,43 @@
   align-items: center;
 }
 
-.mm-image-pane-header input[type='number'] {
-  width: 5.5rem;
+.mm-range-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  padding: 2px;
+  color: #e2e8f0;
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.mm-image-viewer-stage {
+.mm-range-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mm-image-plot {
   position: relative;
   flex: 1;
   min-height: 0;
+  background: #020617;
+}
+
+.mm-image-axes {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.mm-image-viewer-stage {
+  position: absolute;
   background: #000;
   touch-action: none;
 }
@@ -149,4 +295,79 @@
 
 .mm-image-viewer-status.error {
   color: #fecaca;
+}
+
+.mm-range-popover {
+  position: fixed;
+  z-index: 10000;
+  box-sizing: border-box;
+  width: 330px;
+  padding: 7px;
+  border: 1px solid #38bdf8;
+  border-radius: 10px;
+  background: #07101f;
+  color: #e5e7eb;
+  box-shadow: 0 16px 38px rgb(0 0 0 / 55%);
+  font-family: system-ui, sans-serif;
+}
+
+.mm-histogram-wrap {
+  padding: 4px;
+  background: #020617;
+}
+
+.mm-range-histogram {
+  display: block;
+  width: 300px;
+  height: 100px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.mm-range-fields {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.mm-range-fields label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #94a3b8;
+}
+
+.mm-range-fields input[type='number'] {
+  width: 92px;
+  padding: 2px 4px;
+  font-size: 10px;
+  color: #e5e7eb;
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 6px;
+}
+
+.mm-range-fields button {
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #e5e7eb;
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.mm-range-log {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #94a3b8;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mm-range-log input {
+  width: auto;
 }

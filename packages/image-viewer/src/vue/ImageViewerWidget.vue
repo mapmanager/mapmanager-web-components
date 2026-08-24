@@ -4,6 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CHANNEL_LUTS, type LutName } from '../engine/channel-luts'
 import { paneSlots, type ViewerLayout } from '../engine/layout-panes'
 import { displayToSource } from '../engine/orientation'
+import type { Histogram } from '../engine/contrast-range'
 import type { ImageSource, PlaneSelection, Roi, ViewWindow, XyOverlay } from '../engine/types'
 import {
   defaultLineDisplay,
@@ -13,7 +14,9 @@ import {
   type OrthographicViewState,
 } from '../engine/view-fit'
 import { ImageViewerEngine, type LoadedImage } from '../engine/viewer-engine'
+import ContrastPopover from './ContrastPopover.vue'
 import ImagePane from './ImagePane.vue'
+import LucideIcon from './LucideIcon.vue'
 import './widget.css'
 
 export type DoubleClickBehavior = 'home' | 'deck'
@@ -42,6 +45,11 @@ const channelCount = ref(1)
 const zCount = ref(1)
 const tCount = ref(1)
 const layout = ref<ViewerLayout>('single')
+const axesVisible = ref(true)
+const roisVisible = ref(true)
+const channelToolbarsVisible = ref(true)
+const roiToolbarVisible = ref(true)
+const optionsMenu = ref<HTMLDetailsElement | null>(null)
 const selectedRoiId = ref<string | null>(null)
 const overlayRevision = ref(0)
 const loaded = ref<LoadedImage | null>(null)
@@ -54,6 +62,19 @@ const camera = ref<OrthographicViewState>({
 const panesHost = ref<HTMLDivElement | null>(null)
 const paneRefs = ref<PaneApi[]>([])
 const engine = new ImageViewerEngine()
+const rangeOpen = ref(false)
+const rangeChannel = ref<number | null>(null)
+const rangeAnchor = ref<HTMLElement | null>(null)
+const rangeHistogram = ref<Histogram | null>(null)
+const rangeLog = ref(true)
+const rangeMin = ref(0)
+const rangeMax = ref(1)
+const LAYOUT_MODES = [
+  { value: 'side' as const, label: 'Side by side', icon: 'columns-2' as const },
+  { value: 'stack' as const, label: 'Stacked', icon: 'rows-2' as const },
+  { value: 'single' as const, label: 'One channel', icon: 'square' as const },
+  { value: 'composite' as const, label: 'Composite', icon: 'layers-3' as const },
+]
 let loadController: AbortController | null = null
 let viewIsHome = true
 let resizeObserver: ResizeObserver | null = null
@@ -148,6 +169,7 @@ async function setSource(source: ImageSource): Promise<SourceInfo | null> {
     engine.layout = layout.value
     bumpOverlay()
     await nextTick()
+    rangeOpen.value = false
     goHome()
     status.value = formatStatus(next)
     emit('source-change', next.sourceId)
@@ -204,11 +226,71 @@ function onLut(channel: number, name: LutName): void {
   bumpOverlay()
 }
 
-function onContrast(channel: number, which: 0 | 1, value: number): void {
-  const current = engine.channelContrast[channel] ?? engine.loaded?.contrast ?? [0, 1]
-  const next: [number, number] = which === 0 ? [value, current[1]] : [current[0], value]
-  engine.setChannelContrast(channel, next)
+function syncRangeFields(): void {
+  if (rangeChannel.value == null) return
+  const current = engine.channelContrast[rangeChannel.value] ?? engine.loaded?.contrast ?? [0, 1]
+  rangeMin.value = current[0] ?? 0
+  rangeMax.value = current[1] ?? 1
+}
+
+async function onContrastPanel(channel: number, button: HTMLElement): Promise<void> {
+  if (rangeOpen.value && rangeChannel.value === channel) {
+    rangeOpen.value = false
+    return
+  }
+  rangeChannel.value = channel
+  rangeAnchor.value = button
+  rangeHistogram.value = await engine.channelHistogram(channel)
+  syncRangeFields()
+  rangeOpen.value = true
+}
+
+function onContrastRange(min: number, max: number): void {
+  if (rangeChannel.value == null) return
+  engine.setChannelContrast(rangeChannel.value, [min, max])
+  syncRangeFields()
   bumpOverlay()
+}
+
+async function onContrastAuto(): Promise<void> {
+  if (rangeChannel.value == null) return
+  await engine.autoChannelContrast(rangeChannel.value)
+  syncRangeFields()
+  bumpOverlay()
+}
+
+function onAxesToggle(): void {
+  engine.axesVisible = axesVisible.value
+  void nextTick().then(() => {
+    if (viewIsHome) goHome()
+  })
+}
+
+function closeOptionsMenu(): void {
+  if (optionsMenu.value) optionsMenu.value.open = false
+}
+
+function onResetView(): void {
+  goHome()
+  closeOptionsMenu()
+}
+
+function onDocumentPointerDown(event: PointerEvent): void {
+  const menu = optionsMenu.value
+  if (!menu?.open) return
+  if (event.target instanceof Node && menu.contains(event.target)) return
+  menu.open = false
+}
+
+function onDocumentKeyDown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && optionsMenu.value?.open) {
+    optionsMenu.value.open = false
+  }
+}
+
+function setLayout(next: ViewerLayout): void {
+  layout.value = next
+  onLayout()
 }
 
 function addDefaultRoi(kind: 'rect' | 'line'): void {
@@ -248,6 +330,8 @@ function deleteSelectedRoi(): void {
 }
 
 onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDown)
+  document.addEventListener('keydown', onDocumentKeyDown)
   const el = panesHost.value
   if (!el) return
   lastPanesWidth = el.clientWidth
@@ -267,7 +351,15 @@ watch(slots, (next) => {
   paneRefs.value = paneRefs.value.slice(0, next.length)
 })
 
+watch(channelToolbarsVisible, () => {
+  void nextTick().then(() => {
+    if (viewIsHome) goHome()
+  })
+})
+
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+  document.removeEventListener('keydown', onDocumentKeyDown)
   loadController?.abort()
   resizeObserver?.disconnect()
   resizeObserver = null
@@ -279,16 +371,57 @@ defineExpose({ setSource, setRois, setXyOverlays, engine })
 <template>
   <section class="mm-image-viewer">
     <div class="mm-image-viewer-toolbar">
+      <details ref="optionsMenu" class="mm-options-menu">
+        <summary aria-label="Viewer options" title="Viewer options">
+          <LucideIcon name="menu" label="Viewer options" />
+        </summary>
+        <div class="mm-options-panel">
+          <label class="mm-radio">
+            <input v-model="axesVisible" type="checkbox" aria-label="Axes" @change="onAxesToggle" />
+            Axes
+          </label>
+          <label class="mm-radio">
+            <input v-model="roisVisible" type="checkbox" aria-label="ROIs" />
+            ROIs
+          </label>
+          <label class="mm-radio">
+            <input v-model="channelToolbarsVisible" type="checkbox" aria-label="Channel Toolbars" />
+            Channel Toolbars
+          </label>
+          <label class="mm-radio">
+            <input v-model="roiToolbarVisible" type="checkbox" aria-label="ROI Toolbar" />
+            ROI Toolbar
+          </label>
+          <button type="button" class="mm-menu-action" aria-label="Reset view" @click="onResetView">
+            <LucideIcon name="maximize-2" label="Reset view" />
+            Reset view
+          </button>
+        </div>
+      </details>
       <span>{{ sourceId ?? 'idle' }}</span>
-      <label>
-        Layout
-        <select v-model="layout" @change="onLayout">
-          <option value="single">single</option>
-          <option value="side">side</option>
-          <option value="stack">stack</option>
-          <option value="composite">composite</option>
-        </select>
-      </label>
+      <div
+        v-if="channelCount > 1"
+        class="mm-layout-controls"
+        role="radiogroup"
+        aria-label="Channel layout"
+      >
+        <label
+          v-for="mode in LAYOUT_MODES"
+          :key="mode.value"
+          class="mm-icon-radio"
+          :title="mode.label"
+        >
+          <input
+            type="radio"
+            name="mm-layout"
+            :value="mode.value"
+            :checked="layout === mode.value"
+            :aria-label="mode.label"
+            @change="setLayout(mode.value)"
+          />
+          <LucideIcon :name="mode.icon" :label="mode.label" />
+        </label>
+      </div>
       <label v-if="channelCount > 1 && layout === 'single'">
         C
         <input v-model.number="selection.c" type="range" min="0" :max="channelCount - 1" @input="onSelection" />
@@ -304,9 +437,11 @@ defineExpose({ setSource, setRois, setXyOverlays, engine })
         <input v-model.number="selection.t" type="range" min="0" :max="tCount - 1" @input="onSelection" />
         {{ selection.t }}
       </label>
-      <button type="button" @click="addDefaultRoi('rect')">Add rect</button>
-      <button type="button" @click="addDefaultRoi('line')">Add line</button>
-      <button type="button" :disabled="!selectedRoiId" @click="deleteSelectedRoi">Delete ROI</button>
+      <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('rect')">Add rect</button>
+      <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('line')">Add line</button>
+      <button v-if="roiToolbarVisible" type="button" :disabled="!selectedRoiId" @click="deleteSelectedRoi">
+        Delete ROI
+      </button>
     </div>
     <input
       class="mm-image-viewer-copy"
@@ -330,14 +465,31 @@ defineExpose({ setSource, setRois, setXyOverlays, engine })
         :camera="camera"
         :double-click-behavior="doubleClickBehavior"
         :overlay-revision="overlayRevision"
+        :axes-visible="axesVisible"
+        :rois-visible="roisVisible"
+        :channel-toolbars-visible="channelToolbarsVisible"
         @camera-change="onCameraChange"
         @home="goHome"
         @select-roi="onSelectRoi"
         @lut="onLut"
-        @contrast="onContrast"
+        @contrast-panel="onContrastPanel"
       />
       <p v-if="errorMessage" class="mm-image-viewer-status error">{{ errorMessage }}</p>
       <p v-else class="mm-image-viewer-status">{{ status }}</p>
     </div>
+    <ContrastPopover
+      :open="rangeOpen"
+      :channel="rangeChannel"
+      :histogram="rangeHistogram"
+      :min="rangeMin"
+      :max="rangeMax"
+      :color="rangeChannel == null ? CHANNEL_LUTS.green : (engine.channelColors[rangeChannel] ?? CHANNEL_LUTS.green)"
+      :log-scale="rangeLog"
+      :anchor="rangeAnchor"
+      @close="rangeOpen = false"
+      @range="onContrastRange"
+      @auto="onContrastAuto"
+      @log="rangeLog = $event"
+    />
   </section>
 </template>

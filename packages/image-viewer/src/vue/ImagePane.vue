@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Deck, OrthographicView } from '@deck.gl/core'
 import { PathLayer, PolygonLayer } from '@deck.gl/layers'
-import { ColorPaletteExtension } from '@vivjs/extensions'
+import { ColorPaletteExtension, AdditiveColormapExtension } from '@vivjs/extensions'
 import { MultiscaleImageLayer } from '@vivjs/layers'
-import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
-import { CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, type LutName } from '../engine/channel-luts'
+import { CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane, type LutName } from '../engine/channel-luts'
+import { DEFAULT_AXIS_STYLE, drawAxes } from '../engine/axis-ticks'
 import {
   dragZoomMode,
   guideRect,
@@ -16,9 +17,10 @@ import {
 } from '../engine/drag-zoom'
 import { DISPLAY_ORIENTATION, sourceToDisplay } from '../engine/orientation'
 import type { Roi, XyOverlay } from '../engine/types'
-import type { OrthographicViewState } from '../engine/view-fit'
+import { visibleDisplayRect, type OrthographicViewState } from '../engine/view-fit'
 import type { LoadedImage } from '../engine/viewer-engine'
 import { vivSelection } from '../engine/viv-selection'
+import LucideIcon from './LucideIcon.vue'
 
 const VIEW_ID = 'ortho'
 
@@ -34,8 +36,16 @@ const props = withDefaults(
     camera: OrthographicViewState
     doubleClickBehavior?: 'home' | 'deck'
     overlayRevision: number
+    axesVisible?: boolean
+    roisVisible?: boolean
+    channelToolbarsVisible?: boolean
   }>(),
-  { doubleClickBehavior: 'home' },
+  {
+    doubleClickBehavior: 'home',
+    axesVisible: true,
+    roisVisible: true,
+    channelToolbarsVisible: true,
+  },
 )
 
 const emit = defineEmits<{
@@ -43,10 +53,12 @@ const emit = defineEmits<{
   home: []
   'select-roi': [id: string | null]
   lut: [channel: number, name: LutName]
-  contrast: [channel: number, which: 0 | 1, value: number]
+  'contrast-panel': [channel: number, button: HTMLElement]
 }>()
 
 const host = ref<HTMLDivElement | null>(null)
+const plot = ref<HTMLDivElement | null>(null)
+const axesCanvas = ref<HTMLCanvasElement | null>(null)
 const guide = ref<PlotRect | null>(null)
 const deck = shallowRef<Deck<OrthographicView[]> | null>(null)
 let resizeObserver: ResizeObserver | null = null
@@ -75,7 +87,9 @@ function endApplyViewAfterPaint(): void {
   const token = applyViewToken
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      if (token === applyViewToken) applyingView = false
+      if (token !== applyViewToken) return
+      applyingView = false
+      drawAxisChrome()
     })
   })
 }
@@ -96,58 +110,77 @@ function pixelLayers(): unknown[] {
   const loaded = props.loaded
   if (!loaded) return []
   const channels = props.channels
+  const firstLut = lutNameFromRgb(channelColor(channels[0] ?? 0))
+  const colormap = vivColormapForPane(firstLut, channels.length)
+  const shared = {
+    id: `pixels-${loaded.generation}-${channels.join('.')}-z${loaded.selection.z}-${colormap ?? firstLut}`,
+    loader: loaded.loaders as never,
+    selections: channels.map((channel) =>
+      vivSelection(loaded.labels, { ...loaded.selection, c: channel }),
+    ),
+    contrastLimits: channels.map((channel) => channelContrast(channel)),
+    channelsVisible: channels.map(() => true),
+    dtype: loaded.dtype as 'Uint16',
+  }
+  if (colormap) {
+    return [
+      new MultiscaleImageLayer({
+        ...shared,
+        colormap,
+        extensions: [new AdditiveColormapExtension()],
+      } as never),
+    ]
+  }
   return [
     new MultiscaleImageLayer({
-      id: `pixels-${loaded.generation}-${channels.join('.')}-z${loaded.selection.z}`,
-      loader: loaded.loaders as never,
-      selections: channels.map((channel) =>
-        vivSelection(loaded.labels, { ...loaded.selection, c: channel }),
-      ),
-      contrastLimits: channels.map((channel) => channelContrast(channel)),
-      channelsVisible: channels.map(() => true),
+      ...shared,
       colors: channels.map((channel) => channelColor(channel)),
-      dtype: loaded.dtype as 'Uint16',
       extensions: [new ColorPaletteExtension()],
     } as never),
   ]
 }
 
 function overlayLayers(): unknown[] {
-  const polygons = props.rois
-    .filter((roi) => roi.kind === 'rect')
-    .map((roi) => {
-      const a = sourceToDisplay(roi.x0, roi.y0)
-      const b = sourceToDisplay(roi.x1, roi.y0)
-      const c = sourceToDisplay(roi.x1, roi.y1)
-      const d = sourceToDisplay(roi.x0, roi.y1)
-      const selected = roi.id === props.selectedRoiId
-      return {
-        id: roi.id,
-        polygon: [
-          [a.x, a.y],
-          [b.x, b.y],
-          [c.x, c.y],
-          [d.x, d.y],
-        ],
-        lineColor: selected ? [250, 204, 21] : [251, 146, 60],
-      }
-    })
+  const polygons = props.roisVisible
+    ? props.rois
+        .filter((roi) => roi.kind === 'rect')
+        .map((roi) => {
+          const a = sourceToDisplay(roi.x0, roi.y0)
+          const b = sourceToDisplay(roi.x1, roi.y0)
+          const c = sourceToDisplay(roi.x1, roi.y1)
+          const d = sourceToDisplay(roi.x0, roi.y1)
+          const selected = roi.id === props.selectedRoiId
+          return {
+            id: roi.id,
+            polygon: [
+              [a.x, a.y],
+              [b.x, b.y],
+              [c.x, c.y],
+              [d.x, d.y],
+            ],
+            lineColor: selected ? [250, 204, 21] : [251, 146, 60],
+          }
+        })
+    : []
+  const roiLines = props.roisVisible
+    ? props.rois
+        .filter((roi) => roi.kind === 'line')
+        .map((roi) => {
+          const a = sourceToDisplay(roi.x0, roi.y0)
+          const b = sourceToDisplay(roi.x1, roi.y1)
+          const selected = roi.id === props.selectedRoiId
+          return {
+            id: roi.id,
+            path: [
+              [a.x, a.y],
+              [b.x, b.y],
+            ],
+            color: selected ? [250, 204, 21] : [34, 211, 238],
+          }
+        })
+    : []
   const lines = [
-    ...props.rois
-      .filter((roi) => roi.kind === 'line')
-      .map((roi) => {
-        const a = sourceToDisplay(roi.x0, roi.y0)
-        const b = sourceToDisplay(roi.x1, roi.y1)
-        const selected = roi.id === props.selectedRoiId
-        return {
-          id: roi.id,
-          path: [
-            [a.x, a.y],
-            [b.x, b.y],
-          ],
-          color: selected ? [250, 204, 21] : [34, 211, 238],
-        }
-      }),
+    ...roiLines,
     ...props.xyOverlays.map((overlay) => ({
       id: overlay.id,
       path: overlay.x.map((x, index) => {
@@ -368,10 +401,101 @@ function onLutEvent(channel: number, event: Event): void {
   emit('lut', channel, (event.target as HTMLSelectElement).value as LutName)
 }
 
-function onContrastEvent(channel: number, which: 0 | 1, event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value)
-  if (!Number.isFinite(value)) return
-  emit('contrast', channel, which, value)
+function onContrastPanel(channel: number, event: MouseEvent): void {
+  const button = event.currentTarget
+  if (!(button instanceof HTMLElement)) return
+  emit('contrast-panel', channel, button)
+}
+
+const stageInset = computed(() => {
+  if (!props.axesVisible) {
+    return { left: '0px', top: '0px', right: '0px', bottom: '0px' }
+  }
+  const margins = DEFAULT_AXIS_STYLE.margins
+  return {
+    left: `${margins.left}px`,
+    top: `${margins.top}px`,
+    right: `${margins.right}px`,
+    bottom: `${margins.bottom}px`,
+  }
+})
+
+function drawAxisChrome(): void {
+  const canvas = axesCanvas.value
+  const plotEl = plot.value
+  const loaded = props.loaded
+  if (!canvas || !plotEl) return
+  const context = canvas.getContext('2d')
+  if (!context) return
+  const cssWidth = Math.max(1, plotEl.clientWidth)
+  const cssHeight = Math.max(1, plotEl.clientHeight)
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = Math.round(cssWidth * dpr)
+  canvas.height = Math.round(cssHeight * dpr)
+  canvas.style.width = `${cssWidth}px`
+  canvas.style.height = `${cssHeight}px`
+  context.setTransform(dpr, 0, 0, dpr, 0, 0)
+  context.clearRect(0, 0, cssWidth, cssHeight)
+  if (!loaded || !props.axesVisible) return
+  const margins = DEFAULT_AXIS_STYLE.margins
+  const box = {
+    left: margins.left,
+    top: margins.top,
+    width: Math.max(1, cssWidth - margins.left - margins.right),
+    height: Math.max(1, cssHeight - margins.top - margins.bottom),
+  }
+  const edges = plotEdgePhysical(loaded)
+  drawAxes(context, {
+    plot: box,
+    canvasHeight: cssHeight,
+    ...edges,
+    xLabel: loaded.xLabel,
+    xUnit: loaded.xUnit,
+    yLabel: loaded.yLabel,
+    yUnit: loaded.yUnit,
+  })
+}
+
+/**
+ * Physical values at the plot edges, glued to the image.
+ *
+ * Unproject uses the same CSS pixels as pan. Screen-bottom world-Y is
+ * `yBottom` so 0 sits at the bottom after flip-Y. If the viewport is not
+ * ready, fall back to `visibleDisplayRect` (min world-Y at the bottom).
+ */
+function plotEdgePhysical(loaded: LoadedImage): {
+  xLeft: number
+  xRight: number
+  yBottom: number
+  yTop: number
+} {
+  const plotW = elWidth()
+  const plotH = elHeight()
+  const viewport = deck.value?.getViewports()[0]
+  const left = viewport?.unproject([0, plotH / 2])
+  const right = viewport?.unproject([plotW, plotH / 2])
+  const top = viewport?.unproject([plotW / 2, 0])
+  const bottom = viewport?.unproject([plotW / 2, plotH])
+  if (
+    left?.[0] !== undefined &&
+    right?.[0] !== undefined &&
+    top?.[1] !== undefined &&
+    bottom?.[1] !== undefined
+  ) {
+    return {
+      xLeft: left[0] * loaded.xStep,
+      xRight: right[0] * loaded.xStep,
+      yBottom: bottom[1] * loaded.yStep,
+      yTop: top[1] * loaded.yStep,
+    }
+  }
+  const view = visibleDisplayRect(plotW, plotH, props.camera.target, props.camera.zoom)
+  return {
+    xLeft: view.x0 * loaded.xStep,
+    xRight: view.x1 * loaded.xStep,
+    yBottom: view.y0 * loaded.yStep,
+    yTop: view.y1 * loaded.yStep,
+  }
 }
 
 function clientSize(): { width: number; height: number } {
@@ -429,16 +553,19 @@ onMounted(() => {
     lastHostWidth = width
     lastHostHeight = height
     instance.setProps({ width, height })
+    drawAxisChrome()
   })
   resizeObserver.observe(canvasHost)
   draw()
   applyCamera(props.camera)
+  drawAxisChrome()
 })
 
 watch(
   () => props.camera,
   (camera) => {
     applyCamera(camera)
+    drawAxisChrome()
   },
 )
 
@@ -450,11 +577,24 @@ watch(
       props.loaded?.selection.c,
       props.channels.join('.'),
       props.overlayRevision,
+      props.roisVisible,
       props.channelColors,
       props.channelContrast,
+      props.loaded?.xLabel,
+      props.loaded?.xStep,
+      props.loaded?.yLabel,
+      props.loaded?.yStep,
     ] as const,
   () => {
     draw()
+    drawAxisChrome()
+  },
+)
+
+watch(
+  () => props.axesVisible,
+  () => {
+    drawAxisChrome()
   },
 )
 
@@ -491,27 +631,37 @@ defineExpose({ clientSize })
 
 <template>
   <section class="mm-image-pane">
-    <div class="mm-image-pane-header">
+    <div v-if="channelToolbarsVisible" class="mm-image-pane-header">
       <label v-for="channel in channels" :key="channel">
         C{{ channel }}
         <select :value="lutNameFromRgb(channelColor(channel))" @change="onLutEvent(channel, $event)">
           <option v-for="name in LUT_ORDER" :key="name" :value="name">{{ name }}</option>
         </select>
-        <input :value="channelContrast(channel)[0]" type="number" @change="onContrastEvent(channel, 0, $event)" />
-        <input :value="channelContrast(channel)[1]" type="number" @change="onContrastEvent(channel, 1, $event)" />
+        <button
+          type="button"
+          class="mm-range-button"
+          :aria-label="`Channel ${channel} set contrast`"
+          title="Set contrast"
+          @click="onContrastPanel(channel, $event)"
+        >
+          <LucideIcon name="chart-column-decreasing" label="Set contrast" />
+        </button>
       </label>
     </div>
-    <div ref="host" class="mm-image-viewer-stage">
-      <div
-        v-if="guide"
-        class="mm-image-viewer-guide"
-        :style="{
-          left: `${guide.left}px`,
-          top: `${guide.top}px`,
-          width: `${guide.width}px`,
-          height: `${guide.height}px`,
-        }"
-      />
+    <div ref="plot" class="mm-image-plot">
+      <canvas ref="axesCanvas" class="mm-image-axes" />
+      <div ref="host" class="mm-image-viewer-stage" :style="stageInset">
+        <div
+          v-if="guide"
+          class="mm-image-viewer-guide"
+          :style="{
+            left: `${guide.left}px`,
+            top: `${guide.top}px`,
+            width: `${guide.width}px`,
+            height: `${guide.height}px`,
+          }"
+        />
+      </div>
     </div>
   </section>
 </template>

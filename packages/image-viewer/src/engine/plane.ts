@@ -75,6 +75,48 @@ export function extractYxPlane(source: PlaneSource, selection: PlaneSelection): 
   return { data: plane, width, height }
 }
 
+/**
+ * Stride-sample one YX plane without copying every pixel.
+ *
+ * Args:
+ *   source: Dense plane volume.
+ *   selection: t/c/z to read.
+ *   maxSamples: Maximum finite values to return.
+ *
+ * Returns:
+ *   Intensity samples in scan order.
+ */
+export function samplePlaneValues(
+  source: PlaneSource,
+  selection: PlaneSelection,
+  maxSamples = 120_000,
+): number[] {
+  assertPlaneLayout(source.labels, source.shape)
+  const chosen = clampSelection(source, selection)
+  const width = planeWidth(source)
+  const height = planeHeight(source)
+  const total = width * height
+  const step = Math.max(1, Math.floor(total / Math.max(1, maxSamples)))
+  const yIndex = source.labels.indexOf('y')
+  const xIndex = source.labels.indexOf('x')
+  const coords = source.labels.map((axis: AxisName) => {
+    if (axis === 't') return chosen.t
+    if (axis === 'c') return chosen.c
+    if (axis === 'z') return chosen.z
+    return 0
+  })
+  const samples: number[] = []
+  for (let index = 0; index < total && samples.length < maxSamples; index += step) {
+    const y = Math.floor(index / width)
+    const x = index % width
+    coords[yIndex] = y
+    coords[xIndex] = x
+    const value = Number(source.data[sampleOffset(source.shape, coords)])
+    if (Number.isFinite(value)) samples.push(value)
+  }
+  return samples
+}
+
 function allocatePlane(dtype: DtypeName, length: number): Uint8Array | Uint16Array | Float32Array {
   if (dtype === 'uint8') return new Uint8Array(length)
   if (dtype === 'uint16') return new Uint16Array(length)

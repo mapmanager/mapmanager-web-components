@@ -1,7 +1,10 @@
 export { ImageViewerEngine } from './viewer-engine'
 export type { LoadedImage, LoadedKind } from './viewer-engine'
 export { SYNTHETIC_SHAPE, syntheticPlaneSource } from './synthetic'
-export { extractYxPlane, contrastLimits } from './plane'
+export { extractYxPlane, contrastLimits, samplePlaneValues } from './plane'
+export { autoRange, histogramForValues, histogramBarFraction } from './contrast-range'
+export type { Histogram } from './contrast-range'
+export { niceStep, niceTickValues, formatTick, physicalToPlotX, physicalToPlotY, DEFAULT_AXIS_STYLE } from './axis-ticks'
 export { TiledPlanePixelSource, TILE_SIZE, tileCount } from './tile-source'
 export { parseOmeScale, parseOmeContrast } from './ome-metadata'
 export {
@@ -9,11 +12,12 @@ export {
   displayToSource,
   sourceToDisplay,
   transposePlane,
+  transposedAxes,
   transposedShape,
 } from './orientation'
 export { OrientedPixelSource } from './oriented-pixel-source'
 export { MAX_RENDERED_PIXELS, planeFitsInMemory, shouldLoadOmeZarrAsPlane } from './ome-zarr-loader'
-export { defaultChannelColor, CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb } from './channel-luts'
+export { defaultChannelColor, CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane } from './channel-luts'
 export type { LutName } from './channel-luts'
 export { paneChannels, paneSlots } from './layout-panes'
 export type { PaneSlot, ViewerLayout } from './layout-panes'
