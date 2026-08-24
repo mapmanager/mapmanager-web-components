@@ -6,7 +6,9 @@
 > (`cloudscope-web/src/raster-viewer/`) plus which of that chrome
 > `ImageViewer.vue` turns on.  
 > `@mapmanager/image-viewer` should cover this surface (and may regroup
-> controls) but is not required to clone CSS pixel-for-pixel.
+> controls) but is not required to clone CSS pixel-for-pixel.  
+> **Exception:** §3 (home fill + click+drag zoom) **is** a v1 requirement.
+> The previous one-line “elongated drag → axis-lock” note was incomplete.
 
 **Plotly is not part of this inventory.** In-image traces are canvas overlays
 (`xy-plot-overlay.js`). App-level analysis plots (`XYPlot.vue` / Plotly) are a
@@ -115,22 +117,63 @@ stacked), not on the top strip.
 Ignore when focus is in an editable control. Only the last pointer-activated
 viewer instance handles layout/reset keys.
 
-## 3. Viewport gestures (`viewport.js`)
+## 3. Viewport fit and gestures (v1 requirement)
+
+This section is a **requirement** for `@mapmanager/image-viewer`, not optional
+inventory. Match CloudScope-Web `cloudscope-web/src/raster-viewer/viewport.js`.
+Compare **display** width vs height (after orientation). Do not implement a
+“min short side” zoom-in instead of stretch-fill.
+
+### 3.1 Home / fill (`fit`)
+
+| Display size | Home transform |
+|---|---|
+| `width === height` | Square pixels. `scaleX = scaleY = min(plotW/W, plotH/H) * 0.98`. Center in the plot. |
+| `width !== height` | Fill the plot. `scaleX = plotW/W`, `scaleY = plotH/H`. Rectangular pixels allowed. Origin at plot top-left (no letterbox). |
+
+Wheel zoom multiplies **both** `scaleX` and `scaleY` by the same factor so the
+home stretch ratio is preserved. Double-click restores home.
+
+### 3.2 Click+drag zoom
+
+Constants from the original: `AXIS_LOCK_PIXELS = 8`, `MIN_REGION_PIXELS = 12`.
+Shift+drag is pan (no zoom). Motion under 8 px stays `pending` (no zoom on
+release).
+
+**(i) Square display (`width === height`)**
+
+1. After the 8 px threshold, mode is always `region` (never axis-lock).
+2. Rubber-band is forced **square**: side = max(|dx|, |dy|), clamped to the
+   plot in the drag direction.
+3. On mouse-up, `zoomRegion`: isotropic scale so that square fills the plot
+   (contain). Ignore selections smaller than 12 px.
+
+**(ii) Non-square display (`width !== height`)**
+
+1. After the 8 px threshold, dominant initial movement picks the axis:
+   `|dx| >= |dy|` → `x`, else `y`.
+2. Rubber-band: X-lock is a **full-height** band; Y-lock is a **full-width**
+   band (`drawRegionGuide`).
+3. On mouse-up, `zoomAxis('x'|'y')`: zoom only that axis to the drag span.
+   Ignore spans smaller than 12 px.
+
+### 3.3 Gesture table
 
 | Gesture | Action |
 |---|---|
-| Wheel | Zoom about cursor (`wheelZoomFactor`, default ~1.06) |
+| Wheel | Zoom about cursor (`wheelZoomFactor`, default ~1.06); keep `scaleX`/`scaleY` ratio |
 | Alt/Option + wheel | Step Z, else T (invertible) |
-| Drag | Region zoom; elongated drag → axis-locked X or Y |
+| Drag (square image) | Square rubber-band → region zoom |
+| Drag (non-square image) | Axis-locked X or Y zoom from initial movement |
 | Shift + drag | Pan |
-| Double-click | Reset that pane |
+| Double-click | Reset that pane to home |
 
 Pan/zoom is **snapshotted** across layout rebuilds so 1/2/3 and radios do not
 home the view.
 
-View-change events include `cause` (`pan`, `region`, `wheel`, `reset`,
-`api-x-range`, …) and `physical_range` with **unit and label** on both axes.
-Programmatic API causes must not echo into host linking.
+View-change events include `cause` (`pan`, `region`, `region-x`, `region-y`,
+`wheel`, `reset`, `api-x-range`, …) and `physical_range` with **unit and label**
+on both axes. Programmatic API causes must not echo into host linking.
 
 ## 4. What CloudScope Web turns on
 
@@ -162,5 +205,6 @@ gate.
 
 When implementing demos, capture: side / stack / single / composite; LUT +
 contrast popover; ROI select + edit draft; XY overlay on reference-style
-image; wheel zoom + shift-pan; linked X range **with units shown in the
-event payload** (even if the demo only logs it).
+image; square vs non-square **home fill**; square rubber-band zoom vs
+axis-locked X/Y zoom; wheel zoom + shift-pan; linked X range **with units
+shown in the event payload** (even if the demo only logs it).

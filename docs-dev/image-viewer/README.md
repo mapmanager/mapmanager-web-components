@@ -28,6 +28,7 @@ CloudScope / NiceWidgets names stay until those repos consume the package.
 | [01-survey-cloudscope-web.md](./01-survey-cloudscope-web.md) | How the current CloudScope Web engine works (init, planes, events, adapters) |
 | [02-gui-ux-and-layers.md](./02-gui-ux-and-layers.md) | Toolbar / gestures and the canvas layer stack (pixels, ROI, XY overlay) |
 | [03-package-and-demos.md](./03-package-and-demos.md) | Target package shape, required APIs, standalone demos, consumer order |
+| [04-phase1-handoff.md](./04-phase1-handoff.md) | 2026-08-24 stop: what shipped, OME-Zarr blocker, how to resume |
 
 ## Locked for this roadmap (still not a spec)
 
@@ -43,6 +44,9 @@ CloudScope / NiceWidgets names stay until those repos consume the package.
   or NumPy inside the package.
 - **Required v1 APIs:** ROI (including CRUD + local/delegated host modes) and
   in-image XY overlays (canvas, not Plotly).
+- **Required v1 viewport:** square vs non-square **home fill** and
+  **click+drag zoom** from `cloudscope-web/src/raster-viewer/viewport.js`
+  ([02](./02-gui-ux-and-layers.md) §3). Not optional chrome.
 - **Not in this package:** Plotly, analysis plot panels, AcqStore, zarrita,
   NumPy HTTP sources, [Viv](https://github.com/hms-dbmi/viv) / chunked OME-Zarr
   streaming (future viewer, separate effort).

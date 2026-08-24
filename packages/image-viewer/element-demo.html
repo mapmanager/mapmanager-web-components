@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Viewer Custom Element</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #020617;
+      }
+      mapmanager-image-viewer {
+        display: block;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <mapmanager-image-viewer></mapmanager-image-viewer>
+    <script type="module">
+      import { registerImageViewerElement } from './src/element/register.ts'
+      import { syntheticPlaneSource } from './src/engine/synthetic.ts'
+
+      registerImageViewerElement()
+      document.querySelector('mapmanager-image-viewer').setSource(syntheticPlaneSource('YX'))
+    </script>
+  </body>
+</html>

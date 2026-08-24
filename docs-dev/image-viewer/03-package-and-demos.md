@@ -70,7 +70,20 @@ The implementing work **must** expose, in some typed form:
 - Canvas overlay, **not Plotly**.
 - Optional per-channel / per-Z filters as in the current engine.
 
-### 3.4 Out of v1 (explicit)
+### 3.4 Viewport fit and drag-zoom — required
+
+Match CloudScope-Web `cloudscope-web/src/raster-viewer/viewport.js`. See
+[02-gui-ux-and-layers.md](./02-gui-ux-and-layers.md) §3. Summary:
+
+- Home: square display → contain, equal scale, 0.98 inset, centered.
+  Non-square display → independent `scaleX`/`scaleY` that **fill** the plot
+  (rectangular pixels allowed).
+- Click+drag: square display → forced-square region zoom. Non-square → lock
+  to X-only or Y-only from initial mouse movement, then zoom that axis.
+- Wheel multiplies both scales by the same factor. Shift+drag pans.
+  Double-click restores home.
+
+### 3.5 Out of v1 (explicit)
 
 | Out | Why |
 |---|---|
@@ -107,6 +120,8 @@ Ship **in this repo**, runnable without CloudScope:
 - `npm run dev --workspace @mapmanager/image-viewer`
 - Synthetic or fixture 2D planes (no live OME-Zarr required for CI).
 - Exercise: layouts, LUT/contrast, pan/zoom, T/Z if fixture has them.
+- Exercise: square vs non-square **home fill** and (when implemented)
+  square rubber-band vs axis-locked X/Y drag-zoom.
 - Exercise: **ROI CRUD** (local mode is enough for the demo).
 - Exercise: **XY overlay** (e.g. a polyline in physical units).
 - Log `view-change` payloads including **units** (prove time is not assumed).

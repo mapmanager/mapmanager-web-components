@@ -1,0 +1,68 @@
+{
+  "name": "@mapmanager/image-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable deck.gl / Viv scientific image viewer.",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mapmanager/mapmanager-web-components.git",
+    "directory": "packages/image-viewer"
+  },
+  "type": "module",
+  "files": [
+    "dist-lib",
+    "dist-element",
+    "README.md"
+  ],
+  "types": "./dist-lib/types/public-api.d.ts",
+  "module": "./dist-lib/image-viewer-web.js",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/types/public-api.d.ts",
+      "import": "./dist-lib/image-viewer-web.js"
+    },
+    "./register": "./dist-element/image-viewer-element.js",
+    "./style.css": "./dist-lib/image-viewer-web.css"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && npm run build:app && npm run build:lib && npm run build:element",
+    "build:app": "vite build",
+    "build:lib": "vite build --config vite.lib.config.ts && npm run build:types",
+    "build:types": "vue-tsc --project tsconfig.build.json --declaration --emitDeclarationOnly --noEmit false",
+    "build:element": "vite build --config vite.element.config.ts",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --build --force"
+  },
+  "dependencies": {
+    "@deck.gl/core": "9.1.11",
+    "@deck.gl/extensions": "9.1.11",
+    "@deck.gl/geo-layers": "9.1.11",
+    "@deck.gl/layers": "9.1.11",
+    "@deck.gl/mesh-layers": "9.1.11",
+    "@loaders.gl/core": "4.2.2",
+    "@luma.gl/constants": "9.1.9",
+    "@luma.gl/core": "9.1.9",
+    "@luma.gl/engine": "9.1.9",
+    "@luma.gl/gltf": "9.1.9",
+    "@luma.gl/shadertools": "9.1.9",
+    "@luma.gl/webgl": "9.1.9",
+    "@vivjs/extensions": "0.19.0",
+    "@vivjs/layers": "0.19.0",
+    "@vivjs/loaders": "0.19.0",
+    "numcodecs": "^0.3.2",
+    "vue": "^3.5.41",
+    "zarrita": "^0.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
+    "sirv": "^3.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10",
+    "vue-tsc": "^3.3.9"
+  }
+}

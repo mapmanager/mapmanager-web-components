@@ -179,3 +179,30 @@ proves a safer default.
 - Loading / error chrome around the host `div`
 
 None of that belongs in `@mapmanager/image-viewer`.
+
+## 11. Viewport fit and drag-zoom (v1 requirement)
+
+This is missing from older notes in this folder and **is required** for
+`@mapmanager/image-viewer`. Source of truth today is CloudScope-Web
+`cloudscope-web/src/raster-viewer/viewport.js` (`fit`, `dragZoomMode`,
+`selectionRect`, `zoomRegion`, `zoomAxis`, `drawRegionGuide`).
+
+Compare **display** bitmap `width` vs `height` (after orientation), not source
+YX before transpose.
+
+**Home / fill (`fit`):**
+
+- `width === height`: square pixels. One scale = `min(viewW/W, viewH/H) * 0.98`,
+  centered in the plot.
+- `width !== height`: fill the plot. `scaleX = viewW/W`, `scaleY = viewH/H`.
+  Rectangular pixels are allowed; no letterbox.
+
+**Click+drag zoom:**
+
+- Square display: rubber-band is forced **square**; mouse-up zooms to that
+  square (`zoomRegion`).
+- Non-square display: after an 8 px movement threshold, lock to X-only or
+  Y-only from the dominant initial axis; draw a full-height or full-width
+  band; mouse-up zooms that axis only (`zoomAxis`).
+
+Full gesture table and constants: [02-gui-ux-and-layers.md](./02-gui-ux-and-layers.md) §3.

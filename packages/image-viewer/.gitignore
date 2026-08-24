@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-lib/
+dist-element/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.eslintcache
+.vite/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

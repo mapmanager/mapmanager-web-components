@@ -1,0 +1,327 @@
+import { getChannelStats, loadOmeZarr } from '@vivjs/loaders'
+
+import { parseOmeContrast, parseOmeScale } from './ome-metadata'
+import { transposedShape } from './orientation'
+import {
+  clampCounts,
+  clampSelection,
+  contrastLimits,
+  planeHeight,
+  planeWidth,
+} from './plane'
+import { loadOmeZarrPlaneIfSmall } from './ome-zarr-loader'
+import { OrientedPixelSource, type InnerPixelSource } from './oriented-pixel-source'
+import { TiledPlanePixelSource } from './tile-source'
+import type {
+  ImageSource,
+  PlaneSelection,
+  PlaneSource,
+  Roi,
+  ViewWindow,
+  XyOverlay,
+} from './types'
+import { vivSelection } from './viv-selection'
+
+export type LoadedKind = 'plane' | 'ome-zarr'
+
+const MAX_CONTRAST_SAMPLES = 2_000_000
+
+export interface LoadedImage {
+  generation: number
+  sourceId: string
+  kind: LoadedKind
+  /** Display width after transpose (source height). */
+  width: number
+  /** Display height after transpose (source width). */
+  height: number
+  sourceWidth: number
+  sourceHeight: number
+  channelCount: number
+  zCount: number
+  tCount: number
+  selection: PlaneSelection
+  contrast: [number, number]
+  labels: string[]
+  dtype: string
+  xLabel: string
+  xUnit: string
+  xStep: number
+  yLabel: string
+  yUnit: string
+  yStep: number
+  loaders: unknown[]
+}
+
+/** Session state: one pixel source, chrome, overlays. */
+export class ImageViewerEngine {
+  generation = 0
+  loaded: LoadedImage | null = null
+  rois: Roi[] = []
+  xyOverlays: XyOverlay[] = []
+  error: string | null = null
+  layout: 'side' | 'stack' | 'single' | 'composite' = 'single'
+  axesVisible = true
+  #planeSource: PlaneSource | null = null
+
+  async setSource(source: ImageSource, signal?: AbortSignal): Promise<LoadedImage> {
+    const generation = this.generation + 1
+    this.generation = generation
+    this.error = null
+    this.rois = []
+    this.xyOverlays = []
+    this.#planeSource = null
+    try {
+      const loaded =
+        source.kind === 'plane'
+          ? await this.#loadPlane(source, generation, signal)
+          : await this.#loadOmeZarr(source, generation, signal)
+      if (generation !== this.generation) throw abortError()
+      this.loaded = loaded
+      return loaded
+    } catch (reason) {
+      if (generation === this.generation) {
+        this.loaded = null
+        this.error = reason instanceof Error ? reason.message : String(reason)
+      }
+      throw reason
+    }
+  }
+
+  setSelection(selection: Partial<PlaneSelection>): PlaneSelection {
+    if (!this.loaded) throw new Error('no image is loaded')
+    const next = clampCounts(
+      {
+        t: selection.t ?? this.loaded.selection.t,
+        c: selection.c ?? this.loaded.selection.c,
+        z: selection.z ?? this.loaded.selection.z,
+      },
+      { t: this.loaded.tCount, c: this.loaded.channelCount, z: this.loaded.zCount },
+    )
+    this.loaded = { ...this.loaded, selection: next }
+    return next
+  }
+
+  setRois(rois: readonly Roi[]): void {
+    this.rois = [...rois]
+  }
+
+  setXyOverlays(overlays: readonly XyOverlay[]): void {
+    this.xyOverlays = overlays.map((overlay) => ({
+      ...overlay,
+      x: [...overlay.x],
+      y: [...overlay.y],
+    }))
+  }
+
+  viewWindow(): ViewWindow | null {
+    const loaded = this.loaded
+    if (!loaded) return null
+    return {
+      xMin: 0,
+      xMax: (loaded.width - 1) * loaded.xStep,
+      yMin: 0,
+      yMax: (loaded.height - 1) * loaded.yStep,
+      xLabel: loaded.xLabel,
+      xUnit: loaded.xUnit,
+      yLabel: loaded.yLabel,
+      yUnit: loaded.yUnit,
+    }
+  }
+
+  async refreshPlaneContrast(): Promise<[number, number] | null> {
+    if (!this.loaded || !this.#planeSource) return null
+    if (this.loaded.sourceWidth * this.loaded.sourceHeight > MAX_CONTRAST_SAMPLES) {
+      return this.loaded.contrast
+    }
+    const source = this.loaded.loaders[0]
+    if (!(source instanceof OrientedPixelSource)) return null
+    const raster = await source.getRaster({
+      selection: vivSelection(source.labels, this.loaded.selection),
+    })
+    const contrast = contrastLimits(raster.data)
+    this.loaded = { ...this.loaded, contrast }
+    return contrast
+  }
+
+  async #loadPlane(
+    source: ImageSource & { kind: 'plane' },
+    generation: number,
+    signal?: AbortSignal,
+  ): Promise<LoadedImage> {
+    throwIfAborted(signal)
+    this.#planeSource = source
+    const selection = clampSelection(source, { t: 0, c: 0, z: 0 })
+    const pixelSource = new OrientedPixelSource(new TiledPlanePixelSource(source))
+    const sourceWidth = planeWidth(source)
+    const sourceHeight = planeHeight(source)
+    const contrast =
+      sourceWidth * sourceHeight > MAX_CONTRAST_SAMPLES
+        ? defaultContrast('Uint16')
+        : contrastLimits(
+            (
+              await pixelSource.getRaster({
+                selection: vivSelection(pixelSource.labels, selection),
+              })
+            ).data,
+          )
+    throwIfAborted(signal)
+    if (generation !== this.generation) throw abortError()
+    const display = transposedShape(sourceHeight, sourceWidth)
+    return {
+      generation,
+      sourceId: source.id,
+      kind: 'plane',
+      width: display.width,
+      height: display.height,
+      sourceWidth,
+      sourceHeight,
+      channelCount: axisCount(source, 'c'),
+      zCount: axisCount(source, 'z'),
+      tCount: axisCount(source, 't'),
+      selection,
+      contrast,
+      labels: [...source.labels],
+      dtype: pixelSource.dtype,
+      xLabel: source.yAxis?.label ?? 'y',
+      xUnit: source.yAxis?.unit ?? 'px',
+      xStep: source.yAxis?.step ?? 1,
+      yLabel: source.xAxis?.label ?? 'x',
+      yUnit: source.xAxis?.unit ?? 'px',
+      yStep: source.xAxis?.step ?? 1,
+      loaders: [pixelSource],
+    }
+  }
+
+  async #loadOmeZarr(
+    source: ImageSource & { kind: 'ome-zarr' },
+    generation: number,
+    signal?: AbortSignal,
+  ): Promise<LoadedImage> {
+    throwIfAborted(signal)
+    const small = await loadOmeZarrPlaneIfSmall(
+      resolveSourceUrl(source.url),
+      source.id,
+      { t: 0, c: 0, z: 0 },
+      signal,
+    )
+    if (small) {
+      const loaded = await this.#loadPlane(
+        { ...small.source, id: source.id },
+        generation,
+        signal,
+      )
+      return { ...loaded, kind: 'ome-zarr' }
+    }
+    const result = await loadOmeZarr(resolveSourceUrl(source.url), {
+      type: 'multiscales',
+      ...(signal ? { fetchOptions: { signal } } : {}),
+    })
+    throwIfAborted(signal)
+    if (generation !== this.generation) throw abortError()
+    const innerLoaders = Array.isArray(result.data) ? result.data : [result.data]
+    const innerFinest = innerLoaders[0]
+    if (!innerFinest) throw new Error('OME-Zarr contained no resolutions')
+    const labels = [...((innerFinest.labels ?? []) as string[])]
+    const sourceShape = [...((innerFinest.shape ?? []) as number[])]
+    const loaders = innerLoaders.map((loader) => new OrientedPixelSource(loader as InnerPixelSource))
+    const finest = loaders[0]
+    if (!finest) throw new Error('OME-Zarr contained no resolutions')
+    const scale = parseOmeScale(result.metadata)
+    const omero = parseOmeContrast(result.metadata)
+    const contrast = omero ?? (await contrastFromLoader(loaders.at(-1) ?? finest, labels, signal))
+    throwIfAborted(signal)
+    if (generation !== this.generation) throw abortError()
+    const sourceWidth = axisSize(labels, sourceShape, 'x')
+    const sourceHeight = axisSize(labels, sourceShape, 'y')
+    const display = transposedShape(sourceHeight, sourceWidth)
+    return {
+      generation,
+      sourceId: source.id,
+      kind: 'ome-zarr',
+      width: display.width,
+      height: display.height,
+      sourceWidth,
+      sourceHeight,
+      channelCount: axisSize(labels, sourceShape, 'c'),
+      zCount: axisSize(labels, sourceShape, 'z'),
+      tCount: axisSize(labels, sourceShape, 't'),
+      selection: { t: 0, c: 0, z: 0 },
+      contrast,
+      labels,
+      dtype: String(finest.dtype ?? 'Uint16'),
+      xLabel: 'y',
+      xUnit: scale.yUnit,
+      xStep: scale.y,
+      yLabel: 'x',
+      yUnit: scale.xUnit,
+      yStep: scale.x,
+      loaders,
+    }
+  }
+}
+
+function axisCount(source: PlaneSource, axis: 't' | 'c' | 'z'): number {
+  const index = source.labels.indexOf(axis)
+  if (index < 0) return 1
+  return Math.max(1, source.shape[index] ?? 1)
+}
+
+function axisSize(labels: readonly string[], shape: readonly number[], axis: string): number {
+  const index = labels.indexOf(axis)
+  if (index < 0) return 1
+  const size = shape[index]
+  return typeof size === 'number' && size > 0 ? size : 1
+}
+
+async function contrastFromLoader(
+  loader: {
+    getRaster?: (args: {
+      selection: Record<string, number>
+      signal?: AbortSignal
+    }) => Promise<{ data: ArrayLike<number> }>
+    labels?: string[]
+    dtype?: string
+  },
+  labels: readonly string[],
+  signal?: AbortSignal,
+): Promise<[number, number]> {
+  if (typeof loader.getRaster !== 'function') {
+    return defaultContrast(loader.dtype)
+  }
+  try {
+    const raster = await loader.getRaster({
+      selection: vivSelection(loader.labels ?? labels, { t: 0, c: 0, z: 0 }),
+      ...(signal ? { signal } : {}),
+    })
+    const stats = getChannelStats(raster.data as Parameters<typeof getChannelStats>[0])
+    const limits = stats.contrastLimits
+    const low = limits[0]
+    const high = limits[1]
+    if (low !== undefined && high !== undefined && low !== high) {
+      return [low, high]
+    }
+    return contrastLimits(raster.data)
+  } catch {
+    return defaultContrast(loader.dtype)
+  }
+}
+
+function defaultContrast(dtype: string | undefined): [number, number] {
+  if (dtype === 'Uint8' || dtype === 'Int8') return [0, 255]
+  if (dtype === 'Float32' || dtype === 'Float64') return [0, 1]
+  return [0, 65535]
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError()
+}
+
+function abortError(): Error {
+  return new DOMException('The operation was aborted.', 'AbortError')
+}
+
+function resolveSourceUrl(url: string): string {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url
+  const base = globalThis.location?.href
+  return typeof base === 'string' ? new URL(url, base).href : url
+}
