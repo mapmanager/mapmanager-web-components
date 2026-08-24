@@ -74,6 +74,18 @@ today’s Web host).
 Silent vs user-originated: `selectRoi(..., { emit: false })` is the host-sync
 path (avoids feedback loops). Same pattern as today.
 
+**MapManager current (code, not this CloudScope-Web inventory):**
+
+- **Add rect / Add line** insert default geometry in the current view (40%
+  rect, 60% line). No pointer-draw add in the product.
+- Click-select and **Delete ROI**. **Edit / handles are deferred.**
+- Pointer-draw add (rubber-band → `screenToWorld` → `displayToSource`) is
+  recorded in [05-roi-pointer-draw.md](./05-roi-pointer-draw.md) for when
+  edit ships. Do not reintroduce a draw tool just to add.
+
+LUT defaults are green then magenta (no gray). Histogram popover is not
+shipped yet.
+
 ### 1.3 XY overlay layer (required)
 
 Physical-space traces: `{ plot_id, x[], y[], mode, style, visible, channel_ids?, z_index? }`.

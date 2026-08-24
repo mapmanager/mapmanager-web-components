@@ -11,7 +11,7 @@ import {
   transposedShape,
 } from '../src/engine/orientation'
 import { OrientedPixelSource } from '../src/engine/oriented-pixel-source'
-import { extractYxPlane } from '../src/engine/plane'
+import { extractYxPlane, downsamplePlaneHalf, planePyramidSources } from '../src/engine/plane'
 import { SYNTHETIC_SHAPE, syntheticPlaneSource } from '../src/engine/synthetic'
 import { TILE_SIZE, TiledPlanePixelSource, tileCount } from '../src/engine/tile-source'
 import { homeZoom, visibleDisplayRect, defaultRectDisplay, defaultLineDisplay } from '../src/engine/view-fit'
@@ -59,6 +59,53 @@ describe('extractYxPlane', () => {
     const z0 = extractYxPlane(source, { t: 0, c: 0, z: 0 })
     const z1 = extractYxPlane(source, { t: 0, c: 0, z: 1 })
     expect([...z0.data]).not.toEqual([...z1.data])
+  })
+})
+
+describe('in-memory dyadic pyramid', () => {
+  it('downsamples Y and X in C-order without mixing Z/C planes', () => {
+    const data = new Uint16Array(2 * 2 * 4 * 6)
+    for (let index = 0; index < data.length; index += 1) data[index] = index
+    const source = {
+      kind: 'plane' as const,
+      id: 'index-zcyx',
+      data,
+      dtype: 'uint16' as const,
+      shape: [2, 2, 4, 6],
+      labels: ['z', 'c', 'y', 'x'] as ['z', 'c', 'y', 'x'],
+    }
+    const half = downsamplePlaneHalf({ ...source, labels: [...source.labels] })
+    expect(half.shape).toEqual([2, 2, 2, 3])
+    const dest = extractYxPlane(half, { t: 0, c: 1, z: 1 })
+    const full = extractYxPlane({ ...source, labels: [...source.labels] }, { t: 0, c: 1, z: 1 })
+    for (let y = 0; y < 2; y += 1) {
+      for (let x = 0; x < 3; x += 1) {
+        const sourceY = Math.min(3, Math.floor((y * 4) / 2))
+        const sourceX = Math.min(5, Math.floor((x * 6) / 3))
+        expect(dest.data[y * 3 + x]).toBe(full.data[sourceY * 6 + sourceX])
+      }
+    }
+    expect([...extractYxPlane(half, { t: 0, c: 0, z: 0 }).data]).not.toEqual([...dest.data])
+  })
+
+  it('stops when both Y and X are <= maxEdge, finest-first', () => {
+    const source = syntheticPlaneSource('CYX', [1, 40, 20])
+    const levels = planePyramidSources(source, 8)
+    expect(levels.map((level) => level.shape)).toEqual([
+      [1, 40, 20],
+      [1, 20, 10],
+      [1, 10, 5],
+      [1, 5, 2],
+    ])
+    expect(levels[0]).toBe(source)
+  })
+
+  it('gives Viv more than one loader when a plane edge exceeds TILE_SIZE', async () => {
+    const engine = new ImageViewerEngine()
+    await engine.setSource(syntheticPlaneSource('CYX', [1, 48, 2048]))
+    expect(engine.loaded?.loaders).toHaveLength(2)
+    await engine.setSource(syntheticPlaneSource('YX', [16, 24]))
+    expect(engine.loaded?.loaders).toHaveLength(1)
   })
 })
 

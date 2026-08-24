@@ -153,6 +153,34 @@ Order is a recommendation; PRs may split differently.
 Sliding-Z MIP: keep in demo loaders in slice 3–4; do not block on unifying
 Python vs JS MIP.
 
+### 6.1 Current next (from the running package, 2026-08-24)
+
+Code in `packages/image-viewer/` wins. Do not restart slices 1–4.
+
+**Shipped:** NicePool-like package; Viv `MultiscaleImageLayer`; in-memory
+YX/CYX/ZCYX; **N independent `ImagePane` decks** for side/stack (not one
+canvas `viewIds` split); LUT on each pane header (green then magenta, no
+gray); drag-zoom + wheel + double-click home; **Add rect/line** as default
+insert; select + delete; ROI **edit deferred**; **dyadic in-memory pyramid**
+for large planes (Viv background `ImageLayer` can cover home).
+
+**Hard rules still in force:**
+
+- Do **not** patch `goHome` / `viewState` / `onViewStateChange` / `applyingView`
+  to chase leftover home flicker. The old ~0.26 fill hole was missing tile
+  coverage. Measure with the image-viewer Playwright project on **5174**.
+- Do **not** implement ROI edit/handles until a ticket asks. Reuse
+  [05-roi-pointer-draw.md](./05-roi-pointer-draw.md) when that ticket starts.
+- Do **not** use layer `modelMatrix` for transpose (breaks Viv tiles).
+  Orientation is transpose then flip-Y in `orientation.ts`.
+
+**Next slices (KISS, one at a time):**
+
+1. Demo polish that already has engine hooks: XY overlay in the demo,
+   composite smoke (Z slider on ZCYX is already in the toolbar).
+2. ROI edit (handles) using the pointer-draw notes in 05.
+3. Host-facing delegated ROI / richer chrome only when a consumer ticket asks.
+
 ## 7. Viv / HTTP OME-Zarr (in this package)
 
 `@mapmanager/image-viewer` **uses Viv** for HTTP OME-Zarr pyramids. That is
@@ -160,7 +188,12 @@ current work, not a later separate viewer. This folder must not be read as
 “Viv is out of scope.”
 
 Single-level small YX (no pyramid) may decode one plane into RAM and tile at
-1024 for the GPU. Pyramids stay on Viv tiles.
+1024 for the GPU. HTTP pyramids stay on Viv tiles. **Large in-memory planes**
+(synthetic CYX kymo, zarrita-decoded small OME-Zarr) must also expose a
+**dyadic** `loader[]` (finest first, each level ~½ Y and X). Viv assumes
+`loader[i]` is `2^i` smaller than finest and draws `loader.at(-1)` as the
+full-viewport background. A one-level 30000×1024 source is the measured
+cause of the home flash — not `goHome`.
 
 In-memory YX/CYX/ZCYX planes remain a second ingest path (synthetics, later
 NiceGUI arrays).

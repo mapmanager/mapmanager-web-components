@@ -114,6 +114,10 @@ test('CYX rAF fill around wheel then double-click home', async ({ page }, testIn
   })
   summarize('wheel-then-dblclick-home', afterHome)
 
+  const fillMin = Math.min(...afterHome.map((sample) => sample.fill))
+  // Background coverage after home. ~0.26 was missing Viv ImageLayer (single-level CYX).
+  // If this fails near 0.26 again: stop. Do not patch goHome / viewState / applyingView.
+  expect(fillMin).toBeGreaterThan(0.42)
   expect(afterHome.length).toBeGreaterThan(5)
 })
 

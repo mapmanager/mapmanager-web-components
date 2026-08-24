@@ -11,9 +11,10 @@ import {
   clampSelection,
   contrastLimits,
   planeHeight,
+  planePyramidSources,
   planeWidth,
 } from './plane'
-import { TiledPlanePixelSource } from './tile-source'
+import { TILE_SIZE, TiledPlanePixelSource } from './tile-source'
 import type {
   ImageSource,
   PlaneSelection,
@@ -213,16 +214,20 @@ export class ImageViewerEngine {
     throwIfAborted(signal)
     this.#planeSource = source
     const selection = clampSelection(source, { t: 0, c: 0, z: 0 })
-    const pixelSource = new OrientedPixelSource(new TiledPlanePixelSource(source))
     const sourceWidth = planeWidth(source)
     const sourceHeight = planeHeight(source)
+    const loaders = planePyramidSources(source, TILE_SIZE).map(
+      (level) => new OrientedPixelSource(new TiledPlanePixelSource(level)),
+    )
+    const finest = loaders[0]
+    if (!finest) throw new Error('plane pyramid is empty')
     const contrast =
       sourceWidth * sourceHeight > MAX_CONTRAST_SAMPLES
         ? defaultContrast('Uint16')
         : contrastLimits(
             (
-              await pixelSource.getRaster({
-                selection: vivSelection(pixelSource.labels, selection),
+              await finest.getRaster({
+                selection: vivSelection(finest.labels, selection),
               })
             ).data,
           )
@@ -243,14 +248,14 @@ export class ImageViewerEngine {
       selection,
       contrast,
       labels: [...source.labels],
-      dtype: pixelSource.dtype,
+      dtype: finest.dtype,
       xLabel: source.yAxis?.label ?? 'y',
       xUnit: source.yAxis?.unit ?? 'px',
       xStep: source.yAxis?.step ?? 1,
       yLabel: source.xAxis?.label ?? 'x',
       yUnit: source.xAxis?.unit ?? 'px',
       yStep: source.xAxis?.step ?? 1,
-      loaders: [pixelSource],
+      loaders,
     }
   }
 
