@@ -31,37 +31,34 @@ export interface InnerPixelSource {
 /**
  * Viv PixelSource adapter: report display YX and transpose tiles after fetch.
  *
- * Viv keeps requesting tiles in its own grid. This wrapper swaps the last two
- * shape axes and transposes each returned tile so deck.gl sees display pixels.
+ * Methods are own-properties so Viv can extract `onTileError` / `getRaster`
+ * (it does not always call them as methods on this instance).
  */
 export class OrientedPixelSource {
   readonly shape: number[]
   readonly labels: string[]
   readonly dtype: string
   readonly tileSize: number
-  readonly #inner: InnerPixelSource
+  readonly getTile: (request: TileQuery) => Promise<PixelTile>
+  readonly getRaster: (request?: RasterQuery) => Promise<PixelTile>
+  readonly onTileError: (error: Error) => void
 
   constructor(inner: InnerPixelSource) {
-    this.#inner = inner
     this.shape = swapLastTwo(inner.shape)
     this.labels = [...inner.labels]
     this.dtype = inner.dtype
     this.tileSize = inner.tileSize
-  }
-
-  async getRaster(request: RasterQuery = {}): Promise<PixelTile> {
-    if (typeof this.#inner.getRaster !== 'function') {
-      throw new Error('pixel source cannot provide a full plane')
+    this.getTile = async (request: TileQuery) =>
+      orientTile(await inner.getTile({ ...request, x: request.y, y: request.x }))
+    this.getRaster = async (request: RasterQuery = {}) => {
+      if (typeof inner.getRaster !== 'function') {
+        throw new Error('pixel source cannot provide a full plane')
+      }
+      return orientTile(await inner.getRaster(request))
     }
-    return orientTile(await this.#inner.getRaster(request))
-  }
-
-  async getTile(request: TileQuery): Promise<PixelTile> {
-    return orientTile(await this.#inner.getTile({ ...request, x: request.y, y: request.x }))
-  }
-
-  onTileError(error: Error): void {
-    this.#inner.onTileError?.(error)
+    this.onTileError = (error: Error) => {
+      inner.onTileError?.(error)
+    }
   }
 }
 

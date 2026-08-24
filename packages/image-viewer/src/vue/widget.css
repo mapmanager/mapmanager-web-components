@@ -61,6 +61,56 @@
   cursor: text;
 }
 
+.mm-image-viewer-panes {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.mm-image-viewer-panes[data-layout='stack'] {
+  flex-direction: column;
+}
+
+.mm-image-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid #1e293b;
+}
+
+.mm-image-viewer-panes[data-layout='stack'] .mm-image-pane {
+  border-right: 0;
+  border-bottom: 1px solid #1e293b;
+}
+
+.mm-image-pane:last-child {
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.mm-image-pane-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid #1e293b;
+  font-size: 0.78rem;
+}
+
+.mm-image-pane-header label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mm-image-pane-header input[type='number'] {
+  width: 5.5rem;
+}
+
 .mm-image-viewer-stage {
   position: relative;
   flex: 1;

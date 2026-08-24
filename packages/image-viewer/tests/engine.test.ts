@@ -14,10 +14,10 @@ import { OrientedPixelSource } from '../src/engine/oriented-pixel-source'
 import { extractYxPlane } from '../src/engine/plane'
 import { SYNTHETIC_SHAPE, syntheticPlaneSource } from '../src/engine/synthetic'
 import { TILE_SIZE, TiledPlanePixelSource, tileCount } from '../src/engine/tile-source'
-import { homeZoom } from '../src/engine/view-fit'
+import { homeZoom, visibleDisplayRect, defaultRectDisplay, defaultLineDisplay } from '../src/engine/view-fit'
 import { ImageViewerEngine } from '../src/engine/viewer-engine'
 import { defaultChannelColor, LUT_ORDER, lutNameFromRgb } from '../src/engine/channel-luts'
-import { paneChannels, panePixelSize, paneViews } from '../src/engine/layout-panes'
+import { paneChannels, paneSlots } from '../src/engine/layout-panes'
 
 describe('synthetic layouts', () => {
   it('builds YX, CYX, and ZCYX with y,x last', () => {
@@ -261,16 +261,30 @@ describe('channel LUTs', () => {
 })
 
 describe('layout panes', () => {
-  it('splits side and stack into one view per channel', () => {
-    expect(paneViews('single', 2)).toHaveLength(1)
-    expect(paneViews('composite', 2)).toHaveLength(1)
-    expect(paneViews('side', 2).map((pane) => pane.id)).toEqual(['pane-0', 'pane-1'])
-    expect(paneViews('stack', 2).map((pane) => pane.y)).toEqual(['0%', '50%'])
+  it('gives one independent pane per channel for side and stack', () => {
+    expect(paneSlots('single', 2, 1)).toEqual([{ id: 'pane-0', channels: [1] }])
+    expect(paneSlots('composite', 2, 0)).toEqual([{ id: 'pane-0', channels: [0, 1] }])
+    expect(paneSlots('side', 2, 0).map((pane) => pane.channels)).toEqual([[0], [1]])
+    expect(paneSlots('stack', 2, 0)).toHaveLength(2)
     expect(paneChannels('single', 2, 1)).toEqual([1])
     expect(paneChannels('side', 2, 0)).toEqual([0, 1])
     expect(paneChannels('composite', 2, 0)).toEqual([0, 1])
-    expect(panePixelSize('side', 2, 400, 200)).toEqual({ width: 200, height: 200 })
-    expect(panePixelSize('stack', 2, 400, 200)).toEqual({ width: 400, height: 100 })
+  })
+})
+
+describe('visible window and default ROIs', () => {
+  it('uses deck.gl orthographic scale 2**zoom and a 40% default rect', () => {
+    const view = visibleDisplayRect(200, 100, [50, 40, 0], 0)
+    expect(view.x0).toBe(50 - 100)
+    expect(view.x1).toBe(50 + 100)
+    expect(view.y0).toBe(40 - 50)
+    expect(view.y1).toBe(40 + 50)
+    const rect = defaultRectDisplay({ x0: 0, y0: 0, x1: 100, y1: 100 }, 100, 100)
+    expect(rect.x1 - rect.x0).toBeCloseTo(40)
+    expect(rect.y1 - rect.y0).toBeCloseTo(40)
+    const line = defaultLineDisplay({ x0: 0, y0: 0, x1: 100, y1: 100 }, 100, 100)
+    expect(line.x1 - line.x0).toBeCloseTo(60)
+    expect(line.y0).toBe(line.y1)
   })
 })
 

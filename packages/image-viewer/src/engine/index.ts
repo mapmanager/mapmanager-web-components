@@ -15,10 +15,16 @@ export { OrientedPixelSource } from './oriented-pixel-source'
 export { MAX_RENDERED_PIXELS, planeFitsInMemory, shouldLoadOmeZarrAsPlane } from './ome-zarr-loader'
 export { defaultChannelColor, CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb } from './channel-luts'
 export type { LutName } from './channel-luts'
-export { paneChannels, panePixelSize, paneViews } from './layout-panes'
-export type { PaneViewSpec, ViewerLayout } from './layout-panes'
-export { homeZoom } from './view-fit'
-export type { HomeZoom } from './view-fit'
+export { paneChannels, paneSlots } from './layout-panes'
+export type { PaneSlot, ViewerLayout } from './layout-panes'
+export {
+  defaultLineDisplay,
+  defaultRectDisplay,
+  homeZoom,
+  visibleDisplayRect,
+  zoomAxes,
+} from './view-fit'
+export type { HomeZoom, OrthographicViewState } from './view-fit'
 export {
   AXIS_LOCK_PIXELS,
   MIN_REGION_PIXELS,
