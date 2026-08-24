@@ -135,9 +135,9 @@ export function physicalToPlotX(
 /**
  * Map a physical axis value to a plot-canvas Y.
  *
- * `yBottom` / `yTop` are the world values at the **screen** bottom and top
- * (from viewport unproject). Value equal to `yBottom` sits on the bottom
- * edge so 0 is at the bottom when the visible world-Y there is 0.
+ * `yBottom` / `yTop` are the world values at the **screen** bottom and top.
+ * Value equal to `yBottom` sits on the bottom edge so 0 is at the bottom
+ * when that edge’s world-Y is 0.
  */
 export function physicalToPlotY(
   value: number,
@@ -149,6 +149,25 @@ export function physicalToPlotY(
   if (span === 0) return plot.top + plot.height / 2
   const fraction = (value - yBottom) / span
   return plot.top + plot.height - fraction * plot.height
+}
+
+/**
+ * Y plot edges for deck.gl `flipY` (view matrix Y scale is -1).
+ *
+ * `visibleDisplayRect` is not flip-aware, so a pan that moves the image up
+ * would move ticks down if we used `y0` at the bottom. Reflecting through
+ * display height keeps 0 at the bottom at home and reverses pan to follow
+ * the image.
+ */
+export function flipYPlotEdges(
+  viewY0: number,
+  viewY1: number,
+  displayHeight: number,
+): { yBottom: number; yTop: number } {
+  return {
+    yBottom: displayHeight - viewY1,
+    yTop: displayHeight - viewY0,
+  }
 }
 
 /**

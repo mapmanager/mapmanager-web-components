@@ -32,11 +32,11 @@ export const CHANNEL_LUTS: Record<LutName, [number, number, number]> = {
 }
 
 export const LUT_ORDER: LutName[] = [
-  'green',
-  'magenta',
-  'blue',
   'red',
+  'green',
+  'blue',
   'cyan',
+  'magenta',
   'yellow',
   'gray',
   'fire',

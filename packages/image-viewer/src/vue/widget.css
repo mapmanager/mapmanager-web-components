@@ -85,23 +85,28 @@
   position: relative;
 }
 
-.mm-options-menu summary {
+.mm-options-button {
   display: grid;
   width: 28px;
   height: 24px;
   place-items: center;
+  padding: 0;
   border: 1px solid #334155;
   border-radius: 6px;
   color: #e2e8f0;
+  background: transparent;
   cursor: pointer;
-  list-style: none;
 }
 
-.mm-options-menu summary::-webkit-details-marker {
-  display: none;
+.mm-image-viewer-toolbar .mm-options-button {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  color: #e2e8f0;
+  background: transparent;
 }
 
-.mm-options-menu summary svg {
+.mm-options-button svg {
   width: 15px;
   height: 15px;
 }
@@ -119,10 +124,6 @@
   border-radius: 8px;
   background: #0f172a;
   box-shadow: 0 12px 28px rgb(0 0 0 / 55%);
-}
-
-.mm-options-menu:not([open]) .mm-options-panel {
-  display: none;
 }
 
 .mm-radio {

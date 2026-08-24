@@ -14,7 +14,7 @@ import {
 import { OrientedPixelSource } from '../src/engine/oriented-pixel-source'
 import { extractYxPlane, downsamplePlaneHalf, planePyramidSources } from '../src/engine/plane'
 import { autoRange, histogramBarFraction } from '../src/engine/contrast-range'
-import { niceStep, niceTickValues, physicalToPlotX, physicalToPlotY } from '../src/engine/axis-ticks'
+import { niceStep, niceTickValues, physicalToPlotX, physicalToPlotY, flipYPlotEdges } from '../src/engine/axis-ticks'
 import { SYNTHETIC_SHAPE, syntheticPlaneSource } from '../src/engine/synthetic'
 import { TILE_SIZE, TiledPlanePixelSource, tileCount } from '../src/engine/tile-source'
 import { homeZoom, visibleDisplayRect, defaultRectDisplay, defaultLineDisplay } from '../src/engine/view-fit'
@@ -302,10 +302,21 @@ describe('collectionChildUrl', () => {
 })
 
 describe('channel LUTs', () => {
-  it('defaults two channels to green then magenta; dropdown includes gray/fire/viridis/magma', () => {
+  it('lists LUTs red/green/blue then the rest; defaults stay green then magenta', () => {
     expect(defaultChannelColor(0)).toEqual([0, 220, 80])
     expect(defaultChannelColor(1)).toEqual([255, 0, 220])
-    expect(LUT_ORDER).toEqual(expect.arrayContaining(['gray', 'fire', 'viridis', 'magma']))
+    expect(LUT_ORDER).toEqual([
+      'red',
+      'green',
+      'blue',
+      'cyan',
+      'magenta',
+      'yellow',
+      'gray',
+      'fire',
+      'viridis',
+      'magma',
+    ])
     expect(lutNameFromRgb([255, 0, 220])).toBe('magenta')
     expect(vivColormapForPane('gray', 1)).toBe('greys')
     expect(vivColormapForPane('fire', 1)).toBe('hot')
@@ -382,6 +393,16 @@ describe('display axes and contrast auto', () => {
     expect(physicalToPlotY(15, 5, 15, plot)).toBe(0)
     expect(physicalToPlotX(0, 0, 10, { left: 0, width: 100 })).toBe(0)
     expect(physicalToPlotX(10, 0, 10, { left: 0, width: 100 })).toBe(100)
+  })
+
+  it('reflects Y edges so pan-up moves ticks up and home keeps 0 at the bottom', () => {
+    const plot = { top: 0, height: 100 }
+    const home = flipYPlotEdges(0, 10, 10)
+    expect(home).toEqual({ yBottom: 0, yTop: 10 })
+    expect(physicalToPlotY(0, home.yBottom, home.yTop, plot)).toBe(100)
+    const panned = flipYPlotEdges(1, 11, 10)
+    expect(panned).toEqual({ yBottom: -1, yTop: 9 })
+    expect(physicalToPlotY(5, panned.yBottom, panned.yTop, plot)).toBe(40)
   })
 
   it('maps a constant-source-X scan path to a horizontal display line', () => {

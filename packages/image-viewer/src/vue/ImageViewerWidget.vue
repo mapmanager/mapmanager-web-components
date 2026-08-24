@@ -49,7 +49,8 @@ const axesVisible = ref(true)
 const roisVisible = ref(true)
 const channelToolbarsVisible = ref(true)
 const roiToolbarVisible = ref(true)
-const optionsMenu = ref<HTMLDetailsElement | null>(null)
+const optionsOpen = ref(false)
+const optionsMenu = ref<HTMLDivElement | null>(null)
 const selectedRoiId = ref<string | null>(null)
 const overlayRevision = ref(0)
 const loaded = ref<LoadedImage | null>(null)
@@ -267,7 +268,7 @@ function onAxesToggle(): void {
 }
 
 function closeOptionsMenu(): void {
-  if (optionsMenu.value) optionsMenu.value.open = false
+  optionsOpen.value = false
 }
 
 function onResetView(): void {
@@ -276,15 +277,15 @@ function onResetView(): void {
 }
 
 function onDocumentPointerDown(event: PointerEvent): void {
+  if (!optionsOpen.value) return
   const menu = optionsMenu.value
-  if (!menu?.open) return
-  if (event.target instanceof Node && menu.contains(event.target)) return
-  menu.open = false
+  if (event.target instanceof Node && menu?.contains(event.target)) return
+  optionsOpen.value = false
 }
 
 function onDocumentKeyDown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && optionsMenu.value?.open) {
-    optionsMenu.value.open = false
+  if (event.key === 'Escape' && optionsOpen.value) {
+    optionsOpen.value = false
   }
 }
 
@@ -371,11 +372,18 @@ defineExpose({ setSource, setRois, setXyOverlays, engine })
 <template>
   <section class="mm-image-viewer">
     <div class="mm-image-viewer-toolbar">
-      <details ref="optionsMenu" class="mm-options-menu">
-        <summary aria-label="Viewer options" title="Viewer options">
+      <div ref="optionsMenu" class="mm-options-menu">
+        <button
+          type="button"
+          class="mm-options-button"
+          aria-label="Viewer options"
+          title="Viewer options"
+          :aria-expanded="optionsOpen"
+          @click="optionsOpen = !optionsOpen"
+        >
           <LucideIcon name="menu" label="Viewer options" />
-        </summary>
-        <div class="mm-options-panel">
+        </button>
+        <div v-show="optionsOpen" class="mm-options-panel">
           <label class="mm-radio">
             <input v-model="axesVisible" type="checkbox" aria-label="Axes" @change="onAxesToggle" />
             Axes
@@ -397,7 +405,7 @@ defineExpose({ setSource, setRois, setXyOverlays, engine })
             Reset view
           </button>
         </div>
-      </details>
+      </div>
       <span>{{ sourceId ?? 'idle' }}</span>
       <div
         v-if="channelCount > 1"

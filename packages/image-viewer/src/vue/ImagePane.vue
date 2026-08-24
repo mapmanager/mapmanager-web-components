@@ -6,7 +6,7 @@ import { MultiscaleImageLayer } from '@vivjs/layers'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import { CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane, type LutName } from '../engine/channel-luts'
-import { DEFAULT_AXIS_STYLE, drawAxes } from '../engine/axis-ticks'
+import { DEFAULT_AXIS_STYLE, drawAxes, flipYPlotEdges } from '../engine/axis-ticks'
 import {
   dragZoomMode,
   guideRect,
@@ -457,11 +457,10 @@ function drawAxisChrome(): void {
 }
 
 /**
- * Physical values at the plot edges, glued to the image.
+ * Physical values at the plot edges from the camera.
  *
- * Unproject uses the same CSS pixels as pan. Screen-bottom world-Y is
- * `yBottom` so 0 sits at the bottom after flip-Y. If the viewport is not
- * ready, fall back to `visibleDisplayRect` (min world-Y at the bottom).
+ * X uses the visible window directly. Y reflects through display height so
+ * ticks follow flip-Y pan (image up → labels up) with 0 still at the bottom.
  */
 function plotEdgePhysical(loaded: LoadedImage): {
   xLeft: number
@@ -469,32 +468,13 @@ function plotEdgePhysical(loaded: LoadedImage): {
   yBottom: number
   yTop: number
 } {
-  const plotW = elWidth()
-  const plotH = elHeight()
-  const viewport = deck.value?.getViewports()[0]
-  const left = viewport?.unproject([0, plotH / 2])
-  const right = viewport?.unproject([plotW, plotH / 2])
-  const top = viewport?.unproject([plotW / 2, 0])
-  const bottom = viewport?.unproject([plotW / 2, plotH])
-  if (
-    left?.[0] !== undefined &&
-    right?.[0] !== undefined &&
-    top?.[1] !== undefined &&
-    bottom?.[1] !== undefined
-  ) {
-    return {
-      xLeft: left[0] * loaded.xStep,
-      xRight: right[0] * loaded.xStep,
-      yBottom: bottom[1] * loaded.yStep,
-      yTop: top[1] * loaded.yStep,
-    }
-  }
-  const view = visibleDisplayRect(plotW, plotH, props.camera.target, props.camera.zoom)
+  const view = visibleDisplayRect(elWidth(), elHeight(), props.camera.target, props.camera.zoom)
+  const yEdges = flipYPlotEdges(view.y0, view.y1, loaded.height)
   return {
     xLeft: view.x0 * loaded.xStep,
     xRight: view.x1 * loaded.xStep,
-    yBottom: view.y0 * loaded.yStep,
-    yTop: view.y1 * loaded.yStep,
+    yBottom: yEdges.yBottom * loaded.yStep,
+    yTop: yEdges.yTop * loaded.yStep,
   }
 }
 
