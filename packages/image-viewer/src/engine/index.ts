@@ -1,5 +1,5 @@
 export { ImageViewerEngine } from './viewer-engine'
-export type { LoadedImage, LoadedKind } from './viewer-engine'
+export type { LoadedImage, LoadedKind, PreparedSelection } from './viewer-engine'
 export { SYNTHETIC_SHAPE, syntheticPlaneSource } from './synthetic'
 export { extractYxPlane, contrastLimits, samplePlaneValues } from './plane'
 export { autoRange, histogramForValues, histogramBarFraction } from './contrast-range'

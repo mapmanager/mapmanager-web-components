@@ -36,6 +36,7 @@ const props = withDefaults(
     camera: OrthographicViewState
     doubleClickBehavior?: 'home' | 'deck'
     overlayRevision: number
+    pixelRevision: number
     axesVisible?: boolean
     roisVisible?: boolean
     channelToolbarsVisible?: boolean
@@ -61,6 +62,10 @@ const plot = ref<HTMLDivElement | null>(null)
 const axesCanvas = ref<HTMLCanvasElement | null>(null)
 const guide = ref<PlotRect | null>(null)
 const deck = shallowRef<Deck<OrthographicView[]> | null>(null)
+let committedPixelLayers: unknown[] = []
+let committedPixelKey = ''
+let pendingPixelLayers: unknown[] | null = null
+let pixelUpdateToken = 0
 let resizeObserver: ResizeObserver | null = null
 let applyingView = false
 let applyViewToken = 0
@@ -106,14 +111,20 @@ function cameraProps(camera: OrthographicViewState): Record<string, Orthographic
   return { [VIEW_ID]: { ...camera, transitionDuration: 0 } }
 }
 
-function pixelLayers(): unknown[] {
+function pixelKey(): string {
+  const loaded = props.loaded
+  if (!loaded) return ''
+  return `${loaded.generation}:t${loaded.selection.t}:z${loaded.selection.z}:${props.channels.join('.')}`
+}
+
+function pixelLayers(onViewportLoad?: () => void): unknown[] {
   const loaded = props.loaded
   if (!loaded) return []
   const channels = props.channels
   const firstLut = lutNameFromRgb(channelColor(channels[0] ?? 0))
   const colormap = vivColormapForPane(firstLut, channels.length)
   const shared = {
-    id: `pixels-${loaded.generation}-${channels.join('.')}-z${loaded.selection.z}-${colormap ?? firstLut}`,
+    id: `pixels-${loaded.generation}-${channels.join('.')}-t${loaded.selection.t}-z${loaded.selection.z}-${colormap ?? firstLut}`,
     loader: loaded.loaders as never,
     selections: channels.map((channel) =>
       vivSelection(loaded.labels, { ...loaded.selection, c: channel }),
@@ -127,6 +138,7 @@ function pixelLayers(): unknown[] {
     // These tiles are already decoded in memory, so fill the viewport without
     // Viv's network-oriented request throttle.
     maxRequests: loaded.inMemoryTiles ? 64 : 10,
+    ...(onViewportLoad ? { onViewportLoad } : {}),
   }
   if (colormap) {
     return [
@@ -217,10 +229,42 @@ function overlayLayers(): unknown[] {
   ]
 }
 
-function draw(): void {
+function applyLayers(): void {
+  const pixels = pendingPixelLayers
+    ? [...pendingPixelLayers, ...committedPixelLayers]
+    : committedPixelLayers
   deck.value?.setProps({
-    layers: [...pixelLayers(), ...overlayLayers()] as never[],
+    layers: [...pixels, ...overlayLayers()] as never[],
   })
+}
+
+function updatePixelLayers(): void {
+  const nextKey = pixelKey()
+  const loaded = props.loaded
+  const sameSource =
+    committedPixelKey !== '' &&
+    loaded != null &&
+    committedPixelKey.startsWith(`${loaded.generation}:`)
+  const transition = sameSource && nextKey !== committedPixelKey
+  const token = pixelUpdateToken + 1
+  pixelUpdateToken = token
+  let next: unknown[] = []
+  const ready = () => {
+    if (token !== pixelUpdateToken) return
+    committedPixelLayers = next
+    committedPixelKey = nextKey
+    pendingPixelLayers = null
+    applyLayers()
+  }
+  next = pixelLayers(transition ? ready : undefined)
+  if (transition) {
+    pendingPixelLayers = next
+  } else {
+    committedPixelLayers = next
+    committedPixelKey = nextKey
+    pendingPixelLayers = null
+  }
+  applyLayers()
 }
 
 function applyCamera(camera: OrthographicViewState): void {
@@ -534,7 +578,7 @@ onMounted(() => {
     drawAxisChrome()
   })
   resizeObserver.observe(canvasHost)
-  draw()
+  updatePixelLayers()
   applyCamera(props.camera)
   drawAxisChrome()
 })
@@ -551,20 +595,35 @@ watch(
   () =>
     [
       props.loaded?.generation,
+      props.loaded?.selection.t,
       props.loaded?.selection.z,
-      props.loaded?.selection.c,
       props.channels.join('.'),
-      props.overlayRevision,
-      props.roisVisible,
+      props.pixelRevision,
       props.channelColors,
       props.channelContrast,
+    ] as const,
+  () => {
+    updatePixelLayers()
+  },
+)
+
+watch(
+  () => [props.overlayRevision, props.roisVisible] as const,
+  () => {
+    applyLayers()
+  },
+)
+
+watch(
+  () =>
+    [
+      props.loaded?.generation,
       props.loaded?.xLabel,
       props.loaded?.xStep,
       props.loaded?.yLabel,
       props.loaded?.yStep,
     ] as const,
   () => {
-    draw()
     drawAxisChrome()
   },
 )
@@ -591,6 +650,7 @@ watch(
 
 onBeforeUnmount(() => {
   applyViewToken += 1
+  pixelUpdateToken += 1
   applyingView = false
   const canvasHost = host.value
   canvasHost?.removeEventListener('pointerdown', onPointerDown)

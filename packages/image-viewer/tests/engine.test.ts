@@ -199,6 +199,32 @@ describe('ImageViewerEngine', () => {
     expect(engine.loaded?.channelCount).toBe(2)
     expect(engine.loaded?.sourceId).toBe('synthetic-cyx')
   })
+
+  it('prepares and commits a Z selection without exposing intermediate state', async () => {
+    const engine = new ImageViewerEngine()
+    await engine.setSource(syntheticPlaneSource('ZCYX'))
+    const before = engine.loaded
+    const prepared = await engine.prepareSelection({ z: 3, c: 1 })
+
+    expect(engine.loaded).toBe(before)
+    expect(engine.loaded?.selection).toEqual({ t: 0, c: 0, z: 0 })
+    expect(prepared.selection).toEqual({ t: 0, c: 1, z: 3 })
+
+    const committed = engine.commitSelection(prepared)
+    expect(committed).toBe(engine.loaded)
+    expect(committed.selection).toEqual({ t: 0, c: 1, z: 3 })
+    expect(engine.channelContrast[1]).toEqual(committed.contrast)
+  })
+
+  it('rejects a prepared selection after its source has been replaced', async () => {
+    const engine = new ImageViewerEngine()
+    await engine.setSource(syntheticPlaneSource('ZCYX'))
+    const prepared = await engine.prepareSelection({ z: 2 })
+    await engine.setSource(syntheticPlaneSource('YX'))
+    expect(() => engine.commitSelection(prepared)).toThrowError(
+      expect.objectContaining({ name: 'AbortError' }),
+    )
+  })
 })
 
 describe('parseOmeScale', () => {

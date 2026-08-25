@@ -60,6 +60,12 @@ export interface LoadedImage {
   loaders: unknown[]
 }
 
+export interface PreparedSelection {
+  generation: number
+  selection: PlaneSelection
+  contrast: [number, number] | null
+}
+
 /** Session state: one pixel source, chrome, overlays. */
 export class ImageViewerEngine {
   generation = 0
@@ -121,6 +127,52 @@ export class ImageViewerEngine {
     this.loaded = { ...this.loaded, selection: next }
     this.#histograms.clear()
     return next
+  }
+
+  /** Prepare a plane selection without changing the currently displayed state. */
+  async prepareSelection(selection: Partial<PlaneSelection>): Promise<PreparedSelection> {
+    const loaded = this.loaded
+    if (!loaded) throw new Error('no image is loaded')
+    const next = clampCounts(
+      {
+        t: selection.t ?? loaded.selection.t,
+        c: selection.c ?? loaded.selection.c,
+        z: selection.z ?? loaded.selection.z,
+      },
+      { t: loaded.tCount, c: loaded.channelCount, z: loaded.zCount },
+    )
+    if (!this.#planeSource || loaded.sourceWidth * loaded.sourceHeight > MAX_CONTRAST_SAMPLES) {
+      return { generation: loaded.generation, selection: next, contrast: null }
+    }
+    const source = loaded.loaders[0]
+    if (!(source instanceof OrientedPixelSource)) {
+      return { generation: loaded.generation, selection: next, contrast: null }
+    }
+    const raster = await source.getRaster({
+      selection: vivSelection(source.labels, next),
+    })
+    return {
+      generation: loaded.generation,
+      selection: next,
+      contrast: contrastLimits(raster.data),
+    }
+  }
+
+  /** Commit a previously prepared selection as one engine-state update. */
+  commitSelection(prepared: PreparedSelection): LoadedImage {
+    if (!this.loaded || this.loaded.generation !== prepared.generation) {
+      throw new DOMException('The operation was aborted.', 'AbortError')
+    }
+    this.loaded = {
+      ...this.loaded,
+      selection: { ...prepared.selection },
+      ...(prepared.contrast ? { contrast: prepared.contrast } : {}),
+    }
+    if (prepared.contrast) {
+      this.channelContrast[prepared.selection.c] = [...prepared.contrast]
+    }
+    this.#histograms.clear()
+    return this.loaded
   }
 
   setRois(rois: readonly Roi[]): void {

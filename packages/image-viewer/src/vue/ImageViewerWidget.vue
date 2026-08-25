@@ -53,6 +53,7 @@ const optionsOpen = ref(false)
 const optionsMenu = ref<HTMLDivElement | null>(null)
 const selectedRoiId = ref<string | null>(null)
 const overlayRevision = ref(0)
+const pixelRevision = ref(0)
 const loaded = ref<LoadedImage | null>(null)
 const camera = ref<OrthographicViewState>({
   target: [0, 0, 0],
@@ -78,6 +79,7 @@ const LAYOUT_MODES = [
   { value: 'composite' as const, label: 'Composite', icon: 'layers-3' as const },
 ]
 let loadController: AbortController | null = null
+let selectionRevision = 0
 let viewIsHome = true
 let resizeObserver: ResizeObserver | null = null
 let lastPanesWidth = 0
@@ -94,6 +96,10 @@ function emitView(): void {
 
 function bumpOverlay(): void {
   overlayRevision.value += 1
+}
+
+function bumpPixels(): void {
+  pixelRevision.value += 1
 }
 
 function bindPane(index: number, el: unknown): void {
@@ -156,6 +162,7 @@ async function setSource(
   source: ImageSource,
   options: { xyOverlays?: readonly XyOverlay[] } = {},
 ): Promise<SourceInfo | null> {
+  selectionRevision += 1
   loadController?.abort()
   const controller = new AbortController()
   loadController = controller
@@ -226,13 +233,20 @@ function setXyOverlays(overlays: readonly XyOverlay[]): void {
   bumpOverlay()
 }
 
-async function onSelection(): Promise<void> {
+async function onSelection(axis: keyof PlaneSelection, event: Event): Promise<void> {
   if (!engine.loaded) return
-  engine.setSelection(selection.value)
-  selection.value = { ...engine.loaded.selection }
-  loaded.value = engine.loaded
-  await engine.refreshPlaneContrast()
-  bumpOverlay()
+  const input = event.target
+  if (!(input instanceof HTMLInputElement)) return
+  const value = Number(input.value)
+  if (!Number.isInteger(value)) return
+  const revision = selectionRevision + 1
+  selectionRevision = revision
+  const requested = { ...selection.value, [axis]: value }
+  const prepared = await engine.prepareSelection(requested)
+  if (revision !== selectionRevision) return
+  const next = engine.commitSelection(prepared)
+  selection.value = { ...next.selection }
+  loaded.value = next
 }
 
 function onLayout(): void {
@@ -244,7 +258,7 @@ function onLayout(): void {
 
 function onLut(channel: number, name: LutName): void {
   engine.setChannelColor(channel, CHANNEL_LUTS[name])
-  bumpOverlay()
+  bumpPixels()
 }
 
 function syncRangeFields(): void {
@@ -270,14 +284,14 @@ function onContrastRange(min: number, max: number): void {
   if (rangeChannel.value == null) return
   engine.setChannelContrast(rangeChannel.value, [min, max])
   syncRangeFields()
-  bumpOverlay()
+  bumpPixels()
 }
 
 async function onContrastAuto(): Promise<void> {
   if (rangeChannel.value == null) return
   await engine.autoChannelContrast(rangeChannel.value)
   syncRangeFields()
-  bumpOverlay()
+  bumpPixels()
 }
 
 function onAxesToggle(): void {
@@ -463,7 +477,13 @@ defineExpose({
       </div>
       <label v-if="channelCount > 1 && layout === 'single'">
         C
-        <input v-model.number="selection.c" type="range" min="0" :max="channelCount - 1" @input="onSelection" />
+        <input
+          :value="selection.c"
+          type="range"
+          min="0"
+          :max="channelCount - 1"
+          @input="onSelection('c', $event)"
+        />
         {{ selection.c }}
       </label>
       <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('rect')">Add rect</button>
@@ -495,6 +515,7 @@ defineExpose({
           :camera="camera"
           :double-click-behavior="doubleClickBehavior"
           :overlay-revision="overlayRevision"
+          :pixel-revision="pixelRevision"
           :axes-visible="axesVisible"
           :rois-visible="roisVisible"
           :channel-toolbars-visible="channelToolbarsVisible"
@@ -510,26 +531,26 @@ defineExpose({
       <label v-if="tCount > 1" class="mm-slice-control">
         T
         <input
-          v-model.number="selection.t"
+          :value="selection.t"
           type="range"
           min="0"
           :max="tCount - 1"
           step="1"
           aria-label="T plane"
-          @input="onSelection"
+          @input="onSelection('t', $event)"
         />
         {{ selection.t }}
       </label>
       <label v-if="zCount > 1" class="mm-slice-control">
         Z
         <input
-          v-model.number="selection.z"
+          :value="selection.z"
           type="range"
           min="0"
           :max="zCount - 1"
           step="1"
           aria-label="Z plane"
-          @input="onSelection"
+          @input="onSelection('z', $event)"
         />
         {{ selection.z }}
       </label>
