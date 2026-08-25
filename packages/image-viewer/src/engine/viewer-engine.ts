@@ -12,11 +12,10 @@ import {
   clampSelection,
   contrastLimits,
   planeHeight,
-  planePyramidSources,
   planeWidth,
   samplePlaneValues,
 } from './plane'
-import { TILE_SIZE, TiledPlanePixelSource } from './tile-source'
+import { TiledPlanePixelSource } from './tile-source'
 import type {
   ImageSource,
   PlaneSelection,
@@ -50,8 +49,8 @@ export interface LoadedImage {
   contrast: [number, number]
   labels: string[]
   dtype: string
-  /** Viv rendering policy for already-materialized in-memory pyramids. */
-  inMemoryPyramid: boolean
+  /** Viv rendering policy for an already-materialized, exactly tiled plane. */
+  inMemoryTiles: boolean
   xLabel: string
   xUnit: string
   xStep: number
@@ -282,9 +281,7 @@ export class ImageViewerEngine {
     const selection = clampSelection(source, { t: 0, c: 0, z: 0 })
     const sourceWidth = planeWidth(source)
     const sourceHeight = planeHeight(source)
-    const loaders = planePyramidSources(source, TILE_SIZE).map(
-      (level) => new OrientedPixelSource(new TiledPlanePixelSource(level)),
-    )
+    const loaders = [new OrientedPixelSource(new TiledPlanePixelSource(source))]
     const finest = loaders[0]
     if (!finest) throw new Error('plane pyramid is empty')
     const contrast =
@@ -319,7 +316,7 @@ export class ImageViewerEngine {
       contrast,
       labels: [...source.labels],
       dtype: finest.dtype,
-      inMemoryPyramid: true,
+      inMemoryTiles: true,
       xLabel: displayAxes.x.label,
       xUnit: displayAxes.x.unit,
       xStep: displayAxes.x.step,
@@ -391,7 +388,7 @@ export class ImageViewerEngine {
       contrast,
       labels,
       dtype: String(finest.dtype ?? 'Uint16'),
-      inMemoryPyramid: false,
+      inMemoryTiles: false,
       xLabel: displayAxes.x.label,
       xUnit: displayAxes.x.unit,
       xStep: displayAxes.x.step,
