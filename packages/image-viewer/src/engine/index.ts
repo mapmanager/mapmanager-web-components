@@ -4,7 +4,17 @@ export { SYNTHETIC_SHAPE, syntheticPlaneSource } from './synthetic'
 export { extractYxPlane, contrastLimits, samplePlaneValues } from './plane'
 export { autoRange, histogramForValues, histogramBarFraction } from './contrast-range'
 export type { Histogram } from './contrast-range'
-export { niceStep, niceTickValues, formatTick, physicalToPlotX, physicalToPlotY, flipYPlotEdges, DEFAULT_AXIS_STYLE } from './axis-ticks'
+export {
+  niceStep,
+  niceTickValues,
+  formatTick,
+  physicalToPlotX,
+  physicalToPlotY,
+  flipYPlotEdges,
+  visibleImageAxis,
+  DEFAULT_AXIS_STYLE,
+} from './axis-ticks'
+export type { PlotBox, VisibleImageAxis } from './axis-ticks'
 export { TiledPlanePixelSource, TILE_SIZE, tileCount } from './tile-source'
 export { parseOmeScale, parseOmeContrast } from './ome-metadata'
 export {

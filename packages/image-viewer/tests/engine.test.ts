@@ -13,7 +13,14 @@ import {
 import { OrientedPixelSource } from '../src/engine/oriented-pixel-source'
 import { extractYxPlane } from '../src/engine/plane'
 import { autoRange, histogramBarFraction } from '../src/engine/contrast-range'
-import { niceStep, niceTickValues, physicalToPlotX, physicalToPlotY, flipYPlotEdges } from '../src/engine/axis-ticks'
+import {
+  niceStep,
+  niceTickValues,
+  physicalToPlotX,
+  physicalToPlotY,
+  flipYPlotEdges,
+  visibleImageAxis,
+} from '../src/engine/axis-ticks'
 import { SYNTHETIC_SHAPE, syntheticPlaneSource } from '../src/engine/synthetic'
 import { TILE_SIZE, TiledPlanePixelSource, tileCount } from '../src/engine/tile-source'
 import { homeZoom, visibleDisplayRect, defaultRectDisplay, defaultLineDisplay } from '../src/engine/view-fit'
@@ -350,6 +357,83 @@ describe('display axes and contrast auto', () => {
     const panned = flipYPlotEdges(1, 11, 10)
     expect(panned).toEqual({ yBottom: -1, yTop: 9 })
     expect(physicalToPlotY(5, panned.yBottom, panned.yTop, plot)).toBe(40)
+  })
+
+  it('hugs the visible image inside the Deck stage when zoomed out', () => {
+    const plot = { left: 64, top: 10, width: 200, height: 200 }
+    const axis = visibleImageAxis({
+      plot,
+      view: { x0: -50, y0: -50, x1: 150, y1: 150 },
+      imageWidth: 100,
+      imageHeight: 100,
+      xStep: 1,
+      yStep: 1,
+    })
+    expect(axis).not.toBeNull()
+    expect(axis?.plot).toEqual({ left: 114, top: 60, width: 100, height: 100 })
+    expect(axis?.xLeft).toBe(0)
+    expect(axis?.xRight).toBe(99)
+    expect(axis?.yBottom).toBe(0)
+    expect(axis?.yTop).toBe(99)
+    const ticks = niceTickValues(axis!.xLeft, axis!.xRight)
+    expect(ticks.every((value) => value >= 0 && value <= 99)).toBe(true)
+  })
+
+  it('keeps the axis box on the stage when the image fills the view', () => {
+    const plot = { left: 64, top: 10, width: 200, height: 200 }
+    const axis = visibleImageAxis({
+      plot,
+      view: { x0: 10, y0: 20, x1: 50, y1: 80 },
+      imageWidth: 100,
+      imageHeight: 100,
+      xStep: 0.5,
+      yStep: 2,
+    })
+    expect(axis).not.toBeNull()
+    expect(axis?.plot).toEqual(plot)
+    expect(axis?.xLeft).toBe(5)
+    expect(axis?.xRight).toBe(25)
+    expect(axis?.yBottom).toBe(40)
+    expect(axis?.yTop).toBe(160)
+  })
+
+  it('drops negative and past-image ticks when the camera overshoots the plane', () => {
+    const plot = { left: 0, top: 0, width: 100, height: 100 }
+    const axis = visibleImageAxis({
+      plot,
+      view: { x0: -20, y0: 1, x1: 80, y1: 11 },
+      imageWidth: 10,
+      imageHeight: 10,
+      xStep: 1,
+      yStep: 1,
+    })
+    expect(axis).not.toBeNull()
+    expect(axis!.xLeft).toBe(0)
+    expect(axis!.xRight).toBe(9)
+    expect(axis!.yBottom).toBe(0)
+    expect(axis!.yTop).toBe(9)
+    expect(axis!.plot.left).toBeGreaterThan(plot.left)
+    expect(axis!.plot.left + axis!.plot.width).toBeLessThan(plot.width)
+    expect(niceTickValues(axis!.xLeft, axis!.xRight).every((value) => value >= 0 && value <= 9)).toBe(
+      true,
+    )
+    expect(niceTickValues(axis!.yBottom, axis!.yTop).every((value) => value >= 0 && value <= 9)).toBe(
+      true,
+    )
+  })
+
+  it('hides axes when the image is fully panned off the plot', () => {
+    const plot = { left: 0, top: 0, width: 200, height: 200 }
+    expect(
+      visibleImageAxis({
+        plot,
+        view: { x0: 200, y0: 200, x1: 400, y1: 400 },
+        imageWidth: 100,
+        imageHeight: 100,
+        xStep: 1,
+        yStep: 1,
+      }),
+    ).toBeNull()
   })
 
   it('maps a constant-source-X scan path to a horizontal display line', () => {

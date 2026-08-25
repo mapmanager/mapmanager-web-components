@@ -170,12 +170,89 @@ export function flipYPlotEdges(
   }
 }
 
+export type PlotBox = { left: number; top: number; width: number; height: number }
+
+export type VisibleImageAxis = {
+  plot: PlotBox
+  xLeft: number
+  xRight: number
+  yBottom: number
+  yTop: number
+}
+
+function clampPhysical(value: number, max: number): number {
+  return Math.min(Math.max(value, 0), max)
+}
+
+/**
+ * Axis box and physical edges for the visible image ∩ Deck stage.
+ *
+ * The box hugs the raster inside the stage (letterboxed when zoomed out). Tick
+ * values stay in `[0, (n-1)·step]`, matching `viewWindow()`. Returns `null`
+ * when the image is fully off-plot.
+ *
+ * Args:
+ *   plot: Deck stage rectangle in overlay-canvas CSS pixels.
+ *   view: Camera window in display pixels (`visibleDisplayRect`).
+ *   imageWidth: Display image width in samples.
+ *   imageHeight: Display image height in samples.
+ *   xStep: Physical units per display-X sample.
+ *   yStep: Physical units per display-Y sample.
+ *
+ * Returns:
+ *   Inset axis rect and clamped physical edges, or `null` when empty.
+ */
+export function visibleImageAxis(input: {
+  plot: PlotBox
+  view: { x0: number; y0: number; x1: number; y1: number }
+  imageWidth: number
+  imageHeight: number
+  xStep: number
+  yStep: number
+}): VisibleImageAxis | null {
+  const { plot, view, imageWidth, imageHeight, xStep, yStep } = input
+  if (!(plot.width > 0) || !(plot.height > 0)) return null
+  if (!(imageWidth > 0) || !(imageHeight > 0)) return null
+  if (view.x1 === view.x0 || view.y1 === view.y0) return null
+
+  const ix0 = Math.max(view.x0, 0)
+  const ix1 = Math.min(view.x1, imageWidth)
+  if (!(ix1 > ix0)) return null
+
+  const yCam = flipYPlotEdges(view.y0, view.y1, imageHeight)
+  const iyBottom = Math.max(Math.min(yCam.yBottom, yCam.yTop), 0)
+  const iyTop = Math.min(Math.max(yCam.yBottom, yCam.yTop), imageHeight)
+  if (!(iyTop > iyBottom)) return null
+
+  const left = physicalToPlotX(ix0, view.x0, view.x1, plot)
+  const right = physicalToPlotX(ix1, view.x0, view.x1, plot)
+  const top = physicalToPlotY(iyTop, yCam.yBottom, yCam.yTop, plot)
+  const bottom = physicalToPlotY(iyBottom, yCam.yBottom, yCam.yTop, plot)
+  const axisLeft = Math.min(left, right)
+  const axisRight = Math.max(left, right)
+  const axisTop = Math.min(top, bottom)
+  const axisBottom = Math.max(top, bottom)
+  const width = axisRight - axisLeft
+  const height = axisBottom - axisTop
+  if (!(width > 0) || !(height > 0)) return null
+
+  const xMax = Math.max(0, (imageWidth - 1) * xStep)
+  const yMax = Math.max(0, (imageHeight - 1) * yStep)
+  return {
+    plot: { left: axisLeft, top: axisTop, width, height },
+    xLeft: clampPhysical(ix0 * xStep, xMax),
+    xRight: clampPhysical(ix1 * xStep, xMax),
+    yBottom: clampPhysical(iyBottom * yStep, yMax),
+    yTop: clampPhysical(iyTop * yStep, yMax),
+  }
+}
+
 /**
  * Stroke the axis box, nice ticks, and titles. Tick numbers are physical units
  * (`pixelIndex * step`). Labels/units are caller-provided.
  *
- * X/Y placement uses the physical values at the plot edges so ticks follow
- * pan/zoom with deck.gl `flipY` (0 at the bottom when that edge’s world-Y is 0).
+ * `plot` is the visible-image rectangle (image ∩ Deck stage). Titles center on
+ * that box; the X title stays in the bottom gutter (`canvasHeight`).
  */
 export function drawAxes(
   context: CanvasRenderingContext2D,
@@ -195,7 +272,7 @@ export function drawAxes(
   context.save()
   context.strokeStyle = '#64748b'
   context.fillStyle = '#cbd5e1'
-  context.lineWidth = 1
+  context.lineWidth = 2
   context.font = `${style.fontSize}px ${style.fontFamily}`
   context.strokeRect(plot.left + 0.5, plot.top + 0.5, Math.max(0, plot.width - 1), Math.max(0, plot.height - 1))
   if (input.xRight !== input.xLeft) {

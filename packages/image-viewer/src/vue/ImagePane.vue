@@ -6,7 +6,7 @@ import { MultiscaleImageLayer } from '@vivjs/layers'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import { CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane, type LutName } from '../engine/channel-luts'
-import { DEFAULT_AXIS_STYLE, drawAxes, flipYPlotEdges } from '../engine/axis-ticks'
+import { DEFAULT_AXIS_STYLE, drawAxes, visibleImageAxis } from '../engine/axis-ticks'
 import {
   dragZoomMode,
   guideRect,
@@ -443,45 +443,37 @@ function drawAxisChrome(): void {
   context.setTransform(dpr, 0, 0, dpr, 0, 0)
   context.clearRect(0, 0, cssWidth, cssHeight)
   if (!loaded || !props.axesVisible) return
-  const margins = DEFAULT_AXIS_STYLE.margins
+  const stageEl = host.value
+  if (!stageEl) return
+  const plotRect = plotEl.getBoundingClientRect()
+  const stageRect = stageEl.getBoundingClientRect()
   const box = {
-    left: margins.left,
-    top: margins.top,
-    width: Math.max(1, cssWidth - margins.left - margins.right),
-    height: Math.max(1, cssHeight - margins.top - margins.bottom),
+    left: stageRect.left - plotRect.left,
+    top: stageRect.top - plotRect.top,
+    width: Math.max(1, stageEl.clientWidth),
+    height: Math.max(1, stageEl.clientHeight),
   }
-  const edges = plotEdgePhysical(loaded)
-  drawAxes(context, {
+  const axis = visibleImageAxis({
     plot: box,
+    view: visibleDisplayRect(box.width, box.height, props.camera.target, props.camera.zoom),
+    imageWidth: loaded.width,
+    imageHeight: loaded.height,
+    xStep: loaded.xStep,
+    yStep: loaded.yStep,
+  })
+  if (!axis) return
+  drawAxes(context, {
+    plot: axis.plot,
     canvasHeight: cssHeight,
-    ...edges,
+    xLeft: axis.xLeft,
+    xRight: axis.xRight,
+    yBottom: axis.yBottom,
+    yTop: axis.yTop,
     xLabel: loaded.xLabel,
     xUnit: loaded.xUnit,
     yLabel: loaded.yLabel,
     yUnit: loaded.yUnit,
   })
-}
-
-/**
- * Physical values at the plot edges from the camera.
- *
- * X uses the visible window directly. Y reflects through display height so
- * ticks follow flip-Y pan (image up → labels up) with 0 still at the bottom.
- */
-function plotEdgePhysical(loaded: LoadedImage): {
-  xLeft: number
-  xRight: number
-  yBottom: number
-  yTop: number
-} {
-  const view = visibleDisplayRect(elWidth(), elHeight(), props.camera.target, props.camera.zoom)
-  const yEdges = flipYPlotEdges(view.y0, view.y1, loaded.height)
-  return {
-    xLeft: view.x0 * loaded.xStep,
-    xRight: view.x1 * loaded.xStep,
-    yBottom: yEdges.yBottom * loaded.yStep,
-    yTop: yEdges.yTop * loaded.yStep,
-  }
 }
 
 function clientSize(): { width: number; height: number } {
