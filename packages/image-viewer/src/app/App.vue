@@ -10,7 +10,7 @@ type PresetKind = 'YX' | 'CYX' | 'ZCYX' | 'kymo' | 'reference'
 type DemoKind = PresetKind | 'local'
 
 interface WidgetApi {
-  setSource: (source: ImageSource) => Promise<{
+  setSource: (source: ImageSource, options?: { xyOverlays?: readonly XyOverlay[] }) => Promise<{
     width: number
     height: number
     sourceWidth: number
@@ -62,16 +62,12 @@ async function load(kind: PresetKind): Promise<void> {
   demo.value = kind
   const api = widget.value
   if (!api) return
-  const info = await api.setSource(sourceFor(kind))
-  if (!info) {
-    api.setXyOverlays([])
-    return
-  }
-  if (kind === 'kymo' || kind === 'reference') {
-    api.setXyOverlays([])
-    return
-  }
-  api.setXyOverlays([demoScanOverlay(info.sourceWidth, info.sourceHeight)])
+  const source = sourceFor(kind)
+  const xyOverlays =
+    source.kind === 'plane'
+      ? [demoScanOverlay(source.shape.at(-1) ?? 1, source.shape.at(-2) ?? 1)]
+      : []
+  await api.setSource(source, { xyOverlays })
 }
 
 async function openLocalOmeZarr(): Promise<void> {
@@ -79,12 +75,14 @@ async function openLocalOmeZarr(): Promise<void> {
   try {
     const directory = await pickOmeZarrDirectory()
     demo.value = 'local'
-    const info = await widget.value?.setSource({
-      kind: 'ome-zarr',
-      id: directory.name,
-      store: new BrowserDirectoryStore(directory),
-    })
-    if (info) widget.value?.setXyOverlays([])
+    await widget.value?.setSource(
+      {
+        kind: 'ome-zarr',
+        id: directory.name,
+        store: new BrowserDirectoryStore(directory),
+      },
+      { xyOverlays: [] },
+    )
   } catch (reason) {
     if (reason instanceof DOMException && reason.name === 'AbortError') return
     localError.value = reason instanceof Error ? reason.message : String(reason)

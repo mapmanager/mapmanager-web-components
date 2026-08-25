@@ -62,7 +62,7 @@ const camera = ref<OrthographicViewState>({
 })
 const panesHost = ref<HTMLDivElement | null>(null)
 const paneRefs = ref<PaneApi[]>([])
-const engine = new ImageViewerEngine()
+let engine = new ImageViewerEngine()
 const rangeOpen = ref(false)
 const rangeChannel = ref<number | null>(null)
 const rangeAnchor = ref<HTMLElement | null>(null)
@@ -70,6 +70,7 @@ const rangeHistogram = ref<Histogram | null>(null)
 const rangeLog = ref(true)
 const rangeMin = ref(0)
 const rangeMax = ref(1)
+const switchingSource = ref(false)
 const LAYOUT_MODES = [
   { value: 'side' as const, label: 'Side by side', icon: 'columns-2' as const },
   { value: 'stack' as const, label: 'Stacked', icon: 'rows-2' as const },
@@ -151,28 +152,46 @@ export interface SourceInfo {
   tCount: number
 }
 
-async function setSource(source: ImageSource): Promise<SourceInfo | null> {
+async function setSource(
+  source: ImageSource,
+  options: { xyOverlays?: readonly XyOverlay[] } = {},
+): Promise<SourceInfo | null> {
   loadController?.abort()
   const controller = new AbortController()
   loadController = controller
-  status.value = 'Loading…'
+  switchingSource.value = true
   errorMessage.value = null
   try {
-    const next = await engine.setSource(source, controller.signal)
+    const candidate = new ImageViewerEngine()
+    candidate.layout = layout.value
+    candidate.axesVisible = axesVisible.value
+    const next = await candidate.setSource(source, controller.signal)
     if (controller.signal.aborted) return null
-    loaded.value = next
+    candidate.setXyOverlays(options.xyOverlays ?? [])
+    const pane = firstPaneSize()
+    const nextCamera: OrthographicViewState = {
+      target: [Math.max(next.width, 1) / 2, Math.max(next.height, 1) / 2, 0],
+      zoom: homeZoom(pane.width, pane.height, next.width, next.height),
+      minZoom: -10,
+      maxZoom: 8,
+    }
+
+    // Publish one complete frame. The pane must never see new loaders with
+    // the previous source's camera, channels, or overlays.
+    engine = candidate
+    camera.value = nextCamera
     selection.value = { ...next.selection }
     sourceId.value = next.sourceId
     channelCount.value = next.channelCount
     zCount.value = next.zCount
     tCount.value = next.tCount
     selectedRoiId.value = engine.selectedRoiId
-    engine.layout = layout.value
+    loaded.value = next
     bumpOverlay()
-    await nextTick()
     rangeOpen.value = false
-    goHome()
+    viewIsHome = true
     status.value = formatStatus(next)
+    switchingSource.value = false
     emit('source-change', next.sourceId)
     emitView()
     return {
@@ -190,8 +209,9 @@ async function setSource(source: ImageSource): Promise<SourceInfo | null> {
     if (controller.signal.aborted) return null
     errorMessage.value = reason instanceof Error ? reason.message : String(reason)
     status.value = 'Failed'
-    loaded.value = null
     return null
+  } finally {
+    if (loadController === controller) switchingSource.value = false
   }
 }
 
@@ -366,11 +386,22 @@ onBeforeUnmount(() => {
   resizeObserver = null
 })
 
-defineExpose({ setSource, setRois, setXyOverlays, engine })
+defineExpose({
+  setSource,
+  setRois,
+  setXyOverlays,
+  get engine() {
+    return engine
+  },
+})
 </script>
 
 <template>
-  <section class="mm-image-viewer">
+  <section
+    class="mm-image-viewer"
+    :class="{ 'is-switching-source': switchingSource }"
+    :aria-busy="switchingSource"
+  >
     <div class="mm-image-viewer-toolbar">
       <div ref="optionsMenu" class="mm-options-menu">
         <button

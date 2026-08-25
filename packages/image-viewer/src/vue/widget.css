@@ -8,6 +8,11 @@
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
+.mm-image-viewer.is-switching-source .mm-image-viewer-toolbar,
+.mm-image-viewer.is-switching-source .mm-image-viewer-panes {
+  pointer-events: none;
+}
+
 .mm-image-viewer-toolbar {
   display: flex;
   flex-wrap: wrap;
