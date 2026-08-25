@@ -466,16 +466,6 @@ defineExpose({
         <input v-model.number="selection.c" type="range" min="0" :max="channelCount - 1" @input="onSelection" />
         {{ selection.c }}
       </label>
-      <label v-if="zCount > 1">
-        Z
-        <input v-model.number="selection.z" type="range" min="0" :max="zCount - 1" @input="onSelection" />
-        {{ selection.z }}
-      </label>
-      <label v-if="tCount > 1">
-        T
-        <input v-model.number="selection.t" type="range" min="0" :max="tCount - 1" @input="onSelection" />
-        {{ selection.t }}
-      </label>
       <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('rect')">Add rect</button>
       <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('line')">Add line</button>
       <button v-if="roiToolbarVisible" type="button" :disabled="!selectedRoiId" @click="deleteSelectedRoi">
@@ -489,32 +479,60 @@ defineExpose({
       :value="errorMessage ?? status"
       @focus="selectCopyText"
     />
-    <div ref="panesHost" class="mm-image-viewer-panes" :data-layout="layout">
-      <ImagePane
-        v-for="(slot, index) in slots"
-        :key="slot.id"
-        :ref="(el) => bindPane(index, el)"
-        :loaded="loaded"
-        :channels="slot.channels"
-        :channel-colors="engine.channelColors"
-        :channel-contrast="engine.channelContrast"
-        :rois="engine.rois"
-        :selected-roi-id="selectedRoiId"
-        :xy-overlays="engine.xyOverlays"
-        :camera="camera"
-        :double-click-behavior="doubleClickBehavior"
-        :overlay-revision="overlayRevision"
-        :axes-visible="axesVisible"
-        :rois-visible="roisVisible"
-        :channel-toolbars-visible="channelToolbarsVisible"
-        @camera-change="onCameraChange"
-        @home="goHome"
-        @select-roi="onSelectRoi"
-        @lut="onLut"
-        @contrast-panel="onContrastPanel"
-      />
-      <p v-if="errorMessage" class="mm-image-viewer-status error">{{ errorMessage }}</p>
-      <p v-else class="mm-image-viewer-status">{{ status }}</p>
+    <div class="mm-image-viewer-stage-row">
+      <div ref="panesHost" class="mm-image-viewer-panes" :data-layout="layout">
+        <ImagePane
+          v-for="(slot, index) in slots"
+          :key="slot.id"
+          :ref="(el) => bindPane(index, el)"
+          :loaded="loaded"
+          :channels="slot.channels"
+          :channel-colors="engine.channelColors"
+          :channel-contrast="engine.channelContrast"
+          :rois="engine.rois"
+          :selected-roi-id="selectedRoiId"
+          :xy-overlays="engine.xyOverlays"
+          :camera="camera"
+          :double-click-behavior="doubleClickBehavior"
+          :overlay-revision="overlayRevision"
+          :axes-visible="axesVisible"
+          :rois-visible="roisVisible"
+          :channel-toolbars-visible="channelToolbarsVisible"
+          @camera-change="onCameraChange"
+          @home="goHome"
+          @select-roi="onSelectRoi"
+          @lut="onLut"
+          @contrast-panel="onContrastPanel"
+        />
+        <p v-if="errorMessage" class="mm-image-viewer-status error">{{ errorMessage }}</p>
+        <p v-else class="mm-image-viewer-status">{{ status }}</p>
+      </div>
+      <label v-if="tCount > 1" class="mm-slice-control">
+        T
+        <input
+          v-model.number="selection.t"
+          type="range"
+          min="0"
+          :max="tCount - 1"
+          step="1"
+          aria-label="T plane"
+          @input="onSelection"
+        />
+        {{ selection.t }}
+      </label>
+      <label v-if="zCount > 1" class="mm-slice-control">
+        Z
+        <input
+          v-model.number="selection.z"
+          type="range"
+          min="0"
+          :max="zCount - 1"
+          step="1"
+          aria-label="Z plane"
+          @input="onSelection"
+        />
+        {{ selection.z }}
+      </label>
     </div>
     <ContrastPopover
       :open="rangeOpen"
