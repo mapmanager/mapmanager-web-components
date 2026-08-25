@@ -2,10 +2,12 @@
 import { onMounted, ref } from 'vue'
 
 import { syntheticPlaneSource } from '../engine/synthetic'
+import { BrowserDirectoryStore, pickOmeZarrDirectory } from '../engine/browser-directory-store'
 import type { ImageSource, XyOverlay } from '../engine/types'
 import ImageViewerWidget from '../vue/ImageViewerWidget.vue'
 
-type DemoKind = 'YX' | 'CYX' | 'ZCYX' | 'kymo' | 'reference'
+type PresetKind = 'YX' | 'CYX' | 'ZCYX' | 'kymo' | 'reference'
+type DemoKind = PresetKind | 'local'
 
 interface WidgetApi {
   setSource: (source: ImageSource) => Promise<{
@@ -19,12 +21,13 @@ interface WidgetApi {
 
 const widget = ref<WidgetApi | null>(null)
 const demo = ref<DemoKind>('YX')
+const localError = ref<string | null>(null)
 
 const R2_COLLECTION = 'https://data.mapmanager.net/samples/velocity-sample-data.ome.zarr/'
 const kymoUrl = `${R2_COLLECTION}acq_images/acq_image_000/`
 const referenceUrl = `${R2_COLLECTION}acq_images/acq_image_000/reference/`
 
-function sourceFor(kind: DemoKind): ImageSource {
+function sourceFor(kind: PresetKind): ImageSource {
   if (kind === 'kymo') {
     return { kind: 'ome-zarr', id: 'r2-velocity-kymo', url: kymoUrl }
   }
@@ -55,7 +58,7 @@ function demoScanOverlay(sourceWidth: number, sourceHeight: number): XyOverlay {
   return { id: 'demo-scan', x, y }
 }
 
-async function load(kind: DemoKind): Promise<void> {
+async function load(kind: PresetKind): Promise<void> {
   demo.value = kind
   const api = widget.value
   if (!api) return
@@ -69,6 +72,23 @@ async function load(kind: DemoKind): Promise<void> {
     return
   }
   api.setXyOverlays([demoScanOverlay(info.sourceWidth, info.sourceHeight)])
+}
+
+async function openLocalOmeZarr(): Promise<void> {
+  localError.value = null
+  try {
+    const directory = await pickOmeZarrDirectory()
+    demo.value = 'local'
+    const info = await widget.value?.setSource({
+      kind: 'ome-zarr',
+      id: directory.name,
+      store: new BrowserDirectoryStore(directory),
+    })
+    if (info) widget.value?.setXyOverlays([])
+  } catch (reason) {
+    if (reason instanceof DOMException && reason.name === 'AbortError') return
+    localError.value = reason instanceof Error ? reason.message : String(reason)
+  }
 }
 
 onMounted(() => {
@@ -93,7 +113,11 @@ onMounted(() => {
         <button type="button" :class="{ active: demo === 'reference' }" @click="load('reference')">
           R2 reference
         </button>
+        <button type="button" :class="{ active: demo === 'local' }" @click="openLocalOmeZarr">
+          Open local OME-Zarr
+        </button>
       </nav>
+      <p v-if="localError" role="alert">{{ localError }}</p>
     </header>
     <ImageViewerWidget ref="widget" />
   </div>

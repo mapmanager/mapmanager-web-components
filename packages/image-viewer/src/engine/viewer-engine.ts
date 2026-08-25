@@ -1,10 +1,9 @@
-import { getChannelStats, loadOmeZarr } from '@vivjs/loaders'
+import { getChannelStats, loadOmeZarr, loadOmeZarrFromStore } from '@vivjs/loaders'
 
 import { autoRange, histogramForValues, type Histogram } from './contrast-range'
 import { defaultChannelColor } from './channel-luts'
 import type { ViewerLayout } from './layout-panes'
 import { parseOmeContrast, parseOmeScale } from './ome-metadata'
-import { loadOmeZarrPlaneIfSmall } from './ome-zarr-loader'
 import { OrientedPixelSource, type InnerPixelSource } from './oriented-pixel-source'
 import { transposedAxes, transposedShape } from './orientation'
 import {
@@ -25,6 +24,7 @@ import type {
   ViewWindow,
   XyOverlay,
   AxisCalibration,
+  OmeZarrReadableStore,
 } from './types'
 import { vivSelection } from './viv-selection'
 
@@ -332,24 +332,13 @@ export class ImageViewerEngine {
     signal?: AbortSignal,
   ): Promise<LoadedImage> {
     throwIfAborted(signal)
-    const small = await loadOmeZarrPlaneIfSmall(
-      resolveSourceUrl(source.url),
-      source.id,
-      { t: 0, c: 0, z: 0 },
-      signal,
-    )
-    if (small) {
-      const loaded = await this.#loadPlane(
-        { ...small.source, id: source.id },
-        generation,
-        signal,
-      )
-      return { ...loaded, kind: 'ome-zarr' }
-    }
-    const result = await loadOmeZarr(resolveSourceUrl(source.url), {
-      type: 'multiscales',
-      ...(signal ? { fetchOptions: { signal } } : {}),
-    })
+    const result =
+      'url' in source
+        ? await loadOmeZarr(resolveSourceUrl(source.url), {
+            type: 'multiscales',
+            ...(signal ? { fetchOptions: { signal } } : {}),
+          })
+        : await loadOmeZarrFromStore(withAbortSignal(source.store, signal))
     throwIfAborted(signal)
     if (generation !== this.generation) throw abortError()
     const innerLoaders = Array.isArray(result.data) ? result.data : [result.data]
@@ -472,4 +461,25 @@ function resolveSourceUrl(url: string): string {
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url
   const base = globalThis.location?.href
   return typeof base === 'string' ? new URL(url, base).href : url
+}
+
+function withAbortSignal(
+  store: OmeZarrReadableStore,
+  signal?: AbortSignal,
+): OmeZarrReadableStore {
+  if (!signal) return store
+  return {
+    get: (key, options) => store.get(key, mergeSignal(options, signal)),
+    ...(store.getRange
+      ? {
+          getRange: (key, range, options) =>
+            store.getRange!(key, range, mergeSignal(options, signal)),
+        }
+      : {}),
+  }
+}
+
+function mergeSignal(options: unknown, signal: AbortSignal): { signal: AbortSignal } {
+  if (options && typeof options === 'object') return { ...options, signal }
+  return { signal }
 }

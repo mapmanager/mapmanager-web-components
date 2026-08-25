@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { collectionChildUrl } from '../sample-paths'
 import { parseOmeScale } from '../src/engine/ome-metadata'
-import { planeFitsInMemory, shouldLoadOmeZarrAsPlane, zarrJsonUrl } from '../src/engine/ome-zarr-loader'
 import { AXIS_LOCK_PIXELS, dragZoomMode, guideRect, selectionRect } from '../src/engine/drag-zoom'
 import {
   displayToSource,
@@ -133,22 +132,6 @@ describe('TiledPlanePixelSource', () => {
   })
 })
 
-describe('planeFitsInMemory', () => {
-  it('accepts a kymo-scale plane and rejects a large mosaic', () => {
-    expect(planeFitsInMemory(30000, 14)).toBe(true)
-    expect(planeFitsInMemory(512, 512)).toBe(true)
-    expect(planeFitsInMemory(1501, 1000)).toBe(false)
-  })
-})
-
-describe('shouldLoadOmeZarrAsPlane', () => {
-  it('decodes single-level small YX and leaves pyramids to Viv', () => {
-    expect(shouldLoadOmeZarrAsPlane(1, 30000, 14)).toBe(true)
-    expect(shouldLoadOmeZarrAsPlane(6, 512, 512)).toBe(false)
-    expect(shouldLoadOmeZarrAsPlane(1, 1501, 1000)).toBe(false)
-  })
-})
-
 describe('dragZoomMode', () => {
   it('uses region zoom for square images and axis lock otherwise', () => {
     expect(dragZoomMode(512, 512, { x: 0, y: 0 }, { x: 2, y: 2 })).toBe('pending')
@@ -261,17 +244,6 @@ describe('parseOmeScale', () => {
     expect(scale.y).toBe(0.001)
     expect(scale.xUnit).toBe('um')
     expect(scale.yUnit).toBe('seconds')
-  })
-})
-
-describe('zarrJsonUrl', () => {
-  it('appends zarr.json and never returns the directory URL', () => {
-    expect(zarrJsonUrl(new URL('http://example.test/image/')).href).toBe(
-      'http://example.test/image/zarr.json',
-    )
-    expect(zarrJsonUrl(new URL('http://example.test/image')).href).toBe(
-      'http://example.test/image/zarr.json',
-    )
   })
 })
 

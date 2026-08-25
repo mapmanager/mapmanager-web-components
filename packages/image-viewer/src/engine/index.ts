@@ -16,7 +16,11 @@ export {
   transposedShape,
 } from './orientation'
 export { OrientedPixelSource } from './oriented-pixel-source'
-export { MAX_RENDERED_PIXELS, planeFitsInMemory, shouldLoadOmeZarrAsPlane } from './ome-zarr-loader'
+export {
+  BrowserDirectoryStore,
+  browserDirectoryPickerSupported,
+  pickOmeZarrDirectory,
+} from './browser-directory-store'
 export { defaultChannelColor, CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane } from './channel-luts'
 export type { LutName } from './channel-luts'
 export { paneChannels, paneSlots } from './layout-panes'
@@ -42,9 +46,11 @@ export type {
   AxisName,
   ImageSource,
   OmeZarrSource,
+  OmeZarrReadableStore,
   PlaneSelection,
   PlaneSource,
   Roi,
   ViewWindow,
   XyOverlay,
+  StoreRange,
 } from './types'

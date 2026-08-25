@@ -21,11 +21,35 @@ export interface PlaneSource {
   yAxis?: AxisCalibration
 }
 
-export interface OmeZarrSource {
+export type StoreRange =
+  | { offset: number; length: number }
+  | { suffixLength: number }
+
+/** Minimal read-only store contract consumed by Viv's Zarrita loader. */
+export interface OmeZarrReadableStore {
+  get(key: `/${string}`, options?: unknown): Promise<Uint8Array | undefined>
+  getRange?(
+    key: `/${string}`,
+    range: StoreRange,
+    options?: unknown,
+  ): Promise<Uint8Array | undefined>
+}
+
+export interface UrlOmeZarrSource {
   kind: 'ome-zarr'
   id: string
   url: string
+  store?: never
 }
+
+export interface StoreOmeZarrSource {
+  kind: 'ome-zarr'
+  id: string
+  store: OmeZarrReadableStore
+  url?: never
+}
+
+export type OmeZarrSource = UrlOmeZarrSource | StoreOmeZarrSource
 
 export type ImageSource = PlaneSource | OmeZarrSource
 
