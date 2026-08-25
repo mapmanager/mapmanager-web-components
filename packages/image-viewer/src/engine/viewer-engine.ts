@@ -4,6 +4,7 @@ import { autoRange, histogramForValues, type Histogram } from './contrast-range'
 import { defaultChannelColor } from './channel-luts'
 import type { ViewerLayout } from './layout-panes'
 import { parseOmeContrast, parseOmeScale } from './ome-metadata'
+import { smallOmeZarrPlane } from './ome-zarr-fast-path'
 import { OrientedPixelSource, type InnerPixelSource } from './oriented-pixel-source'
 import { transposedAxes, transposedShape } from './orientation'
 import {
@@ -346,11 +347,22 @@ export class ImageViewerEngine {
     if (!innerFinest) throw new Error('OME-Zarr contained no resolutions')
     const labels = [...((innerFinest.labels ?? []) as string[])]
     const sourceShape = [...((innerFinest.shape ?? []) as number[])]
+    const scale = parseOmeScale(result.metadata)
+    const omero = parseOmeContrast(result.metadata)
+    const plane = await smallOmeZarrPlane(
+      source.id,
+      innerLoaders as InnerPixelSource[],
+      signal,
+    )
+    if (plane) {
+      plane.xAxis = { label: 'x', unit: scale.xUnit, step: scale.x }
+      plane.yAxis = { label: 'y', unit: scale.yUnit, step: scale.y }
+      const loaded = await this.#loadPlane(plane, generation, signal)
+      return { ...loaded, kind: 'ome-zarr', contrast: omero ?? loaded.contrast }
+    }
     const loaders = innerLoaders.map((loader) => new OrientedPixelSource(loader as InnerPixelSource))
     const finest = loaders[0]
     if (!finest) throw new Error('OME-Zarr contained no resolutions')
-    const scale = parseOmeScale(result.metadata)
-    const omero = parseOmeContrast(result.metadata)
     const contrast = omero ?? (await contrastFromLoader(loaders.at(-1) ?? finest, labels, signal))
     throwIfAborted(signal)
     if (generation !== this.generation) throw abortError()
