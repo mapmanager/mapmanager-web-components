@@ -121,6 +121,13 @@ function pixelLayers(): unknown[] {
     contrastLimits: channels.map((channel) => channelContrast(channel)),
     channelsVisible: channels.map(() => true),
     dtype: loaded.dtype as 'Uint16',
+    // Viv scales its coarsest raster by 2**level. For narrow in-memory
+    // pyramids that can extend beyond the finest image bounds (for example,
+    // 18px becomes 1px and is then scaled to 32px).
+    excludeBackground: loaded.inMemoryPyramid,
+    // These tiles are already decoded in memory, so fill the viewport without
+    // Viv's network-oriented request throttle.
+    maxRequests: loaded.inMemoryPyramid ? 64 : 10,
   }
   if (colormap) {
     return [

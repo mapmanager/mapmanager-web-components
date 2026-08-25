@@ -106,8 +106,10 @@ describe('in-memory dyadic pyramid', () => {
     const engine = new ImageViewerEngine()
     await engine.setSource(syntheticPlaneSource('CYX', [1, 48, 2048]))
     expect(engine.loaded?.loaders).toHaveLength(2)
+    expect(engine.loaded?.inMemoryPyramid).toBe(true)
     await engine.setSource(syntheticPlaneSource('YX', [16, 24]))
     expect(engine.loaded?.loaders).toHaveLength(1)
+    expect(engine.loaded?.inMemoryPyramid).toBe(true)
   })
 })
 

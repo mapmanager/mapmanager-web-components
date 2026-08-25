@@ -50,6 +50,8 @@ export interface LoadedImage {
   contrast: [number, number]
   labels: string[]
   dtype: string
+  /** Viv rendering policy for already-materialized in-memory pyramids. */
+  inMemoryPyramid: boolean
   xLabel: string
   xUnit: string
   xStep: number
@@ -317,6 +319,7 @@ export class ImageViewerEngine {
       contrast,
       labels: [...source.labels],
       dtype: finest.dtype,
+      inMemoryPyramid: true,
       xLabel: displayAxes.x.label,
       xUnit: displayAxes.x.unit,
       xStep: displayAxes.x.step,
@@ -388,6 +391,7 @@ export class ImageViewerEngine {
       contrast,
       labels,
       dtype: String(finest.dtype ?? 'Uint16'),
+      inMemoryPyramid: false,
       xLabel: displayAxes.x.label,
       xUnit: displayAxes.x.unit,
       xStep: displayAxes.x.step,
