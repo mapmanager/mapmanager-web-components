@@ -1,6 +1,7 @@
 import { getChannelStats, loadOmeZarr, loadOmeZarrFromStore } from '@vivjs/loaders'
 
 import { autoRange, histogramForValues, type Histogram } from './contrast-range'
+import { AsyncPlanePixelSource } from './async-plane-source'
 import { defaultChannelColor } from './channel-luts'
 import type { ViewerLayout } from './layout-panes'
 import { parseOmeContrast, parseOmeScale } from './ome-metadata'
@@ -17,6 +18,7 @@ import {
 } from './plane'
 import { TiledPlanePixelSource } from './tile-source'
 import type {
+  AsyncPlaneSource,
   ImageSource,
   PlaneSelection,
   PlaneSource,
@@ -25,7 +27,9 @@ import type {
   XyOverlay,
   AxisCalibration,
   OmeZarrReadableStore,
+  ViewerSource,
 } from './types'
+import { assertPlaneLayout } from './types'
 import { vivSelection } from './viv-selection'
 
 export type LoadedKind = 'plane' | 'ome-zarr'
@@ -79,10 +83,11 @@ export class ImageViewerEngine {
   channelColors: [number, number, number][] = []
   channelContrast: [number, number][] = []
   #planeSource: PlaneSource | null = null
+  #asyncPlaneSource: OrientedPixelSource | null = null
   #roiSerial = 0
   #histograms = new Map<number, Histogram | null>()
 
-  async setSource(source: ImageSource, signal?: AbortSignal): Promise<LoadedImage> {
+  async setSource(source: ViewerSource, signal?: AbortSignal): Promise<LoadedImage> {
     const generation = this.generation + 1
     this.generation = generation
     this.error = null
@@ -92,11 +97,13 @@ export class ImageViewerEngine {
     this.channelColors = []
     this.channelContrast = []
     this.#planeSource = null
+    this.#asyncPlaneSource = null
     this.#histograms.clear()
     try {
-      const loaded =
-        source.kind === 'plane'
-          ? await this.#loadPlane(source, generation, signal)
+      const loaded = source.kind === 'plane'
+        ? await this.#loadPlane(source, generation, signal)
+        : source.kind === 'async-plane'
+          ? await this.#loadAsyncPlane(source, generation, signal)
           : await this.#loadOmeZarr(source, generation, signal)
       if (generation !== this.generation) throw abortError()
       this.loaded = loaded
@@ -141,10 +148,10 @@ export class ImageViewerEngine {
       },
       { t: loaded.tCount, c: loaded.channelCount, z: loaded.zCount },
     )
-    if (!this.#planeSource || loaded.sourceWidth * loaded.sourceHeight > MAX_CONTRAST_SAMPLES) {
+    if (!this.#planeSource && !this.#asyncPlaneSource) {
       return { generation: loaded.generation, selection: next, contrast: null }
     }
-    const source = loaded.loaders[0]
+    const source = this.#asyncPlaneSource ?? loaded.loaders[0]
     if (!(source instanceof OrientedPixelSource)) {
       return { generation: loaded.generation, selection: next, contrast: null }
     }
@@ -154,7 +161,10 @@ export class ImageViewerEngine {
     return {
       generation: loaded.generation,
       selection: next,
-      contrast: contrastLimits(raster.data),
+      contrast:
+        loaded.sourceWidth * loaded.sourceHeight <= MAX_CONTRAST_SAMPLES
+          ? contrastLimits(raster.data)
+          : null,
     }
   }
 
@@ -376,6 +386,70 @@ export class ImageViewerEngine {
       yUnit: displayAxes.y.unit,
       yStep: displayAxes.y.step,
       loaders,
+    }
+  }
+
+  async #loadAsyncPlane(
+    source: AsyncPlaneSource,
+    generation: number,
+    signal?: AbortSignal,
+  ): Promise<LoadedImage> {
+    throwIfAborted(signal)
+    assertPlaneLayout(source.labels, source.shape)
+    const selection = clampCounts(
+      { t: 0, c: 0, z: 0 },
+      {
+        t: axisSize(source.labels, source.shape, 't'),
+        c: axisSize(source.labels, source.shape, 'c'),
+        z: axisSize(source.labels, source.shape, 'z'),
+      },
+    )
+    const sourceWidth = axisSize(source.labels, source.shape, 'x')
+    const sourceHeight = axisSize(source.labels, source.shape, 'y')
+    const inner = new AsyncPlanePixelSource(source)
+    const finest = new OrientedPixelSource(inner)
+    this.#asyncPlaneSource = finest
+    const contrast =
+      sourceWidth * sourceHeight > MAX_CONTRAST_SAMPLES
+        ? defaultContrast(finest.dtype)
+        : contrastLimits(
+            (
+              await finest.getRaster({
+                selection: vivSelection(finest.labels, selection),
+                ...(signal ? { signal } : {}),
+              })
+            ).data,
+          )
+    throwIfAborted(signal)
+    if (generation !== this.generation) throw abortError()
+    const display = transposedShape(sourceHeight, sourceWidth)
+    const displayAxes = transposedAxes(
+      source.xAxis ?? { label: 'x', unit: 'px', step: 1 },
+      source.yAxis ?? { label: 'y', unit: 'px', step: 1 },
+    )
+    return {
+      generation,
+      sourceId: source.id,
+      kind: 'plane',
+      width: display.width,
+      height: display.height,
+      sourceWidth,
+      sourceHeight,
+      channelCount: axisSize(source.labels, source.shape, 'c'),
+      zCount: axisSize(source.labels, source.shape, 'z'),
+      tCount: axisSize(source.labels, source.shape, 't'),
+      selection,
+      contrast,
+      labels: [...source.labels],
+      dtype: finest.dtype,
+      inMemoryTiles: true,
+      xLabel: displayAxes.x.label,
+      xUnit: displayAxes.x.unit,
+      xStep: displayAxes.x.step,
+      yLabel: displayAxes.y.label,
+      yUnit: displayAxes.y.unit,
+      yStep: displayAxes.y.step,
+      loaders: [finest],
     }
   }
 

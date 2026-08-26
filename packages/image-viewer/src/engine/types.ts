@@ -21,6 +21,30 @@ export interface PlaneSource {
   yAxis?: AxisCalibration
 }
 
+export interface AsyncPlane {
+  data: Uint8Array | Uint16Array | Float32Array
+  width: number
+  height: number
+}
+
+export interface AsyncPlaneRequest {
+  selection: PlaneSelection
+  signal?: AbortSignal
+}
+
+/** Lazily supplies selected YX planes without exposing storage-format details. */
+export interface AsyncPlaneSource {
+  kind: 'async-plane'
+  id: string
+  dtype: DtypeName
+  /** Length of `labels`. Last two axes must be `y` then `x`. */
+  shape: number[]
+  labels: AxisName[]
+  xAxis?: AxisCalibration
+  yAxis?: AxisCalibration
+  getPlane(request: AsyncPlaneRequest): Promise<AsyncPlane>
+}
+
 export type StoreRange =
   | { offset: number; length: number }
   | { suffixLength: number }
@@ -52,6 +76,9 @@ export interface StoreOmeZarrSource {
 export type OmeZarrSource = UrlOmeZarrSource | StoreOmeZarrSource
 
 export type ImageSource = PlaneSource | OmeZarrSource
+
+/** All source types accepted by the viewer. Existing ImageSource remains stable. */
+export type ViewerSource = ImageSource | AsyncPlaneSource
 
 export interface PlaneSelection {
   t: number

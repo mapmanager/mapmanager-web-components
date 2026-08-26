@@ -5,7 +5,7 @@ import { CHANNEL_LUTS, type LutName } from '../engine/channel-luts'
 import { paneSlots, type ViewerLayout } from '../engine/layout-panes'
 import { displayToSource } from '../engine/orientation'
 import type { Histogram } from '../engine/contrast-range'
-import type { ImageSource, PlaneSelection, Roi, ViewWindow, XyOverlay } from '../engine/types'
+import type { PlaneSelection, Roi, ViewerSource, ViewWindow, XyOverlay } from '../engine/types'
 import {
   defaultLineDisplay,
   defaultRectDisplay,
@@ -160,7 +160,7 @@ export interface SourceInfo {
 }
 
 async function setSource(
-  source: ImageSource,
+  source: ViewerSource,
   options: { xyOverlays?: readonly XyOverlay[] } = {},
 ): Promise<SourceInfo | null> {
   selectionRevision += 1

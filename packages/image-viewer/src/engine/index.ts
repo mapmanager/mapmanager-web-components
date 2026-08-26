@@ -26,6 +26,7 @@ export {
   transposedShape,
 } from './orientation'
 export { OrientedPixelSource } from './oriented-pixel-source'
+export { AsyncPlanePixelSource } from './async-plane-source'
 export {
   BrowserDirectoryStore,
   browserDirectoryPickerSupported,
@@ -54,6 +55,9 @@ export type { DragZoomMode, PlotPoint, PlotRect } from './drag-zoom'
 export type { LayoutName } from './synthetic'
 export type {
   AxisName,
+  AsyncPlane,
+  AsyncPlaneRequest,
+  AsyncPlaneSource,
   ImageSource,
   OmeZarrSource,
   OmeZarrReadableStore,
@@ -63,4 +67,5 @@ export type {
   ViewWindow,
   XyOverlay,
   StoreRange,
+  ViewerSource,
 } from './types'
