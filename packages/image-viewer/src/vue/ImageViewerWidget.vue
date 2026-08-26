@@ -28,7 +28,7 @@ interface PaneApi {
 const props = withDefaults(
   defineProps<{
     doubleClickBehavior?: DoubleClickBehavior
-    /** Enable interactive ROI creation and deletion controls. */
+    /** Enable ROI overlays and interactive ROI controls. */
     roiToolsEnabled?: boolean
   }>(),
   { doubleClickBehavior: 'home', roiToolsEnabled: true },
@@ -437,7 +437,7 @@ defineExpose({
             <input v-model="axesVisible" type="checkbox" aria-label="Axes" @change="onAxesToggle" />
             Axes
           </label>
-          <label class="mm-radio">
+          <label v-if="roiToolsEnabled" class="mm-radio">
             <input v-model="roisVisible" type="checkbox" aria-label="ROIs" />
             ROIs
           </label>
@@ -531,7 +531,7 @@ defineExpose({
           :pixel-revision="pixelRevision"
           :plane-revision="planeRevision"
           :axes-visible="axesVisible"
-          :rois-visible="roisVisible"
+          :rois-visible="roiToolsEnabled && roisVisible"
           :channel-toolbars-visible="channelToolbarsVisible"
           @camera-change="onCameraChange"
           @home="goHome"
