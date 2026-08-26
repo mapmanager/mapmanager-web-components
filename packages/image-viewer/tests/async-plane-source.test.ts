@@ -71,4 +71,20 @@ describe('ImageViewerEngine async planes', () => {
     engine.commitSelection(prepared)
     expect(engine.loaded?.selection.c).toBe(1)
   })
+
+  it('fetches a large initial plane instead of using a generic dtype range', async () => {
+    const source = asyncSource()
+    source.shape = [1, 2_000_001]
+    source.labels = ['y', 'x']
+    source.getPlane = vi.fn(async () => {
+      const data = new Uint16Array(2_000_001)
+      data[0] = 100
+      data[data.length - 1] = 4_000
+      return { width: 2_000_001, height: 1, data }
+    })
+    const engine = new ImageViewerEngine()
+    const loaded = await engine.setSource(source)
+    expect(source.getPlane).toHaveBeenCalledTimes(1)
+    expect(loaded.contrast[1]).toBeLessThanOrEqual(4_000)
+  })
 })

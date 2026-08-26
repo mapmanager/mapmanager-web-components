@@ -409,17 +409,10 @@ export class ImageViewerEngine {
     const inner = new AsyncPlanePixelSource(source)
     const finest = new OrientedPixelSource(inner)
     this.#asyncPlaneSource = finest
-    const contrast =
-      sourceWidth * sourceHeight > MAX_CONTRAST_SAMPLES
-        ? defaultContrast(finest.dtype)
-        : contrastLimits(
-            (
-              await finest.getRaster({
-                selection: vivSelection(finest.labels, selection),
-                ...(signal ? { signal } : {}),
-              })
-            ).data,
-          )
+    // Async sources must fetch the initial plane before the viewer is ready.
+    // Besides warming the bounded cache for Viv tile requests, this avoids
+    // applying a generic 16-bit range to scientifically meaningful 12-bit data.
+    const contrast = await contrastFromLoader(finest, source.labels, signal)
     throwIfAborted(signal)
     if (generation !== this.generation) throw abortError()
     const display = transposedShape(sourceHeight, sourceWidth)
