@@ -54,6 +54,7 @@ const optionsMenu = ref<HTMLDivElement | null>(null)
 const selectedRoiId = ref<string | null>(null)
 const overlayRevision = ref(0)
 const pixelRevision = ref(0)
+const planeRevision = ref(0)
 const loaded = ref<LoadedImage | null>(null)
 const camera = ref<OrthographicViewState>({
   target: [0, 0, 0],
@@ -247,6 +248,7 @@ async function onSelection(axis: keyof PlaneSelection, event: Event): Promise<vo
   const next = engine.commitSelection(prepared)
   selection.value = { ...next.selection }
   loaded.value = next
+  planeRevision.value += 1
 }
 
 function onLayout(): void {
@@ -516,6 +518,7 @@ defineExpose({
           :double-click-behavior="doubleClickBehavior"
           :overlay-revision="overlayRevision"
           :pixel-revision="pixelRevision"
+          :plane-revision="planeRevision"
           :axes-visible="axesVisible"
           :rois-visible="roisVisible"
           :channel-toolbars-visible="channelToolbarsVisible"
