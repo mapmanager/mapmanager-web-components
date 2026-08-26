@@ -286,6 +286,13 @@
   align-items: center;
 }
 
+.mm-image-pane-header select {
+  width: 64px;
+  height: 24px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
 .mm-copy-button {
   display: inline-flex;
   width: 28px;
@@ -339,6 +346,7 @@
 
 .mm-image-axes {
   position: absolute;
+  z-index: 1;
   inset: 0;
   display: block;
   width: 100%;

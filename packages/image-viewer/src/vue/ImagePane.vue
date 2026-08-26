@@ -39,7 +39,6 @@ const props = withDefaults(
     doubleClickBehavior?: 'home' | 'deck'
     overlayRevision: number
     pixelRevision: number
-    planeRevision: number
     axesVisible?: boolean
     roisVisible?: boolean
     channelToolbarsVisible?: boolean
@@ -71,7 +70,7 @@ const copied = ref(false)
 const deck = shallowRef<Deck<OrthographicView[]> | null>(null)
 let committedPixelLayers: unknown[] = []
 let committedPixelKey = ''
-let committedPlaneRevision = -1
+let committedSliceKey = ''
 let pendingPixelLayers: unknown[] | null = null
 let pixelUpdateToken = 0
 let resizeObserver: ResizeObserver | null = null
@@ -124,6 +123,12 @@ function pixelKey(): string {
   const loaded = props.loaded
   if (!loaded) return ''
   return `${loaded.generation}:t${loaded.selection.t}:z${loaded.selection.z}:${props.channels.join('.')}`
+}
+
+function sliceKey(): string {
+  const loaded = props.loaded
+  if (!loaded) return ''
+  return `${loaded.generation}:t${loaded.selection.t}:z${loaded.selection.z}`
 }
 
 function pixelLayers(onViewportLoad?: () => void): unknown[] {
@@ -249,15 +254,16 @@ function applyLayers(): void {
 
 function updatePixelLayers(): void {
   const nextKey = pixelKey()
+  const nextSliceKey = sliceKey()
   const loaded = props.loaded
   const sameSource =
     committedPixelKey !== '' &&
     loaded != null &&
     committedPixelKey.startsWith(`${loaded.generation}:`)
-  const transition =
-    sameSource &&
-    nextKey !== committedPixelKey &&
-    props.planeRevision !== committedPlaneRevision
+  // T/Z changes may need new tiles, so retain the previous complete frame.
+  // Channel-only changes reuse the current slice and must replace immediately;
+  // Viv may not emit onViewportLoad again when that channel is already cached.
+  const transition = sameSource && nextSliceKey !== committedSliceKey
   const token = pixelUpdateToken + 1
   pixelUpdateToken = token
   let next: unknown[] = []
@@ -265,7 +271,7 @@ function updatePixelLayers(): void {
     if (token !== pixelUpdateToken) return
     committedPixelLayers = next
     committedPixelKey = nextKey
-    committedPlaneRevision = props.planeRevision
+    committedSliceKey = nextSliceKey
     pendingPixelLayers = null
     applyLayers()
   }
@@ -275,7 +281,7 @@ function updatePixelLayers(): void {
   } else {
     committedPixelLayers = next
     committedPixelKey = nextKey
-    committedPlaneRevision = props.planeRevision
+    committedSliceKey = nextSliceKey
     pendingPixelLayers = null
   }
   applyLayers()
@@ -660,7 +666,6 @@ watch(
       props.loaded?.selection.t,
       props.loaded?.selection.z,
       props.channels.join('.'),
-      props.planeRevision,
       props.pixelRevision,
       props.channelColors,
       props.channelContrast,
