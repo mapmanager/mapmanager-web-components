@@ -61,6 +61,12 @@
   gap: 4px;
 }
 
+.mm-image-viewer-toolbar .mm-channel-radio,
+.mm-image-viewer-toolbar .mm-icon-radio {
+  display: grid;
+  gap: 0;
+}
+
 .mm-channel-radio {
   position: relative;
   display: grid;
