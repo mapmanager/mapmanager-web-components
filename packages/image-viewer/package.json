@@ -1,7 +1,7 @@
 {
   "name": "@mapmanager/image-viewer",
   "version": "0.2.0-alpha.1",
-  "private": false,
+  "private": true,
   "description": "Reusable deck.gl / Viv scientific image viewer.",
   "license": "GPL-3.0-only",
   "repository": {
@@ -10,9 +10,6 @@
     "directory": "packages/image-viewer"
   },
   "type": "module",
-  "publishConfig": {
-    "access": "public"
-  },
   "files": [
     "dist-lib",
     "dist-element",

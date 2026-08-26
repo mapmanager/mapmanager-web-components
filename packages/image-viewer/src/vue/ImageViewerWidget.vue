@@ -28,8 +28,10 @@ interface PaneApi {
 const props = withDefaults(
   defineProps<{
     doubleClickBehavior?: DoubleClickBehavior
+    /** Enable interactive ROI creation and deletion controls. */
+    roiToolsEnabled?: boolean
   }>(),
-  { doubleClickBehavior: 'home' },
+  { doubleClickBehavior: 'home', roiToolsEnabled: true },
 )
 
 const emit = defineEmits<{
@@ -443,7 +445,7 @@ defineExpose({
             <input v-model="channelToolbarsVisible" type="checkbox" aria-label="Channel Toolbars" />
             Channel Toolbars
           </label>
-          <label class="mm-radio">
+          <label v-if="roiToolsEnabled" class="mm-radio">
             <input v-model="roiToolbarVisible" type="checkbox" aria-label="ROI Toolbar" />
             ROI Toolbar
           </label>
@@ -488,9 +490,18 @@ defineExpose({
         />
         {{ selection.c }}
       </label>
-      <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('rect')">Add rect</button>
-      <button v-if="roiToolbarVisible" type="button" @click="addDefaultRoi('line')">Add line</button>
-      <button v-if="roiToolbarVisible" type="button" :disabled="!selectedRoiId" @click="deleteSelectedRoi">
+      <button v-if="roiToolsEnabled && roiToolbarVisible" type="button" @click="addDefaultRoi('rect')">
+        Add rect
+      </button>
+      <button v-if="roiToolsEnabled && roiToolbarVisible" type="button" @click="addDefaultRoi('line')">
+        Add line
+      </button>
+      <button
+        v-if="roiToolsEnabled && roiToolbarVisible"
+        type="button"
+        :disabled="!selectedRoiId"
+        @click="deleteSelectedRoi"
+      >
         Delete ROI
       </button>
     </div>
