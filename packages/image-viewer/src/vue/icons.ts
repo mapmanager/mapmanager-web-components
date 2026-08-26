@@ -6,6 +6,8 @@ export type IconName =
   | 'square'
   | 'layers-3'
   | 'chart-column-decreasing'
+  | 'check'
+  | 'copy'
   | 'menu'
   | 'maximize-2'
 
@@ -36,6 +38,11 @@ export const ICONS: Record<IconName, IconNode[]> = {
     ['path', { d: 'M18 17v-3' }],
     ['path', { d: 'M3 3v16a2 2 0 0 0 2 2h16' }],
     ['path', { d: 'M8 17V5' }],
+  ],
+  check: [['path', { d: 'M20 6 9 17l-5-5' }]],
+  copy: [
+    ['rect', { x: 8, y: 8, width: 13, height: 13, rx: 2 }],
+    ['path', { d: 'M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3' }],
   ],
   menu: [
     ['path', { d: 'M4 12h16' }],

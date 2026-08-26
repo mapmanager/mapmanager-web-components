@@ -4,6 +4,7 @@ export { SYNTHETIC_SHAPE, syntheticPlaneSource } from './synthetic'
 export { extractYxPlane, contrastLimits, samplePlaneValues } from './plane'
 export { autoRange, histogramForValues, histogramBarFraction } from './contrast-range'
 export type { Histogram } from './contrast-range'
+export type { CopyViewRequest } from './clipboard'
 export {
   niceStep,
   niceTickValues,

@@ -1,5 +1,6 @@
 import { createApp, h, ref, type App, type ComponentPublicInstance } from 'vue'
 
+import type { CopyViewRequest } from '../engine/clipboard'
 import type { ViewerSource } from '../engine/types'
 import ImageViewerWidget from '../vue/ImageViewerWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
@@ -13,6 +14,7 @@ export class ImageViewerElement extends HTMLElement {
   #app: App<Element> | null = null
   #widget = ref<(ComponentPublicInstance & WidgetApi) | null>(null)
   #pending: ViewerSource | null = null
+  #hostClipboardBridge = ref(false)
 
   connectedCallback(): void {
     if (this.#app) return
@@ -23,7 +25,20 @@ export class ImageViewerElement extends HTMLElement {
     mount.style.height = '100%'
     shadow.replaceChildren(style, mount)
     this.#app = createApp({
-      render: () => h(ImageViewerWidget, { ref: this.#widget }),
+      render: () =>
+        h(ImageViewerWidget, {
+          ref: this.#widget,
+          hostClipboardBridge: this.#hostClipboardBridge.value,
+          onCopyViewRequest: (detail: CopyViewRequest) => {
+            this.dispatchEvent(
+              new CustomEvent<CopyViewRequest>('copy-view-request', {
+                detail,
+                bubbles: true,
+                composed: true,
+              }),
+            )
+          },
+        }),
     })
     this.#app.mount(mount)
     if (this.#pending) {
@@ -47,5 +62,13 @@ export class ImageViewerElement extends HTMLElement {
       return Promise.resolve()
     }
     return this.#widget.value.setSource(source)
+  }
+
+  get hostClipboardBridge(): boolean {
+    return this.#hostClipboardBridge.value
+  }
+
+  set hostClipboardBridge(value: boolean) {
+    this.#hostClipboardBridge.value = Boolean(value)
   }
 }

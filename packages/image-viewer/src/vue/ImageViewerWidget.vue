@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 
 import { CHANNEL_LUTS, type LutName } from '../engine/channel-luts'
+import {
+  blobToDataUrl,
+  imageClipboardSupported,
+  writePngToClipboard,
+  type CopyViewRequest,
+} from '../engine/clipboard'
 import { paneSlots, type ViewerLayout } from '../engine/layout-panes'
 import { displayToSource } from '../engine/orientation'
 import type { Histogram } from '../engine/contrast-range'
@@ -30,16 +36,18 @@ const props = withDefaults(
     doubleClickBehavior?: DoubleClickBehavior
     /** Enable ROI overlays and interactive ROI controls. */
     roiToolsEnabled?: boolean
+    /** Enable a native host to handle PNG clipboard requests when browser clipboard access is unavailable. */
+    hostClipboardBridge?: boolean
   }>(),
-  { doubleClickBehavior: 'home', roiToolsEnabled: true },
+  { doubleClickBehavior: 'home', roiToolsEnabled: true, hostClipboardBridge: false },
 )
 
 const emit = defineEmits<{
   'view-change': [window: ViewWindow]
   'source-change': [id: string]
+  'copy-view-request': [detail: CopyViewRequest]
 }>()
 
-const status = ref('No image')
 const errorMessage = ref<string | null>(null)
 const selection = ref<PlaneSelection>({ t: 0, c: 0, z: 0 })
 const sourceId = ref<string | null>(null)
@@ -51,6 +59,8 @@ const axesVisible = ref(true)
 const roisVisible = ref(true)
 const channelToolbarsVisible = ref(true)
 const roiToolbarVisible = ref(true)
+const xyPlotsVisible = ref(true)
+const xyOverlayCount = ref(0)
 const optionsOpen = ref(false)
 const optionsMenu = ref<HTMLDivElement | null>(null)
 const selectedRoiId = ref<string | null>(null)
@@ -75,6 +85,7 @@ const rangeLog = ref(true)
 const rangeMin = ref(0)
 const rangeMax = ref(1)
 const switchingSource = ref(false)
+const channelRadioName = `${useId()}-channel`
 const LAYOUT_MODES = [
   { value: 'side' as const, label: 'Side by side', icon: 'columns-2' as const },
   { value: 'stack' as const, label: 'Stacked', icon: 'rows-2' as const },
@@ -91,6 +102,7 @@ let lastPanesHeight = 0
 const slots = computed(() =>
   paneSlots(layout.value, channelCount.value, selection.value.c),
 )
+const copyAvailable = computed(() => props.hostClipboardBridge || imageClipboardSupported())
 
 function emitView(): void {
   const window = engine.viewWindow()
@@ -132,21 +144,6 @@ function onCameraChange(next: OrthographicViewState): void {
   viewIsHome = false
   camera.value = next
   emitView()
-}
-
-function formatStatus(image: LoadedImage): string {
-  return [
-    image.kind,
-    `display ${image.width}×${image.height}`,
-    `source ${image.sourceHeight}×${image.sourceWidth}`,
-    `C${image.channelCount}`,
-    `Z${image.zCount}`,
-  ].join(' ')
-}
-
-function selectCopyText(event: Event): void {
-  const el = event.target
-  if (el instanceof HTMLInputElement) el.select()
 }
 
 export interface SourceInfo {
@@ -197,10 +194,11 @@ async function setSource(
     tCount.value = next.tCount
     selectedRoiId.value = engine.selectedRoiId
     loaded.value = next
+    xyOverlayCount.value = engine.xyOverlays.length
+    xyPlotsVisible.value = true
     bumpOverlay()
     rangeOpen.value = false
     viewIsHome = true
-    status.value = formatStatus(next)
     switchingSource.value = false
     emit('source-change', next.sourceId)
     emitView()
@@ -218,7 +216,6 @@ async function setSource(
   } catch (reason) {
     if (controller.signal.aborted) return null
     errorMessage.value = reason instanceof Error ? reason.message : String(reason)
-    status.value = 'Failed'
     return null
   } finally {
     if (loadController === controller) switchingSource.value = false
@@ -232,8 +229,32 @@ function setRois(rois: readonly Roi[]): void {
 }
 
 function setXyOverlays(overlays: readonly XyOverlay[]): void {
+  const previouslyEmpty = xyOverlayCount.value === 0
   engine.setXyOverlays(overlays)
+  xyOverlayCount.value = engine.xyOverlays.length
+  if (previouslyEmpty && xyOverlayCount.value > 0) xyPlotsVisible.value = true
   bumpOverlay()
+}
+
+async function copyImage(blob: Blob, channels: readonly number[]): Promise<void> {
+  errorMessage.value = null
+  try {
+    if (imageClipboardSupported()) {
+      await writePngToClipboard(blob)
+      return
+    }
+    if (!props.hostClipboardBridge || !sourceId.value) {
+      throw new Error('Image clipboard access is unavailable in this browser context')
+    }
+    emit('copy-view-request', {
+      sourceId: sourceId.value,
+      pngDataUrl: await blobToDataUrl(blob),
+      channels: [...channels],
+    })
+  } catch (reason) {
+    errorMessage.value = reason instanceof Error ? reason.message : String(reason)
+    throw reason
+  }
 }
 
 async function onSelection(axis: keyof PlaneSelection, event: Event): Promise<void> {
@@ -445,6 +466,15 @@ defineExpose({
             <input v-model="channelToolbarsVisible" type="checkbox" aria-label="Channel Toolbars" />
             Channel Toolbars
           </label>
+          <label class="mm-radio" :class="{ disabled: xyOverlayCount === 0 }">
+            <input
+              v-model="xyPlotsVisible"
+              type="checkbox"
+              aria-label="XY Plot"
+              :disabled="xyOverlayCount === 0"
+            />
+            XY Plot
+          </label>
           <label v-if="roiToolsEnabled" class="mm-radio">
             <input v-model="roiToolbarVisible" type="checkbox" aria-label="ROI Toolbar" />
             ROI Toolbar
@@ -479,17 +509,24 @@ defineExpose({
           <LucideIcon :name="mode.icon" :label="mode.label" />
         </label>
       </div>
-      <label v-if="channelCount > 1 && layout === 'single'">
-        C
-        <input
-          :value="selection.c"
-          type="range"
-          min="0"
-          :max="channelCount - 1"
-          @input="onSelection('c', $event)"
-        />
-        {{ selection.c }}
-      </label>
+      <div
+        v-if="channelCount > 1 && layout === 'single'"
+        class="mm-channel-controls"
+        role="radiogroup"
+        aria-label="Selected channel"
+      >
+        <label v-for="channel in channelCount" :key="channel - 1" class="mm-channel-radio">
+          <input
+            type="radio"
+            :name="channelRadioName"
+            :value="channel - 1"
+            :checked="selection.c === channel - 1"
+            :aria-label="`Channel ${channel - 1}`"
+            @change="onSelection('c', $event)"
+          />
+          {{ channel - 1 }}
+        </label>
+      </div>
       <button v-if="roiToolsEnabled && roiToolbarVisible" type="button" @click="addDefaultRoi('rect')">
         Add rect
       </button>
@@ -505,13 +542,6 @@ defineExpose({
         Delete ROI
       </button>
     </div>
-    <input
-      class="mm-image-viewer-copy"
-      type="text"
-      readonly
-      :value="errorMessage ?? status"
-      @focus="selectCopyText"
-    />
     <div class="mm-image-viewer-stage-row">
       <div ref="panesHost" class="mm-image-viewer-panes" :data-layout="layout">
         <ImagePane
@@ -525,6 +555,7 @@ defineExpose({
           :rois="engine.rois"
           :selected-roi-id="selectedRoiId"
           :xy-overlays="engine.xyOverlays"
+          :xy-overlays-visible="xyPlotsVisible"
           :camera="camera"
           :double-click-behavior="doubleClickBehavior"
           :overlay-revision="overlayRevision"
@@ -533,6 +564,8 @@ defineExpose({
           :axes-visible="axesVisible"
           :rois-visible="roiToolsEnabled && roisVisible"
           :channel-toolbars-visible="channelToolbarsVisible"
+          :copy-available="copyAvailable"
+          :copy-image="copyImage"
           @camera-change="onCameraChange"
           @home="goHome"
           @select-roi="onSelectRoi"
@@ -540,7 +573,6 @@ defineExpose({
           @contrast-panel="onContrastPanel"
         />
         <p v-if="errorMessage" class="mm-image-viewer-status error">{{ errorMessage }}</p>
-        <p v-else class="mm-image-viewer-status">{{ status }}</p>
       </div>
       <label v-if="tCount > 1" class="mm-slice-control">
         T

@@ -6,6 +6,7 @@ import { MultiscaleImageLayer } from '@vivjs/layers'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import { CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane, type LutName } from '../engine/channel-luts'
+import { canvasToPngBlob } from '../engine/clipboard'
 import { DEFAULT_AXIS_STYLE, drawAxes, visibleImageAxis } from '../engine/axis-ticks'
 import {
   dragZoomMode,
@@ -33,6 +34,7 @@ const props = withDefaults(
     rois: readonly Roi[]
     selectedRoiId: string | null
     xyOverlays: readonly XyOverlay[]
+    xyOverlaysVisible: boolean
     camera: OrthographicViewState
     doubleClickBehavior?: 'home' | 'deck'
     overlayRevision: number
@@ -41,6 +43,8 @@ const props = withDefaults(
     axesVisible?: boolean
     roisVisible?: boolean
     channelToolbarsVisible?: boolean
+    copyAvailable: boolean
+    copyImage: (blob: Blob, channels: readonly number[]) => Promise<void>
   }>(),
   {
     doubleClickBehavior: 'home',
@@ -62,6 +66,8 @@ const host = ref<HTMLDivElement | null>(null)
 const plot = ref<HTMLDivElement | null>(null)
 const axesCanvas = ref<HTMLCanvasElement | null>(null)
 const guide = ref<PlotRect | null>(null)
+const copying = ref(false)
+const copied = ref(false)
 const deck = shallowRef<Deck<OrthographicView[]> | null>(null)
 let committedPixelLayers: unknown[] = []
 let committedPixelKey = ''
@@ -69,6 +75,7 @@ let committedPlaneRevision = -1
 let pendingPixelLayers: unknown[] | null = null
 let pixelUpdateToken = 0
 let resizeObserver: ResizeObserver | null = null
+let copiedTimer: ReturnType<typeof setTimeout> | null = null
 let applyingView = false
 let applyViewToken = 0
 let lastHostWidth = 0
@@ -201,7 +208,7 @@ function overlayLayers(): unknown[] {
     : []
   const lines = [
     ...roiLines,
-    ...props.xyOverlays.map((overlay) => ({
+    ...(props.xyOverlaysVisible ? props.xyOverlays : []).map((overlay) => ({
       id: overlay.id,
       path: overlay.x.map((x, index) => {
         const point = sourceToDisplay(x, overlay.y[index] ?? 0)
@@ -531,6 +538,54 @@ function clientSize(): { width: number; height: number } {
   return { width: elWidth(), height: elHeight() }
 }
 
+async function panePngBlob(): Promise<Blob> {
+  const plotEl = requireValue(plot.value, 'pane plot is not mounted')
+  const stageEl = requireValue(host.value, 'pane stage is not mounted')
+  const deckCanvas = requireValue(deck.value?.getCanvas(), 'image canvas is unavailable')
+  const axes = requireValue(axesCanvas.value, 'axes canvas is unavailable')
+  deck.value?.redraw('copy-view')
+
+  const output = document.createElement('canvas')
+  output.width = axes.width
+  output.height = axes.height
+  const context = requireValue(output.getContext('2d'), 'image export canvas is unavailable')
+  context.fillStyle = '#020617'
+  context.fillRect(0, 0, output.width, output.height)
+
+  const plotRect = plotEl.getBoundingClientRect()
+  const stageRect = stageEl.getBoundingClientRect()
+  const scaleX = output.width / Math.max(1, plotEl.clientWidth)
+  const scaleY = output.height / Math.max(1, plotEl.clientHeight)
+  context.drawImage(
+    deckCanvas,
+    (stageRect.left - plotRect.left) * scaleX,
+    (stageRect.top - plotRect.top) * scaleY,
+    stageEl.clientWidth * scaleX,
+    stageEl.clientHeight * scaleY,
+  )
+  context.drawImage(axes, 0, 0)
+  return canvasToPngBlob(output)
+}
+
+async function onCopyView(): Promise<void> {
+  if (copying.value || !props.copyAvailable || !props.loaded) return
+  copying.value = true
+  copied.value = false
+  try {
+    await props.copyImage(await panePngBlob(), props.channels)
+    copied.value = true
+    if (copiedTimer) clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => {
+      copied.value = false
+      copiedTimer = null
+    }, 1000)
+  } catch {
+    copied.value = false
+  } finally {
+    copying.value = false
+  }
+}
+
 onMounted(() => {
   const canvasHost = requireValue(host.value, 'pane host is not mounted')
   const instance = new Deck<OrthographicView[]>({
@@ -616,7 +671,7 @@ watch(
 )
 
 watch(
-  () => [props.overlayRevision, props.roisVisible] as const,
+  () => [props.overlayRevision, props.roisVisible, props.xyOverlaysVisible] as const,
   () => {
     applyLayers()
   },
@@ -668,6 +723,8 @@ onBeforeUnmount(() => {
   canvasHost?.removeEventListener('dblclick', onDoubleClick, true)
   resizeObserver?.disconnect()
   resizeObserver = null
+  if (copiedTimer) clearTimeout(copiedTimer)
+  copiedTimer = null
   deck.value?.finalize()
   deck.value = null
 })
@@ -693,6 +750,16 @@ defineExpose({ clientSize })
           <LucideIcon name="chart-column-decreasing" label="Set contrast" />
         </button>
       </label>
+      <button
+        type="button"
+        class="mm-copy-button"
+        :disabled="!copyAvailable || !loaded || copying"
+        :aria-label="copied ? 'Copied' : 'Copy view to clipboard'"
+        :title="copyAvailable ? (copied ? 'Copied' : 'Copy view to clipboard') : 'Image clipboard access is unavailable'"
+        @click="onCopyView"
+      >
+        <LucideIcon :name="copied ? 'check' : 'copy'" :label="copied ? 'Copied' : 'Copy view to clipboard'" />
+      </button>
     </div>
     <div ref="plot" class="mm-image-plot">
       <canvas ref="axesCanvas" class="mm-image-axes" />
