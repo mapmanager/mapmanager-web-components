@@ -251,8 +251,8 @@ export function visibleImageAxis(input: {
  * Stroke the axis box, nice ticks, and titles. Tick numbers are physical units
  * (`pixelIndex * step`). Labels/units are caller-provided.
  *
- * `plot` is the visible-image rectangle (image ∩ Deck stage). Titles center on
- * that box; the X title stays in the bottom gutter (`canvasHeight`).
+ * `plot` is the visible-image rectangle (image ∩ Deck stage). Titles remain at
+ * their existing gutter offsets from that box so they follow it during zoom.
  */
 export function drawAxes(
   context: CanvasRenderingContext2D,
@@ -303,9 +303,14 @@ export function drawAxes(
   const yUnit = input.yUnit ? ` (${input.yUnit})` : ''
   context.textAlign = 'center'
   context.textBaseline = 'bottom'
-  context.fillText(`${input.xLabel}${xUnit}`, plot.left + plot.width / 2, input.canvasHeight - 1)
+  const xTitleY = Math.min(
+    input.canvasHeight - 1,
+    plot.top + plot.height + style.margins.bottom - 1,
+  )
+  context.fillText(`${input.xLabel}${xUnit}`, plot.left + plot.width / 2, xTitleY)
   context.save()
-  context.translate(10, plot.top + plot.height / 2)
+  const yTitleX = plot.left - style.margins.left + 10
+  context.translate(yTitleX, plot.top + plot.height / 2)
   context.rotate(-Math.PI / 2)
   context.fillText(`${input.yLabel}${yUnit}`, 0, 0)
   context.restore()

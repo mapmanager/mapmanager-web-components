@@ -14,6 +14,7 @@ import { OrientedPixelSource } from '../src/engine/oriented-pixel-source'
 import { extractYxPlane } from '../src/engine/plane'
 import { autoRange, histogramBarFraction } from '../src/engine/contrast-range'
 import {
+  drawAxes,
   niceStep,
   niceTickValues,
   physicalToPlotX,
@@ -351,6 +352,40 @@ describe('ROI add/delete', () => {
 })
 
 describe('display axes and contrast auto', () => {
+  it('anchors axis titles to the moving image box', () => {
+    const labels: Array<{ text: string; x: number; y: number }> = []
+    const translations: Array<[number, number]> = []
+    const context = {
+      save() {},
+      restore() {},
+      strokeRect() {},
+      fillText(text: string, x: number, y: number) {
+        labels.push({ text, x, y })
+      },
+      translate(x: number, y: number) {
+        translations.push([x, y])
+      },
+      rotate() {},
+    } as unknown as CanvasRenderingContext2D
+
+    drawAxes(context, {
+      plot: { left: 114, top: 60, width: 100, height: 100 },
+      canvasHeight: 250,
+      xLeft: 0,
+      xRight: 0,
+      yBottom: 0,
+      yTop: 0,
+      xLabel: 'x',
+      xUnit: 'µm',
+      yLabel: 'y',
+      yUnit: 'µm',
+    })
+
+    expect(labels[0]).toEqual({ text: 'x (µm)', x: 164, y: 199 })
+    expect(translations[0]).toEqual([60, 110])
+    expect(labels[1]).toEqual({ text: 'y (µm)', x: 0, y: 0 })
+  })
+
   it('swaps source x/y calibration onto display axes after transpose', () => {
     const display = transposedAxes(
       { label: 'line', unit: 'µm', step: 0.2 },

@@ -3,7 +3,7 @@ import { Deck, OrthographicView } from '@deck.gl/core'
 import { PathLayer, PolygonLayer } from '@deck.gl/layers'
 import { ColorPaletteExtension, AdditiveColormapExtension } from '@vivjs/extensions'
 import { MultiscaleImageLayer } from '@vivjs/layers'
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import { CHANNEL_LUTS, LUT_ORDER, lutNameFromRgb, vivColormapForPane, type LutName } from '../engine/channel-luts'
 import { canvasToPngBlob } from '../engine/clipboard'
@@ -477,18 +477,12 @@ function onContrastPanel(channel: number, event: MouseEvent): void {
   emit('contrast-panel', channel, button)
 }
 
-const stageInset = computed(() => {
-  if (!props.axesVisible) {
-    return { left: '0px', top: '0px', right: '0px', bottom: '0px' }
-  }
-  const margins = DEFAULT_AXIS_STYLE.margins
-  return {
-    left: `${margins.left}px`,
-    top: `${margins.top}px`,
-    right: `${margins.right}px`,
-    bottom: `${margins.bottom}px`,
-  }
-})
+const stageInset = {
+  left: `${DEFAULT_AXIS_STYLE.margins.left}px`,
+  top: `${DEFAULT_AXIS_STYLE.margins.top}px`,
+  right: `${DEFAULT_AXIS_STYLE.margins.right}px`,
+  bottom: `${DEFAULT_AXIS_STYLE.margins.bottom}px`,
+}
 
 function drawAxisChrome(): void {
   const canvas = axesCanvas.value
