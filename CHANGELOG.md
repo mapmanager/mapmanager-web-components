@@ -2,12 +2,16 @@
 
 Notable user-facing changes to MapManager Web Components are documented here.
 
-The packages are currently versioned `0.1.0` and have no tagged releases.
+NicePool is currently versioned `0.1.0`; Image Viewer is versioned `0.2.0`.
+Both packages are private, pre-1.0 workspaces and have no tagged releases.
 Pending changes remain under `Unreleased` until a release is created.
 
 ## Unreleased
 
 ### Added
+
+- Added a repository-wide MkDocs site with current guides for Image Viewer and
+  NicePool, client examples, and contributor documentation.
 
 - Added `@mapmanager/nicepool`, a reusable browser-native statistical plotting component with linked selection, filtering, summaries, persistent plot slots, saved presets, Vue and Custom Element integrations, and scatter, swarm, box, violin, histogram, and cumulative-histogram views.
 - Added `@mapmanager/image-viewer`, a reusable Deck.gl/Viv scientific image viewer with YX, CYX, and ZCYX sources; channel layouts and color maps; contrast controls and histograms; calibrated axes; zoom and pan; ROI tools; XY overlays; Vue and Custom Element integrations; and standalone development sources.
@@ -15,6 +19,9 @@ Pending changes remain under `Unreleased` until a release is created.
 - Added workspace-wide tests, type checking, production builds, browser end-to-end coverage, and continuous-integration checks.
 
 ### Changed
+
+- Finalized the first Image Viewer rewrite release as `0.2.0`; it remains a
+  pre-1.0 API that may evolve with documented migration guidance.
 
 - Upgraded the image viewer from Viv 0.19 to Viv 0.22.1 with coordinated Deck.gl 9.3.3, Luma.gl 9.3.3, and loaders.gl 4.4.1 dependencies.
 - Unified URL-backed and browser-directory OME-Zarr loading through Viv's supported loader APIs.

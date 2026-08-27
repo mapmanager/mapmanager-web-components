@@ -64,6 +64,6 @@ authoritative selection behavior remains in this package.
 - `src/element/`: the `<nice-pool>` host boundary for plain HTML and NiceGUI.
 - `src/app/`: standalone development application.
 
-See `docs/architecture.md`, `docs/data-and-selection-api.md`,
-`docs/plot-and-summary-semantics.md`, `docs/state-and-presets.md`, and
-`docs/preset-persistence.md` for the behavioral contracts.
+See the repository's [NicePool documentation](../../docs/nicepool/index.md) for
+architecture, data and selection contracts, plot semantics, state, and preset
+persistence.

@@ -1,0 +1,42 @@
+site_name: MapManager Web Components
+site_url: https://mapmanager.github.io/mapmanager-web-components/
+repo_url: https://github.com/mapmanager/mapmanager-web-components
+repo_name: mapmanager/mapmanager-web-components
+
+theme:
+  name: material
+  features:
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Image Viewer:
+      - Overview: image-viewer/index.md
+      - Sources: image-viewer/sources.md
+      - Vue integration: image-viewer/vue-integration.md
+      - Custom Element: image-viewer/custom-element.md
+      - OME-Zarr: image-viewer/ome-zarr.md
+      - Overlays and ROIs: image-viewer/overlays-and-rois.md
+      - Architecture: image-viewer/architecture.md
+  - NicePool:
+      - Overview: nicepool/index.md
+      - Architecture: nicepool/architecture.md
+      - Data and selection API: nicepool/data-and-selection-api.md
+      - Plot and summary semantics: nicepool/plot-and-summary-semantics.md
+      - State and presets: nicepool/state-and-presets.md
+      - Preset persistence: nicepool/preset-persistence.md
+  - Example clients: clients.md
+  - Development: development.md
+
+strict: true

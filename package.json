@@ -12,7 +12,9 @@
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "check": "npm run test && npm run typecheck && npm run build && npm run test:e2e"
+    "check": "npm run test && npm run typecheck && npm run build && npm run test:e2e",
+    "docs:serve": "uv run --isolated --with-requirements requirements-docs.txt mkdocs serve",
+    "docs:build": "uv run --isolated --with-requirements requirements-docs.txt mkdocs build --strict"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1"
