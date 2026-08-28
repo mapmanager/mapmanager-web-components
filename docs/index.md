@@ -12,7 +12,8 @@ in-memory and lazy image planes as well as remote or browser-selected local
 OME-Zarr data. It provides channel layouts, composites, contrast and color-map
 controls, calibrated axes, ROIs, XY overlays, and copying of the current view.
 
-[Read the Image Viewer guide](image-viewer/index.md)
+[Read the Image Viewer guide](image-viewer/index.md).
+[Open the hosted Image Viewer demo](https://mapmanager.github.io/mapmanager-web-components/demos/image-viewer/).
 
 ### NicePool
 
@@ -20,7 +21,8 @@ controls, calibrated axes, ROIs, XY overlays, and copying of the current view.
 selection, summaries, saved plot presets, and Vue and Custom Element entry
 points.
 
-[Read the NicePool guide](nicepool/index.md)
+[Read the NicePool guide](nicepool/index.md).
+[Open the hosted NicePool demo](https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/).
 
 ## Project status
 

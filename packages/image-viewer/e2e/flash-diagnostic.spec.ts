@@ -9,7 +9,7 @@ type FrameSample = { fill: number; mean: number }
 async function waitForCyx(page: Page): Promise<void> {
   await page.goto('/')
   await page.getByRole('button', { name: 'CYX', exact: true }).click()
-  await expect(page.locator('.mm-image-viewer-copy')).toHaveValue(/30000/, { timeout: 60_000 })
+  await expect(page.getByText('synthetic-cyx')).toBeVisible({ timeout: 60_000 })
   await expect(page.locator('.mm-image-viewer-stage canvas')).toBeVisible()
   await page.waitForTimeout(1500)
 }

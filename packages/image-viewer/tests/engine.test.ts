@@ -29,10 +29,23 @@ import { ImageViewerEngine } from '../src/engine/viewer-engine'
 import { defaultChannelColor, LUT_ORDER, lutNameFromRgb, vivColormapForPane } from '../src/engine/channel-luts'
 import { paneChannels, paneSlots } from '../src/engine/layout-panes'
 
+function argmaxIndex(data: ArrayLike<number>): number {
+  let best = Number.NEGATIVE_INFINITY
+  let bestIndex = 0
+  for (let index = 0; index < data.length; index += 1) {
+    const value = data[index]
+    if (value !== undefined && value > best) {
+      best = value
+      bestIndex = index
+    }
+  }
+  return bestIndex
+}
+
 describe('synthetic layouts', () => {
   it('builds YX, CYX, and ZCYX with y,x last', () => {
     expect(SYNTHETIC_SHAPE.YX).toEqual([384, 512])
-    expect(SYNTHETIC_SHAPE.CYX).toEqual([2, 30000, 1024])
+    expect(SYNTHETIC_SHAPE.CYX).toEqual([2, 384, 512])
     expect(SYNTHETIC_SHAPE.ZCYX).toEqual([6, 2, 256, 320])
     const yx = syntheticPlaneSource('YX')
     const cyx = syntheticPlaneSource('CYX', [2, 16, 24])
@@ -43,6 +56,17 @@ describe('synthetic layouts', () => {
     expect(cyx.shape).toEqual([2, 16, 24])
     expect(zcyx.shape[0]).toBe(6)
     expect(zcyx.shape[1]).toBe(2)
+  })
+
+  it('uses a continuous YX bar ramp instead of binary bands', () => {
+    const yx = syntheticPlaneSource('YX', [32, 48])
+    const values = new Set(yx.data)
+    expect(values.size).toBeGreaterThan(8)
+    const min = Math.min(...yx.data)
+    const max = Math.max(...yx.data)
+    expect(min).toBeGreaterThan(0)
+    expect(max).toBeGreaterThan(min)
+    expect([...yx.data].some((value) => value > min && value < max)).toBe(true)
   })
 })
 
@@ -60,8 +84,9 @@ describe('extractYxPlane', () => {
     const c0 = extractYxPlane(source, { t: 0, c: 0, z: 0 })
     const c1 = extractYxPlane(source, { t: 0, c: 1, z: 0 })
     expect([...c0.data]).not.toEqual([...c1.data])
-    expect(c0.data[1]).not.toBe(c0.data[0])
-    expect(c1.data[24]).not.toBe(c1.data[0])
+    expect(new Set(c0.data).size).toBeGreaterThan(8)
+    expect(new Set(c1.data).size).toBeGreaterThan(8)
+    expect(argmaxIndex(c0.data)).not.toBe(argmaxIndex(c1.data))
   })
 
   it('returns different ZCYX planes for different z', () => {
@@ -69,6 +94,7 @@ describe('extractYxPlane', () => {
     const z0 = extractYxPlane(source, { t: 0, c: 0, z: 0 })
     const z1 = extractYxPlane(source, { t: 0, c: 0, z: 1 })
     expect([...z0.data]).not.toEqual([...z1.data])
+    expect(argmaxIndex(z0.data)).not.toBe(argmaxIndex(z1.data))
   })
 })
 

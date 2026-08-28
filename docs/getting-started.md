@@ -14,7 +14,14 @@ npm run check
 `npm run check` runs package tests, type checking, builds, and repository browser
 tests.
 
-## Run a component
+## Hosted demos
+
+GitHub Pages publishes the same standalone demo applications:
+
+- [Image Viewer](https://mapmanager.github.io/mapmanager-web-components/demos/image-viewer/)
+- [NicePool](https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/)
+
+## Run a component locally
 
 ```bash
 npm run dev --workspace @mapmanager/image-viewer

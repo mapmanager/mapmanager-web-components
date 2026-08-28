@@ -1,4 +1,4 @@
-name: Publish documentation
+name: Publish documentation and demos
 
 on:
   push:
@@ -8,6 +8,9 @@ on:
       - mkdocs.yml
       - requirements-docs.txt
       - .github/workflows/pages.yml
+      - packages/**
+      - package.json
+      - package-lock.json
   workflow_dispatch:
 
 permissions:
@@ -17,7 +20,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -26,6 +29,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -33,11 +43,26 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-docs.txt
 
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Build Image Viewer demo
+        run: npm run build:app --workspace @mapmanager/image-viewer
+
+      - name: Build NicePool demo
+        run: npm run build:app --workspace @mapmanager/nicepool
+
       - name: Install documentation dependencies
         run: pip install -r requirements-docs.txt
 
       - name: Build documentation
         run: python -m mkdocs build --strict
+
+      - name: Add demo sites to Pages artifact
+        run: |
+          mkdir -p site/demos
+          cp -R packages/image-viewer/dist site/demos/image-viewer
+          cp -R packages/nicepool/dist site/demos/nicepool
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4

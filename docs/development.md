@@ -40,6 +40,13 @@ GitHub Pages deliberately installs the same pinned `requirements-docs.txt`
 with pip. This keeps the publishing workflow compatible with GitHub's standard
 Python runner while local development retains the faster npm-and-uv workflow.
 
+The Pages workflow also builds each package's Vite demo (`build:app`) and copies
+the output under `site/demos/` after MkDocs runs, so a clean documentation
+build cannot wipe the demos. MkDocs `docs:serve` is documentation only; preview
+the combined artifact by building both demos, running `docs:build`, copying
+`packages/image-viewer/dist` to `site/demos/image-viewer` and
+`packages/nicepool/dist` to `site/demos/nicepool`, then serving `site/`.
+
 Package READMEs are concise entry points and should link to the canonical
 pages here. Do not duplicate detailed guides under package directories.
 

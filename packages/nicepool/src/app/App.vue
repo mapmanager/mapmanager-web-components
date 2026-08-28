@@ -14,7 +14,6 @@ const theme = ref<NicePoolTheme>('dark')
   <div class="demo-page" :class="`demo-page-${theme}`">
     <header>
       <div>
-        <p class="eyebrow">Slice 1 development host</p>
         <h1>NicePool Web</h1>
       </div>
       <p>{{ dataset.rows.length }} rows · primary {{ lastSelection.primaryRowId ?? 'none' }}</p>
@@ -30,5 +29,4 @@ html, body, #app { min-height: 100%; margin: 0; }
 .demo-page-light { color: #172033; background: #e2e8f0; color-scheme: light; }
 .demo-page > header { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 16px; color: inherit; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 .demo-page h1, .demo-page p { margin: 0; }
-.demo-page .eyebrow { margin-bottom: 4px; color: #94a3b8; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 </style>

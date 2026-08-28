@@ -98,7 +98,6 @@ onMounted(() => {
   <div class="demo-page">
     <header>
       <div>
-        <p class="eyebrow">Phase 1 spike</p>
         <h1>MapManager Image Viewer</h1>
       </div>
       <nav>
@@ -147,14 +146,6 @@ body,
 .demo-page h1,
 .demo-page p {
   margin: 0;
-}
-.demo-page .eyebrow {
-  margin-bottom: 4px;
-  color: #94a3b8;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 .demo-page nav {
   display: flex;

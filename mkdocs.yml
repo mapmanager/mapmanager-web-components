@@ -36,6 +36,9 @@ nav:
       - Plot and summary semantics: nicepool/plot-and-summary-semantics.md
       - State and presets: nicepool/state-and-presets.md
       - Preset persistence: nicepool/preset-persistence.md
+  - Live demos:
+      - Image Viewer: https://mapmanager.github.io/mapmanager-web-components/demos/image-viewer/
+      - NicePool: https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/
   - Example clients: clients.md
   - Development: development.md
 

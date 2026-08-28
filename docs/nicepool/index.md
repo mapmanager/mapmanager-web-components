@@ -7,6 +7,8 @@ summaries, four persistent plot slots, and saved single-plot presets.
 It provides a Vue component and a framework-neutral `<nice-pool>` Custom
 Element. [CloudScope Web](https://mapmanager.github.io/cloudscope-web/) is the
 primary client example.
+A hosted package demo is at
+[mapmanager.github.io/mapmanager-web-components/demos/nicepool](https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/).
 
 ## Guides
 
