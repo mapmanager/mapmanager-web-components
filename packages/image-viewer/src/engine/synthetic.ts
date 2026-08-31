@@ -27,6 +27,22 @@ const BLOB_FRACTIONS: ReadonlyArray<readonly [number, number]> = [
   [0.48, 0.68],
 ]
 
+/** Offsets from the traveling centroid, as a fraction of min(x, y). */
+type ZcyxBlob = { dx: number; dy: number; sigma: number }
+
+const ZCYX_C0_BLOBS: readonly ZcyxBlob[] = [
+  { dx: -0.16, dy: -0.14, sigma: 0.055 },
+  { dx: 0.18, dy: -0.10, sigma: 0.06 },
+  { dx: 0.02, dy: 0.18, sigma: 0.07 },
+]
+
+const ZCYX_C1_BLOBS: readonly ZcyxBlob[] = [
+  { dx: -0.20, dy: -0.16, sigma: 0.045 },
+  { dx: 0.22, dy: -0.08, sigma: 0.09 },
+  { dx: -0.08, dy: 0.20, sigma: 0.06 },
+  { dx: 0.14, dy: 0.12, sigma: 0.075 },
+]
+
 /** Build a uint16 volume. Pass `shape` in tests to avoid large allocations. */
 export function syntheticPlaneSource(
   layout: LayoutName,
@@ -70,7 +86,7 @@ function fillVolume(data: Uint16Array, labels: readonly AxisName[], shape: reado
 /**
  * YX: soft vertical cosine bars (not binary) so contrast min/max has a ramp.
  * CYX: 2D Gaussian blobs, channel 1 offset so channels only partially overlap.
- * ZCYX: 3D Gaussians with the same channel offset plus XY drift through z.
+ * ZCYX: C0 three blobs travel UL→BR; C1 four blobs appear at z=1 in BR and travel BR→TL.
  */
 function sample(
   layout: LayoutName,
@@ -105,13 +121,43 @@ function blobs3d(
   ySize: number,
   zSize: number,
 ): number {
-  const zMid = (zSize - 1) / 2
-  const driftX = (z - zMid) * 0.08 * xSize
-  const driftY = (z - zMid) * 0.05 * ySize
-  const cz = (c === 0 ? 0.35 : 0.65) * Math.max(zSize - 1, 1)
-  const sigmaZ = Math.max(0.85, zSize * 0.4)
-  const zWeight = Math.exp(-0.5 * ((z - cz) / sigmaZ) ** 2)
-  return toUint16(FLOOR + (PEAK - FLOOR) * blobField2d(x, y, c, xSize, ySize, driftX, driftY) * zWeight)
+  const lastZ = Math.max(zSize - 1, 1)
+  // Display: x is vertical (high x at top), y is horizontal (low y at left).
+  const xTop = 0.78 * xSize
+  const xBot = 0.22 * xSize
+  const yLeft = 0.22 * ySize
+  const yRight = 0.78 * ySize
+  const minDim = Math.min(xSize, ySize)
+  let cx: number
+  let cy: number
+  let blobs: readonly ZcyxBlob[]
+  if (c === 0) {
+    const t = z / lastZ
+    cx = lerp(xTop, xBot, t)
+    cy = lerp(yLeft, yRight, t)
+    blobs = ZCYX_C0_BLOBS
+  } else {
+    const t = zSize <= 2 ? 0 : clamp01((z - 1) / (zSize - 2))
+    cx = lerp(xBot, xTop, t)
+    cy = lerp(yRight, yLeft, t)
+    blobs = ZCYX_C1_BLOBS
+  }
+  let intensity = 0
+  for (const blob of blobs) {
+    const sigma = Math.max(2, blob.sigma * minDim)
+    const dx = (x - (cx + blob.dx * minDim)) / sigma
+    const dy = (y - (cy + blob.dy * minDim)) / sigma
+    intensity += Math.exp(-0.5 * (dx * dx + dy * dy))
+  }
+  return toUint16(FLOOR + (PEAK - FLOOR) * intensity)
+}
+
+function lerp(start: number, end: number, t: number): number {
+  return start + (end - start) * t
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
 }
 
 function blobField2d(

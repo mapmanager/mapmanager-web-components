@@ -29,6 +29,14 @@ import { ImageViewerEngine } from '../src/engine/viewer-engine'
 import { defaultChannelColor, LUT_ORDER, lutNameFromRgb, vivColormapForPane } from '../src/engine/channel-luts'
 import { paneChannels, paneSlots } from '../src/engine/layout-panes'
 
+function toNumbers(data: ArrayLike<number>): number[] {
+  return Array.from({ length: data.length }, (_, index) => {
+    const value = data[index]
+    if (value === undefined) throw new Error(`missing sample ${index}`)
+    return value
+  })
+}
+
 function argmaxIndex(data: ArrayLike<number>): number {
   let best = Number.NEGATIVE_INFINITY
   let bestIndex = 0
@@ -40,6 +48,19 @@ function argmaxIndex(data: ArrayLike<number>): number {
     }
   }
   return bestIndex
+}
+
+function xyOf(index: number, width: number): { x: number; y: number } {
+  return { x: index % width, y: Math.floor(index / width) }
+}
+
+function maxSample(data: ArrayLike<number>): number {
+  let max = Number.NEGATIVE_INFINITY
+  for (let index = 0; index < data.length; index += 1) {
+    const value = data[index]
+    if (value !== undefined && value > max) max = value
+  }
+  return max
 }
 
 describe('synthetic layouts', () => {
@@ -60,13 +81,14 @@ describe('synthetic layouts', () => {
 
   it('uses a continuous YX bar ramp instead of binary bands', () => {
     const yx = syntheticPlaneSource('YX', [32, 48])
-    const values = new Set(yx.data)
-    expect(values.size).toBeGreaterThan(8)
-    const min = Math.min(...yx.data)
-    const max = Math.max(...yx.data)
+    const samples = toNumbers(yx.data)
+    const unique = new Set(samples)
+    expect(unique.size).toBeGreaterThan(8)
+    const min = Math.min(...samples)
+    const max = Math.max(...samples)
     expect(min).toBeGreaterThan(0)
     expect(max).toBeGreaterThan(min)
-    expect([...yx.data].some((value) => value > min && value < max)).toBe(true)
+    expect(samples.some((value) => value > min && value < max)).toBe(true)
   })
 })
 
@@ -95,6 +117,41 @@ describe('extractYxPlane', () => {
     const z1 = extractYxPlane(source, { t: 0, c: 0, z: 1 })
     expect([...z0.data]).not.toEqual([...z1.data])
     expect(argmaxIndex(z0.data)).not.toBe(argmaxIndex(z1.data))
+  })
+
+  it('animates ZCYX blobs from opposite corners and overlaps mid-stack', () => {
+    const source = syntheticPlaneSource('ZCYX')
+    const width = source.shape[3] ?? 0
+    const height = source.shape[2] ?? 0
+    const lastZ = (source.shape[0] ?? 1) - 1
+    const c0Start = xyOf(argmaxIndex(extractYxPlane(source, { t: 0, c: 0, z: 0 }).data), width)
+    const c0End = xyOf(argmaxIndex(extractYxPlane(source, { t: 0, c: 0, z: lastZ }).data), width)
+    const c1Start = xyOf(argmaxIndex(extractYxPlane(source, { t: 0, c: 1, z: 1 }).data), width)
+    const c1End = xyOf(argmaxIndex(extractYxPlane(source, { t: 0, c: 1, z: lastZ }).data), width)
+    expect(c0Start.x).toBeGreaterThan(width / 2)
+    expect(c0Start.y).toBeLessThan(height / 2)
+    expect(c0End.x).toBeLessThan(width / 2)
+    expect(c0End.y).toBeGreaterThan(height / 2)
+    expect(c1Start.x).toBeLessThan(width / 2)
+    expect(c1Start.y).toBeGreaterThan(height / 2)
+    expect(c1End.x).toBeGreaterThan(width / 2)
+    expect(c1End.y).toBeLessThan(height / 2)
+    const c1AtZero = extractYxPlane(source, { t: 0, c: 1, z: 0 })
+    const c1AtZeroXy = xyOf(argmaxIndex(c1AtZero.data), width)
+    expect(maxSample(c1AtZero.data)).toBeGreaterThan(20000)
+    expect(c1AtZeroXy.x).toBeLessThan(width / 2)
+    expect(c1AtZeroXy.y).toBeGreaterThan(height / 2)
+    const mid = Math.floor(lastZ / 2) + 1
+    const c0Mid = extractYxPlane(source, { t: 0, c: 0, z: mid })
+    const c1Mid = extractYxPlane(source, { t: 0, c: 1, z: mid })
+    let overlap = false
+    for (let index = 0; index < c0Mid.data.length; index += 1) {
+      if ((c0Mid.data[index] ?? 0) > 20000 && (c1Mid.data[index] ?? 0) > 20000) {
+        overlap = true
+        break
+      }
+    }
+    expect(overlap).toBe(true)
   })
 })
 
