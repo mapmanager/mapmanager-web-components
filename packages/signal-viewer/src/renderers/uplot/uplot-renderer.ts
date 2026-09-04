@@ -229,7 +229,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
     if (nextWidth === this.#width && nextHeight === this.#height) return
     this.#width = nextWidth
     this.#height = nextHeight
-    this.#plot?.setSize({ width: nextWidth, height: nextHeight })
+    this.#fitPlotToHost()
   }
 
   destroy(): void {
@@ -296,10 +296,18 @@ export class UPlotSignalRenderer implements SignalRenderer {
       },
     }
     this.#plot = new uPlot(options, emptyData(description.series.length), this.#host)
+    this.#fitPlotToHost()
     if (this.#frame) {
       this.setFrame(this.#frame)
       if (preservedRanges) this.#restoreAxisRanges(preservedRanges)
     }
+  }
+
+  #fitPlotToHost(): void {
+    const plot = this.#plot
+    if (!plot) return
+    const legendHeight = plot.root.querySelector<HTMLElement>('.u-legend')?.offsetHeight ?? 0
+    plot.setSize({ width: this.#width, height: Math.max(1, this.#height - legendHeight) })
   }
 
   #applyAxisRange(axis: SignalYAxisId, preserved: SignalAxisRange | null = null): void {
