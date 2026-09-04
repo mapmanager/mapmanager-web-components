@@ -121,6 +121,21 @@ export class UPlotSignalRenderer implements SignalRenderer {
     return scale?.min == null || scale.max == null ? null : { min: scale.min, max: scale.max }
   }
 
+  resetYAxisRanges(): void {
+    const plot = this.#plot
+    if (!plot) return
+    this.#internalUpdate = true
+    try {
+      plot.batch(() => {
+        this.#applyAxisRange('left')
+        if (this.#description?.yAxes.right) this.#applyAxisRange('right')
+      })
+    } finally {
+      this.#internalUpdate = false
+    }
+    plot.redraw(false, true)
+  }
+
   setAxisVisible(axis: SignalAxisId, visible: boolean): void {
     if (this.#axisVisibility[axis] === visible) return
     this.#axisVisibility[axis] = visible

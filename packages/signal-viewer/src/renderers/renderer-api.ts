@@ -33,6 +33,7 @@ export interface SignalRenderer {
   setCursors(cursors: SignalCursorState): void
   setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void
   getAxisRange(axis: SignalYAxisId): SignalAxisRange | null
+  resetYAxisRanges(): void
   setAxisVisible(axis: SignalAxisId, visible: boolean): void
   getAxisVisible(axis: SignalAxisId): boolean
   setGridVisible(axis: SignalAxisId, visible: boolean): void

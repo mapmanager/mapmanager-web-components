@@ -120,7 +120,8 @@ outside this API version.
 
 The plot's options button uses these same public operations to show or hide
 traces, named scatter series, axes, and cursor pairs and to reset the full view.
-Double-clicking the plot uses the same full-view reset operation. The first time a pair is
+Double-clicking the plot uses the same full-view reset operation, restoring both
+the complete X range and the configured Y-axis ranges. The first time a pair is
 enabled, A/B are placed at 25% and 75% of the visible X range and C/D at 25%
 and 75% of the visible left Y range. Later toggles preserve their positions.
 Dragging chooses the dominant direction and zooms only X or only both Y

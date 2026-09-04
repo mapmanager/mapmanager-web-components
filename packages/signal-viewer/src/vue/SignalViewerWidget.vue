@@ -263,6 +263,7 @@ function getCursors(): SignalCursorState {
 async function resetView(): Promise<void> {
   if (!engine.description) return
   await setViewport(fullViewport(engine.description))
+  renderer?.resetYAxisRanges()
   if (currentViewport) emit('view-change', currentViewport)
 }
 
