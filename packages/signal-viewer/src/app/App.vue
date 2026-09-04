@@ -32,6 +32,7 @@ const selected = ref<string | null>(null)
 const cursorDelta = ref<string>('—')
 const datasetId = ref<SyntheticDatasetId>('recording-a')
 const theme = ref<SignalViewerTheme>('dark')
+const renderInput = ref('—')
 
 function datasetOverlays(id: SyntheticDatasetId): SignalOverlays {
   const dataset = SYNTHETIC_DATASETS.find((candidate) => candidate.id === id)
@@ -60,10 +61,28 @@ function datasetOverlays(id: SyntheticDatasetId): SignalOverlays {
 async function loadDataset(): Promise<void> {
   selected.value = null
   cursorDelta.value = '—'
-  await widget.value?.setSource(new SyntheticSignalSource(datasetId.value))
+  renderInput.value = 'Loading…'
+  await widget.value?.setSource(instrumentSource(new SyntheticSignalSource(datasetId.value)))
   widget.value?.setOverlays(datasetOverlays(datasetId.value))
   widget.value?.setCursor('a', 60)
   widget.value?.setCursor('b', 120)
+}
+
+function instrumentSource(source: SignalSource): SignalSource {
+  return {
+    describe: () => source.describe(),
+    async getRange(request) {
+      const result = await source.getRange(request)
+      const series = result.series[0]
+      if (!series) renderInput.value = 'No visible traces'
+      else if (series.kind === 'samples') {
+        renderInput.value = `${series.values.length.toLocaleString()} exact samples`
+      } else {
+        renderInput.value = `${series.minimum.length.toLocaleString()} min/max bins × ${series.factor}`
+      }
+      return result
+    },
+  }
 }
 
 function toggleTheme(event: Event): void {
@@ -108,6 +127,7 @@ onMounted(loadDataset)
     />
     <footer>
       <span>Viewport: {{ viewport ? `${viewport.xMin.toFixed(3)}–${viewport.xMax.toFixed(3)} s` : '—' }}</span>
+      <span>Render input: {{ renderInput }}</span>
       <span>Selected: {{ selected ?? 'none' }}</span>
       <span>B − A: {{ cursorDelta }} s</span>
     </footer>

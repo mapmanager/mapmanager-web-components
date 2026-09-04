@@ -416,19 +416,28 @@ export class UPlotSignalRenderer implements SignalRenderer {
     style: ReturnType<typeof resolveTraceStyle>,
   ): void {
     const { ctx } = plot
-    ctx.beginPath()
     ctx.strokeStyle = style.color
     ctx.lineWidth = style.lineWidth * devicePixelRatio
+    const envelope = new Path2D()
+    const midpoint = new Path2D()
+    let midpointStarted = false
     for (let index = 0; index < series.minimum.length; index += 1) {
       const low = series.minimum[index]
       const high = series.maximum[index]
-      if (low === undefined || high === undefined || !Number.isFinite(low) || !Number.isFinite(high)) continue
+      if (low === undefined || high === undefined || !Number.isFinite(low) || !Number.isFinite(high)) {
+        midpointStarted = false
+        continue
+      }
       const sample = frame.result.startSample + index * series.factor + series.factor / 2
       const left = plot.valToPos(sampleX(frame, sample), 'x', true)
-      ctx.moveTo(left, plot.valToPos(low, axis, true))
-      ctx.lineTo(left, plot.valToPos(high, axis, true))
+      envelope.moveTo(left, plot.valToPos(low, axis, true))
+      envelope.lineTo(left, plot.valToPos(high, axis, true))
+      const middle = plot.valToPos((low + high) / 2, axis, true)
+      if (midpointStarted) midpoint.lineTo(left, middle)
+      else { midpoint.moveTo(left, middle); midpointStarted = true }
     }
-    ctx.stroke()
+    ctx.stroke(midpoint)
+    ctx.stroke(envelope)
   }
 
   #drawRegions(plot: uPlot): void {
