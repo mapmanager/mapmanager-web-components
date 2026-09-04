@@ -5,6 +5,7 @@ import type {
   SignalCursorChange, SignalCursorId, SignalCursorState, SignalOverlays, SignalSource,
   SignalScatterSeries, SignalScatterSeriesUpdate, SignalTrace, SignalTraceUpdate,
   SignalViewport, SignalYAxisId,
+  SignalViewerTheme,
 } from '../core'
 import SignalViewerWidget from '../vue/SignalViewerWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
@@ -33,6 +34,8 @@ interface WidgetApi {
   getGridVisible(axis: SignalAxisId): boolean
   setHoverVisible(visible: boolean): void
   getHoverVisible(): boolean
+  setTheme(theme: SignalViewerTheme): void
+  getTheme(): SignalViewerTheme
   setCursor(id: SignalCursorId, value: number): void
   setCursorVisible(id: SignalCursorId, visible: boolean): void
   setCursors(cursors: readonly SignalCursor[]): void
@@ -181,6 +184,12 @@ export class SignalViewerElement extends HTMLElement {
   getHoverVisible(): boolean {
     return this.#requireWidget().getHoverVisible()
   }
+
+  /** Apply the centralized light or dark viewer palette. */
+  setTheme(theme: SignalViewerTheme): void { this.#requireWidget().setTheme(theme) }
+
+  /** Return the active viewer palette. */
+  getTheme(): SignalViewerTheme { return this.#requireWidget().getTheme() }
 
   /** Set and show one A/B/C/D cursor without emitting an event. */
   setCursor(id: SignalCursorId, value: number): void { this.#requireWidget().setCursor(id, value) }

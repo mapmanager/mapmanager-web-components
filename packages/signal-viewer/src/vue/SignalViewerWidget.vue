@@ -9,6 +9,7 @@ import {
   defaultCursorState,
   fullViewport,
   isAbort,
+  signalViewerThemeVariables,
   type InMemorySignalSourceOptions,
   type SignalAxisRange,
   type SignalAxisRangeSetting,
@@ -25,6 +26,7 @@ import {
   type SignalTrace,
   type SignalTraceUpdate,
   type SignalViewport,
+  type SignalViewerTheme,
   type SignalYAxisId,
 } from '../core'
 import type { SignalRenderer } from '../renderers/renderer-api'
@@ -49,6 +51,7 @@ const scatterControls = ref<readonly SignalScatterSeries[]>([])
 const axisControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
 const gridControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
 const hoverControl = ref(true)
+const activeTheme = ref<SignalViewerTheme>('dark')
 let engine = new SignalViewerEngine()
 let renderer: SignalRenderer | null = null
 let inMemorySource: InMemorySignalSource | null = null
@@ -114,7 +117,7 @@ async function setViewport(viewport: SignalViewport): Promise<void> {
   error.value = null
   try {
     const frame = await engine.setViewport(viewport, targetPoints())
-    renderer?.setFrame(frame)
+    renderer?.setFrame(frame, { preserveYAxisRange: true })
     currentViewport = frame.requestedViewport
   } catch (reason) {
     if (!isAbort(reason)) error.value = reason instanceof Error ? reason.message : String(reason)
@@ -201,6 +204,17 @@ function setHoverVisible(visible: boolean): void {
 /** Return whether the hover crosshair and trace-position symbols are visible. */
 function getHoverVisible(): boolean {
   return hoverControl.value
+}
+
+/** Apply a complete centralized light or dark palette. */
+function setTheme(theme: SignalViewerTheme): void {
+  activeTheme.value = theme
+  renderer?.setTheme(theme)
+}
+
+/** Return the active viewer palette. */
+function getTheme(): SignalViewerTheme {
+  return activeTheme.value
 }
 
 /** Set and show one persistent A/B/C/D cursor without emitting an event. */
@@ -426,6 +440,7 @@ onMounted(async () => {
     cursorChange: handleCursorChange,
     resetViewRequest: () => { void resetView() },
   })
+  renderer.setTheme(activeTheme.value)
   renderer.resize(width, height)
   renderer.setOverlays(overlays)
   renderer.setCursors(cursors)
@@ -452,12 +467,17 @@ defineExpose({
   setScatterSeriesVisible, getVisibleScatterSeries,
   setAxisRange, getAxisRange, setAxisVisible, getAxisVisible,
   setGridVisible, getGridVisible, setHoverVisible, getHoverVisible,
+  setTheme, getTheme,
   setCursor, setCursorVisible, setCursors, getCursor, getCursors,
 })
 </script>
 
 <template>
-  <div class="mm-signal-viewer">
+  <div
+    class="mm-signal-viewer"
+    :class="`mm-signal-viewer--${activeTheme}`"
+    :style="signalViewerThemeVariables(activeTheme)"
+  >
     <div ref="host" class="mm-signal-viewer__plot" />
     <details class="mm-signal-viewer__options">
       <summary aria-label="Viewer options" title="Viewer options">☰</summary>

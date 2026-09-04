@@ -1,6 +1,9 @@
 /** Numeric values accepted without forcing callers to copy typed arrays. */
 export type SignalValues = readonly number[] | Float32Array | Float64Array
 
+/** Supported viewer color themes. */
+export type SignalViewerTheme = 'dark' | 'light'
+
 /** The two supported independent Y axes. */
 export type SignalYAxisId = 'left' | 'right'
 

@@ -5,6 +5,7 @@ import {
   cursorChange,
   defaultCursorState,
   resolveTraceStyle,
+  SIGNAL_VIEWER_THEMES,
   type LoadedSignalFrame,
   type MinMaxSeriesResult,
   type SampleSeriesResult,
@@ -18,8 +19,10 @@ import {
   type SignalOverlays,
   type SignalSeriesResult,
   type SignalViewport,
+  type SignalViewerTheme,
   type SignalYAxisId,
 } from '../../core'
+import type { SignalViewerThemeTokens } from '../../core/theme'
 import type { SignalFrameOptions, SignalRenderer, SignalRendererCallbacks } from '../renderer-api'
 
 interface HitPoint { id: string; left: number; top: number }
@@ -37,6 +40,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
   #axisVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
   #gridVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
   #hoverVisible = true
+  #theme: SignalViewerTheme = 'dark'
   #internalUpdate = false
   #hitPoints: HitPoint[] = []
   #dragCursor: SignalCursorId | null = null
@@ -147,6 +151,16 @@ export class UPlotSignalRenderer implements SignalRenderer {
     return this.#hoverVisible
   }
 
+  setTheme(theme: SignalViewerTheme): void {
+    if (this.#theme === theme) return
+    this.#theme = theme
+    this.#rebuild()
+  }
+
+  getTheme(): SignalViewerTheme {
+    return this.#theme
+  }
+
   setViewport(viewport: SignalViewport): void {
     if (!this.#plot) return
     this.#internalUpdate = true
@@ -179,16 +193,15 @@ export class UPlotSignalRenderer implements SignalRenderer {
     this.#host.replaceChildren()
     const description = this.#description
     if (!description) return
+    const theme = SIGNAL_VIEWER_THEMES[this.#theme]
     const options: uPlot.Options = {
       width: this.#width,
       height: this.#height,
       legend: { show: description.series.length > 1 },
       cursor: {
         show: true,
-        x: this.#hoverVisible,
-        y: this.#hoverVisible,
-        points: { show: this.#hoverVisible },
-        drag: { x: true, y: false, setScale: true },
+        ...(this.#hoverVisible ? {} : { x: false, y: false, points: { show: false } }),
+        drag: { x: true, y: true, uni: Infinity, setScale: true },
         bind: { mousedown: (_plot, _target, handler) => (event) => {
           if (!this.#beginCursorDrag(event)) return handler(event)
           return null
@@ -201,11 +214,11 @@ export class UPlotSignalRenderer implements SignalRenderer {
       },
       scales: { x: { time: false }, left: { auto: false }, right: { auto: false } },
       axes: [
-        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x, this.#gridVisibility.x, 55),
-        axisOptions('left', axisLabel(description.yAxes.left.label, description.yAxes.left.unit), this.#axisVisibility.y, this.#gridVisibility.y, 65),
+        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x, this.#gridVisibility.x, 55, theme),
+        axisOptions('left', axisLabel(description.yAxes.left.label, description.yAxes.left.unit), this.#axisVisibility.y, this.#gridVisibility.y, 65, theme),
         ...(description.yAxes.right
           ? [{
-              ...axisOptions('right', axisLabel(description.yAxes.right.label, description.yAxes.right.unit), this.#axisVisibility.y, false, 65),
+              ...axisOptions('right', axisLabel(description.yAxes.right.label, description.yAxes.right.unit), this.#axisVisibility.y, false, 65, theme),
               side: 1 as const,
               grid: { show: false },
             }]
@@ -531,16 +544,17 @@ function axisOptions(
   axisVisible: boolean,
   gridVisible: boolean,
   size: number,
+  theme: SignalViewerThemeTokens,
 ): uPlot.Axis {
   return {
     scale,
     label: axisVisible ? label : '',
     show: true,
     size,
-    stroke: axisVisible ? '#94a3b8' : 'transparent',
-    ticks: { show: axisVisible, stroke: '#64748b', width: 1 },
-    border: { show: axisVisible, stroke: '#64748b', width: 1 },
-    grid: { show: gridVisible, stroke: 'rgba(100, 116, 139, 0.22)', width: 1 },
+    stroke: axisVisible ? theme.axis : 'transparent',
+    ticks: { show: axisVisible, stroke: theme.axis, width: 1 },
+    border: { show: axisVisible, stroke: theme.axis, width: 1 },
+    grid: { show: gridVisible, stroke: theme.grid, width: 1 },
   }
 }
 

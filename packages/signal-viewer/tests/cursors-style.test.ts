@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { cursorChange, defaultCursorState, resolveTraceStyle } from '../src/core'
+import {
+  SIGNAL_VIEWER_THEMES,
+  cursorChange,
+  defaultCursorState,
+  resolveTraceStyle,
+  signalViewerThemeVariables,
+} from '../src/core'
 
 describe('cursor state and trace styles', () => {
   it('reports B-A and D-C only for visible cursor pairs', () => {
@@ -14,6 +20,15 @@ describe('cursor state and trace styles', () => {
     expect(resolveTraceStyle(undefined, 0)).toMatchObject({ lineWidth: 2, markers: false })
     expect(resolveTraceStyle({ lineWidth: 4, markers: true }, 1)).toMatchObject({
       lineWidth: 4, markers: true,
+    })
+  })
+
+  it('provides complete centralized light and dark palettes', () => {
+    expect(Object.keys(SIGNAL_VIEWER_THEMES.light)).toEqual(Object.keys(SIGNAL_VIEWER_THEMES.dark))
+    expect(SIGNAL_VIEWER_THEMES.light.background).not.toBe(SIGNAL_VIEWER_THEMES.dark.background)
+    expect(signalViewerThemeVariables('light')).toMatchObject({
+      '--sv-background': SIGNAL_VIEWER_THEMES.light.background,
+      '--sv-selection': SIGNAL_VIEWER_THEMES.light.selection,
     })
   })
 })

@@ -5,9 +5,12 @@
   min-width: 120px;
   min-height: 100px;
   overflow: hidden;
-  color: #cbd5e1;
-  background: #020617;
+  color: var(--sv-text);
+  background: var(--sv-background);
 }
+
+.mm-signal-viewer--dark { color-scheme: dark; }
+.mm-signal-viewer--light { color-scheme: light; }
 
 .mm-signal-viewer__plot {
   width: 100%;
@@ -29,9 +32,9 @@
   box-sizing: border-box;
   place-items: center;
   margin-left: auto;
-  color: #e2e8f0;
-  background: rgb(15 23 42 / 88%);
-  border: 1px solid #475569;
+  color: var(--sv-text);
+  background: var(--sv-panel);
+  border: 1px solid var(--sv-border);
   border-radius: 4px;
   cursor: pointer;
   list-style: none;
@@ -47,9 +50,9 @@
   gap: 10px;
   margin-top: 5px;
   padding: 10px;
-  color: #e2e8f0;
-  background: rgb(15 23 42 / 96%);
-  border: 1px solid #475569;
+  color: var(--sv-text);
+  background: var(--sv-panel);
+  border: 1px solid var(--sv-border);
   border-radius: 5px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
   overflow-y: auto;
@@ -65,7 +68,7 @@
 
 .mm-signal-viewer__options-panel legend {
   margin-bottom: 4px;
-  color: #94a3b8;
+  color: var(--sv-muted);
   font-weight: 600;
 }
 
@@ -74,9 +77,9 @@
 
 .mm-signal-viewer__options-panel button {
   padding: 6px 8px;
-  color: #e2e8f0;
-  background: #1e293b;
-  border: 1px solid #475569;
+  color: var(--sv-text);
+  background: var(--sv-input);
+  border: 1px solid var(--sv-border);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -85,6 +88,16 @@
 
 .mm-signal-viewer .uplot {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.mm-signal-viewer .u-select {
+  background: var(--sv-selection);
+  border: 1px solid var(--sv-selection-border);
+}
+
+.mm-signal-viewer .u-cursor-x,
+.mm-signal-viewer .u-cursor-y {
+  border-color: var(--sv-muted);
 }
 
 .mm-signal-viewer__status,

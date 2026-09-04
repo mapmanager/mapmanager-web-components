@@ -105,6 +105,11 @@ fixed amount of layout space even while hidden. X and Y grid lines and the
 hover crosshair can also be toggled independently. uPlot chooses tick intervals
 automatically from the visible range and available pixel space.
 
+Call `setTheme('light' | 'dark')` to switch the complete component palette at
+runtime and `getTheme()` to inspect it. The default is `dark`. Theme tokens are
+centralized and shared by the uPlot adapter and component chrome; callers do
+not need to know about uPlot styling.
+
 ## Cursors and events
 
 A/B are vertical X cursors. C/D are horizontal cursors calibrated to the left
@@ -118,6 +123,10 @@ traces, named scatter series, axes, and cursor pairs and to reset the full view.
 Double-clicking the plot uses the same full-view reset operation. The first time a pair is
 enabled, A/B are placed at 25% and 75% of the visible X range and C/D at 25%
 and 75% of the visible left Y range. Later toggles preserve their positions.
+Dragging chooses the dominant direction and zooms only X or only both Y
+scales. A visible selection band previews that range. When hover is enabled,
+uPlot shows the crosshair and one trace-colored position marker per visible
+trace.
 
 The other events are `source-change`, `view-change`, and `overlay-select`.
 The custom element exposes the same methods and emits events with the same

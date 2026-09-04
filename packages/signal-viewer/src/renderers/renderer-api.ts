@@ -7,6 +7,7 @@ import type {
   SignalCursorState,
   SignalDescription,
   SignalOverlays,
+  SignalViewerTheme,
   SignalViewport,
   SignalYAxisId,
 } from '../core'
@@ -38,6 +39,8 @@ export interface SignalRenderer {
   getGridVisible(axis: SignalAxisId): boolean
   setHoverVisible(visible: boolean): void
   getHoverVisible(): boolean
+  setTheme(theme: SignalViewerTheme): void
+  getTheme(): SignalViewerTheme
   setViewport(viewport: SignalViewport): void
   resize(width: number, height: number): void
   destroy(): void
