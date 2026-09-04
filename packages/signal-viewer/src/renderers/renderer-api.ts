@@ -43,7 +43,6 @@ export interface SignalRenderer {
   getHoverVisible(): boolean
   setLegendVisible(visible: boolean): void
   getLegendVisible(): boolean
-  setSeriesVisible(id: string, visible: boolean): void
   setTheme(theme: SignalViewerTheme): void
   getTheme(): SignalViewerTheme
   setViewport(viewport: SignalViewport): void

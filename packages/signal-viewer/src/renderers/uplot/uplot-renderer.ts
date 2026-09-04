@@ -91,6 +91,8 @@ export class UPlotSignalRenderer implements SignalRenderer {
           plot.setSeries(index + 1, { show: loadedIds.has(series.id) }, false)
         })
         plot.setScale('x', { min: frame.requestedViewport.xMin, max: frame.requestedViewport.xMax })
+      })
+      plot.batch(() => {
         this.#applyAxisRange('left', preservedRanges?.left ?? null)
         if (frame.description.yAxes.right) this.#applyAxisRange('right', preservedRanges?.right ?? null)
       })
@@ -185,22 +187,12 @@ export class UPlotSignalRenderer implements SignalRenderer {
   setLegendVisible(visible: boolean): void {
     if (this.#legendVisible === visible) return
     this.#legendVisible = visible
-    this.#rebuild()
+    this.#applyLegendVisibility()
+    this.#fitPlotToHost()
   }
 
   getLegendVisible(): boolean {
     return this.#legendVisible
-  }
-
-  setSeriesVisible(id: string, visible: boolean): void {
-    const index = this.#description?.series.findIndex((series) => series.id === id) ?? -1
-    if (index < 0 || !this.#plot) return
-    this.#internalUpdate = true
-    try {
-      this.#plot.setSeries(index + 1, { show: visible })
-    } finally {
-      this.#internalUpdate = false
-    }
   }
 
   setTheme(theme: SignalViewerTheme): void {
@@ -226,7 +218,6 @@ export class UPlotSignalRenderer implements SignalRenderer {
   resize(width: number, height: number): void {
     const nextWidth = Math.max(120, Math.floor(width))
     const nextHeight = Math.max(100, Math.floor(height))
-    if (nextWidth === this.#width && nextHeight === this.#height) return
     this.#width = nextWidth
     this.#height = nextHeight
     this.#fitPlotToHost()
@@ -250,7 +241,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
     const options: uPlot.Options = {
       width: this.#width,
       height: this.#height,
-      legend: { show: this.#legendVisible },
+      legend: { show: true, live: this.#hoverVisible },
       cursor: {
         show: true,
         ...(this.#hoverVisible ? {} : { x: false, y: false, points: { show: false } }),
@@ -290,12 +281,15 @@ export class UPlotSignalRenderer implements SignalRenderer {
       ],
       hooks: {
         setScale: [(_plot, key) => this.#onScale(key)],
-        setSeries: [(plot, index) => this.#onSeries(plot, index)],
         draw: [(plot) => this.#draw(plot)],
-        ready: [(plot) => plot.over.addEventListener('click', this.#onClick)],
+        ready: [(plot) => {
+          plot.over.addEventListener('click', this.#onClick)
+          this.#configureLegend(plot)
+        }],
       },
     }
     this.#plot = new uPlot(options, emptyData(description.series.length), this.#host)
+    this.#applyLegendVisibility()
     this.#fitPlotToHost()
     if (this.#frame) {
       this.setFrame(this.#frame)
@@ -307,7 +301,29 @@ export class UPlotSignalRenderer implements SignalRenderer {
     const plot = this.#plot
     if (!plot) return
     const legendHeight = plot.root.querySelector<HTMLElement>('.u-legend')?.offsetHeight ?? 0
-    plot.setSize({ width: this.#width, height: Math.max(1, this.#height - legendHeight) })
+    const width = this.#host.clientWidth || this.#width
+    const height = this.#host.clientHeight || this.#height
+    const plotHeight = Math.max(1, height - legendHeight)
+    if (plot.width !== width || plot.height !== plotHeight) plot.setSize({ width, height: plotHeight })
+  }
+
+  #applyLegendVisibility(): void {
+    const legend = this.#plot?.root.querySelector<HTMLElement>('.u-legend')
+    if (legend) legend.hidden = !this.#legendVisible
+  }
+
+  #configureLegend(plot: uPlot): void {
+    const legend = plot.root.querySelector<HTMLElement>('.u-legend')
+    if (!legend || !this.#description) return
+    const rows = [...legend.querySelectorAll<HTMLElement>('.u-series')]
+    const traceRows = rows.slice(-this.#description.series.length)
+    traceRows.forEach((row, index) => {
+      const descriptor = this.#description?.series[index]
+      if (!descriptor) return
+      row.dataset.seriesId = descriptor.id
+      row.dataset.seriesIndex = String(index + 1)
+    })
+    legend.addEventListener('click', this.#onLegendClick, true)
   }
 
   #applyAxisRange(axis: SignalYAxisId, preserved: SignalAxisRange | null = null): void {
@@ -600,10 +616,15 @@ export class UPlotSignalRenderer implements SignalRenderer {
     if (x) this.#callbacks.viewportChange({ xMin: x.min, xMax: x.max })
   }
 
-  #onSeries(plot: uPlot, index: number | null): void {
-    if (this.#internalUpdate || index == null || index < 1) return
-    const descriptor = this.#description?.series[index - 1]
-    if (descriptor) this.#callbacks.traceVisibilityRequest(descriptor.id, plot.series[index]?.show !== false)
+  #onLegendClick = (event: MouseEvent): void => {
+    const row = (event.target as Element | null)?.closest<HTMLElement>('.u-series[data-series-id]')
+    const index = Number(row?.dataset.seriesIndex)
+    const id = row?.dataset.seriesId
+    const plot = this.#plot
+    if (!id || !plot || !Number.isInteger(index)) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    this.#callbacks.traceVisibilityRequest(id, plot.series[index]?.show === false)
   }
 }
 

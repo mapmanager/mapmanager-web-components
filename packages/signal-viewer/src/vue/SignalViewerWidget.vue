@@ -104,7 +104,6 @@ async function setTraceVisible(id: string, visible: boolean): Promise<void> {
   else visibleTraceIds.delete(id)
   visibleControlIds.value = engine.getVisibleSeries()
   renderer?.setFrame(frame, { preserveYAxisRange: true })
-  renderer?.setSeriesVisible(id, visible)
 }
 
 /** Return visible trace IDs in source declaration order. */

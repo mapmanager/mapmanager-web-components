@@ -128,7 +128,8 @@ and 75% of the visible left Y range. Later toggles preserve their positions.
 Dragging chooses the dominant direction and zooms only X or only both Y
 scales. A visible selection band previews that range. When hover is enabled,
 uPlot shows the crosshair and one trace-colored position marker per visible
-trace.
+trace, and the legend reports corresponding values. Disabling hover also
+disables those live legend values.
 Shift-drag pans X and both Y axes freely. X panning is clamped to the complete
 recording, and a lazy range request is issued once when the gesture ends. The
 built-in uPlot legend delegates trace toggles to the same source-aware

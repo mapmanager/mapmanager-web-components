@@ -95,6 +95,8 @@
   font-size: 12px;
 }
 
+.mm-signal-viewer .u-legend[hidden] { display: none; }
+
 .mm-signal-viewer .u-select {
   background: var(--sv-selection);
   border: 1px solid var(--sv-selection-border);
