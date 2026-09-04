@@ -1,3 +1,6 @@
 export * from './engine'
+export * from './cursors'
+export * from './in-memory-source'
 export * from './range'
+export * from './style'
 export * from './types'

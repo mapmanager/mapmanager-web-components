@@ -1,15 +1,31 @@
 import { createApp, h, ref, type App, type ComponentPublicInstance } from 'vue'
 
-import type { SignalOverlays, SignalSource, SignalViewport } from '../core'
+import type {
+  InMemorySignalSourceOptions, SignalAxisRange, SignalAxisRangeSetting, SignalCursor,
+  SignalCursorChange, SignalCursorId, SignalCursorState, SignalOverlays, SignalSource,
+  SignalTrace, SignalTraceUpdate, SignalViewport, SignalYAxisId,
+} from '../core'
 import SignalViewerWidget from '../vue/SignalViewerWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
 
 interface WidgetApi {
   setSource(source: SignalSource): Promise<void>
+  setTraces(traces: readonly SignalTrace[], options?: InMemorySignalSourceOptions): Promise<void>
+  addTrace(trace: SignalTrace): Promise<void>
+  updateTrace(id: string, update: SignalTraceUpdate): Promise<void>
+  setTraceVisible(id: string, visible: boolean): Promise<void>
+  getVisibleTraces(): readonly string[]
   setViewport(viewport: SignalViewport): Promise<void>
-  setOverlays(overlays: SignalOverlays): void
-  resetView(): Promise<void>
   getViewport(): SignalViewport | null
+  resetView(): Promise<void>
+  setOverlays(overlays: SignalOverlays): void
+  setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void
+  getAxisRange(axis: SignalYAxisId): SignalAxisRange | null
+  setCursor(id: SignalCursorId, value: number): void
+  setCursorVisible(id: SignalCursorId, visible: boolean): void
+  setCursors(cursors: readonly SignalCursor[]): void
+  getCursor(id: SignalCursorId): SignalCursor
+  getCursors(): SignalCursorState
 }
 
 /** Framework-neutral custom-element host for the Vue signal viewer. */
@@ -32,6 +48,7 @@ export class SignalViewerElement extends HTMLElement {
         onSourceChange: (id: string) => this.#dispatch('source-change', id),
         onViewChange: (viewport: SignalViewport) => this.#dispatch('view-change', viewport),
         onOverlaySelect: (id: string | null) => this.#dispatch('overlay-select', id),
+        onCursorChange: (change: SignalCursorChange) => this.#dispatch('cursor-change', change),
       }),
     })
     this.#app.mount(mount)
@@ -48,6 +65,7 @@ export class SignalViewerElement extends HTMLElement {
     this.#widget.value = null
   }
 
+  /** Replace the complete session with an asynchronous range source. */
   setSource(source: SignalSource): Promise<void> {
     if (!this.#widget.value) {
       this.#pendingSource = source
@@ -56,20 +74,67 @@ export class SignalViewerElement extends HTMLElement {
     return this.#widget.value.setSource(source)
   }
 
-  setViewport(viewport: SignalViewport): Promise<void> {
-    return this.#widget.value?.setViewport(viewport) ?? Promise.resolve()
+  /** Replace the complete session with aligned in-memory traces. */
+  setTraces(traces: readonly SignalTrace[], options?: InMemorySignalSourceOptions): Promise<void> {
+    return this.#requireWidget().setTraces(traces, options)
   }
 
-  setOverlays(overlays: SignalOverlays): void {
-    this.#widget.value?.setOverlays(overlays)
+  /** Add one aligned in-memory trace with a stable ID. */
+  addTrace(trace: SignalTrace): Promise<void> { return this.#requireWidget().addTrace(trace) }
+
+  /** Update one in-memory trace without changing its ID. */
+  updateTrace(id: string, update: SignalTraceUpdate): Promise<void> {
+    return this.#requireWidget().updateTrace(id, update)
   }
 
-  resetView(): Promise<void> {
-    return this.#widget.value?.resetView() ?? Promise.resolve()
+  /** Show or hide one trace. */
+  setTraceVisible(id: string, visible: boolean): Promise<void> {
+    return this.#requireWidget().setTraceVisible(id, visible)
   }
 
-  getViewport(): SignalViewport | null {
-    return this.#widget.value?.getViewport() ?? null
+  /** Return visible trace IDs in source declaration order. */
+  getVisibleTraces(): readonly string[] { return this.#requireWidget().getVisibleTraces() }
+
+  /** Replace the calibrated visible X interval. */
+  setViewport(viewport: SignalViewport): Promise<void> { return this.#requireWidget().setViewport(viewport) }
+
+  /** Return the current calibrated X viewport. */
+  getViewport(): SignalViewport | null { return this.#requireWidget().getViewport() }
+
+  /** Restore the complete calibrated X range. */
+  resetView(): Promise<void> { return this.#requireWidget().resetView() }
+
+  /** Replace all sparse point and interval overlays. */
+  setOverlays(overlays: SignalOverlays): void { this.#requireWidget().setOverlays(overlays) }
+
+  /** Set one Y axis to automatic or explicit range control. */
+  setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void {
+    this.#requireWidget().setAxisRange(axis, range)
+  }
+
+  /** Return the currently rendered range for one Y axis. */
+  getAxisRange(axis: SignalYAxisId): SignalAxisRange | null { return this.#requireWidget().getAxisRange(axis) }
+
+  /** Set and show one A/B/C/D cursor without emitting an event. */
+  setCursor(id: SignalCursorId, value: number): void { this.#requireWidget().setCursor(id, value) }
+
+  /** Show or hide one A/B/C/D cursor without emitting an event. */
+  setCursorVisible(id: SignalCursorId, visible: boolean): void {
+    this.#requireWidget().setCursorVisible(id, visible)
+  }
+
+  /** Replace complete A/B/C/D cursor state without emitting an event. */
+  setCursors(cursors: readonly SignalCursor[]): void { this.#requireWidget().setCursors(cursors) }
+
+  /** Return a defensive copy of one cursor. */
+  getCursor(id: SignalCursorId): SignalCursor { return this.#requireWidget().getCursor(id) }
+
+  /** Return defensive copies of complete cursor state. */
+  getCursors(): SignalCursorState { return this.#requireWidget().getCursors() }
+
+  #requireWidget(): ComponentPublicInstance & WidgetApi {
+    if (!this.#widget.value) throw new Error('signal viewer is not connected')
+    return this.#widget.value
   }
 
   #dispatch<T>(name: string, detail: T): void {

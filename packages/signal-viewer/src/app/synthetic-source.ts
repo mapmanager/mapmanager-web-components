@@ -13,9 +13,14 @@ export class SyntheticSignalSource implements SignalSource {
       xStep: 1 / SAMPLE_RATE,
       xLabel: 'Time',
       xUnit: 's',
-      yLabel: 'Membrane potential',
-      yUnit: 'mV',
-      series: [{ id: 'raw', label: 'Vm', color: '#38bdf8' }],
+      yAxes: {
+        left: { label: 'Membrane potential', unit: 'mV' },
+        right: { label: 'Command', unit: 'pA' },
+      },
+      series: [
+        { id: 'raw', label: 'Vm', style: { color: '#38bdf8' } },
+        { id: 'command', label: 'Command', yAxis: 'right' as const, style: { color: '#f97316' } },
+      ],
     }
   }
 
@@ -23,41 +28,45 @@ export class SyntheticSignalSource implements SignalSource {
     if (request.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     const count = request.stopSample - request.startSample
     if (count <= request.targetPoints * 2) {
-      const values = Float64Array.from({ length: count }, (_, index) =>
-        valueAt(request.startSample + index),
-      )
       return {
         startSample: request.startSample,
         stopSample: request.stopSample,
-        series: [{ id: 'raw', kind: 'samples', values }],
+        series: request.seriesIds.map((id) => ({
+          id,
+          kind: 'samples' as const,
+          values: Float64Array.from({ length: count }, (_, index) => valueAt(id, request.startSample + index)),
+        })),
       }
     }
     const factor = Math.max(2, Math.ceil(count / request.targetPoints))
     const bins = Math.ceil(count / factor)
-    const minimum = new Float64Array(bins)
-    const maximum = new Float64Array(bins)
-    for (let bin = 0; bin < bins; bin += 1) {
-      let low = Infinity
-      let high = -Infinity
-      const start = request.startSample + bin * factor
-      const stop = Math.min(start + factor, request.stopSample)
-      for (let sample = start; sample < stop; sample += 1) {
-        const value = valueAt(sample)
-        low = Math.min(low, value)
-        high = Math.max(high, value)
-      }
-      minimum[bin] = low
-      maximum[bin] = high
-    }
     return {
       startSample: request.startSample,
       stopSample: request.stopSample,
-      series: [{ id: 'raw', kind: 'minmax', factor, minimum, maximum }],
+      series: request.seriesIds.map((id) => {
+        const minimum = new Float64Array(bins)
+        const maximum = new Float64Array(bins)
+        for (let bin = 0; bin < bins; bin += 1) {
+          let low = Infinity
+          let high = -Infinity
+          const start = request.startSample + bin * factor
+          const stop = Math.min(start + factor, request.stopSample)
+          for (let sample = start; sample < stop; sample += 1) {
+            const value = valueAt(id, sample)
+            low = Math.min(low, value)
+            high = Math.max(high, value)
+          }
+          minimum[bin] = low
+          maximum[bin] = high
+        }
+        return { id, kind: 'minmax' as const, factor, minimum, maximum }
+      }),
     }
   }
 }
 
-function valueAt(sample: number): number {
+function valueAt(id: string, sample: number): number {
+  if (id === 'command') return sample % 20_000 >= 8_000 && sample % 20_000 < 12_000 ? 100 : 0
   const seconds = sample / SAMPLE_RATE
   const baseline = -65 + 2 * Math.sin(seconds * Math.PI * 0.7)
   const phase = sample % 20_000

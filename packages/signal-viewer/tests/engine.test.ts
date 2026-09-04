@@ -8,8 +8,8 @@ class Source implements SignalSource {
   async describe() {
     return {
       id: 'source', sampleCount: 100, xStart: 0, xStep: 0.1,
-      xLabel: 'Time', xUnit: 's', yLabel: 'Value', yUnit: 'mV',
-      series: [{ id: 'raw', label: 'Raw', color: '#fff' }],
+      xLabel: 'Time', xUnit: 's', yAxes: { left: { label: 'Value', unit: 'mV' } },
+      series: [{ id: 'raw', label: 'Raw', style: { color: '#fff' } }],
     }
   }
 
@@ -39,5 +39,15 @@ describe('SignalViewerEngine', () => {
     expect(source.requests).toHaveLength(2)
     expect(source.requests[1]?.startSample).toBeLessThan(20)
     expect(source.requests[1]?.stopSample).toBeGreaterThan(31)
+  })
+
+  it('loads only visible series and supports hiding all traces', async () => {
+    const source = new Source()
+    const engine = new SignalViewerEngine()
+    await engine.setSource(source, 500)
+    const hidden = await engine.setSeriesVisibility('raw', false, 500)
+    expect(engine.getVisibleSeries()).toEqual([])
+    expect(hidden.result.series).toEqual([])
+    expect(source.requests).toHaveLength(1)
   })
 })

@@ -1,5 +1,6 @@
 import type { SignalDescription, SignalRangeResult, SignalViewport } from './types'
 
+/** Return the complete calibrated X range. */
 export function fullViewport(description: SignalDescription): SignalViewport {
   return {
     xMin: description.xStart,
@@ -7,6 +8,7 @@ export function fullViewport(description: SignalDescription): SignalViewport {
   }
 }
 
+/** Clamp and order a calibrated viewport, falling back to the full range. */
 export function normalizeViewport(
   description: SignalDescription,
   viewport: SignalViewport,
@@ -18,6 +20,7 @@ export function normalizeViewport(
   return { xMin: low, xMax: high }
 }
 
+/** Convert a calibrated viewport to an overscanned half-open sample range. */
 export function viewportSamples(
   description: SignalDescription,
   viewport: SignalViewport,
@@ -34,6 +37,7 @@ export function viewportSamples(
   }
 }
 
+/** Validate source metadata before it reaches a renderer. */
 export function validateDescription(description: SignalDescription): void {
   if (!description.id) throw new Error('signal description requires an id')
   if (!Number.isInteger(description.sampleCount) || description.sampleCount < 2) {
@@ -47,8 +51,19 @@ export function validateDescription(description: SignalDescription): void {
   if (ids.some((id) => !id) || new Set(ids).size !== ids.length) {
     throw new Error('signal series ids must be non-empty and unique')
   }
+  if (description.series.some((series) => series.yAxis === 'right') && !description.yAxes.right) {
+    throw new Error('right-axis series require right-axis configuration')
+  }
+  for (const axis of [description.yAxes.left, description.yAxes.right]) {
+    if (axis?.range !== undefined && axis.range !== 'auto') {
+      if (!Number.isFinite(axis.range.min) || !Number.isFinite(axis.range.max) || axis.range.max <= axis.range.min) {
+        throw new Error('explicit Y-axis ranges require finite min < max')
+      }
+    }
+  }
 }
 
+/** Validate source range output against its description and requested IDs. */
 export function validateRangeResult(
   description: SignalDescription,
   result: SignalRangeResult,

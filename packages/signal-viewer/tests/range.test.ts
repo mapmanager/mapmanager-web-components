@@ -9,9 +9,8 @@ const description = {
   xStep: 0.001,
   xLabel: 'Time',
   xUnit: 's',
-  yLabel: 'Value',
-  yUnit: 'mV',
-  series: [{ id: 'raw', label: 'Raw', color: '#fff' }],
+  yAxes: { left: { label: 'Value', unit: 'mV' } },
+  series: [{ id: 'raw', label: 'Raw', style: { color: '#fff' } }],
 }
 
 describe('signal ranges', () => {

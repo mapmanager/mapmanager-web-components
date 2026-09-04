@@ -1,24 +1,29 @@
 import uPlot from 'uplot'
 
-import type {
-  LoadedSignalFrame,
-  MinMaxSeriesResult,
-  SampleSeriesResult,
-  SignalDescription,
-  SignalOverlayPoint,
-  SignalOverlays,
-  SignalSeriesResult,
-  SignalViewport,
+import {
+  cloneCursorState,
+  cursorChange,
+  defaultCursorState,
+  resolveTraceStyle,
+  type LoadedSignalFrame,
+  type MinMaxSeriesResult,
+  type SampleSeriesResult,
+  type SignalAxisRange,
+  type SignalAxisRangeSetting,
+  type SignalCursorId,
+  type SignalCursorState,
+  type SignalDescription,
+  type SignalOverlayPoint,
+  type SignalOverlays,
+  type SignalSeriesResult,
+  type SignalViewport,
+  type SignalYAxisId,
 } from '../../core'
 import type { SignalRenderer, SignalRendererCallbacks } from '../renderer-api'
 
-interface HitPoint {
-  id: string
-  left: number
-  top: number
-}
+interface HitPoint { id: string; left: number; top: number }
 
-/** uPlot adapter. Storage, range loading, and application state stay outside. */
+/** uPlot adapter. Sources, session state, and application policy stay outside. */
 export class UPlotSignalRenderer implements SignalRenderer {
   #host: HTMLElement
   #callbacks: SignalRendererCallbacks
@@ -26,8 +31,11 @@ export class UPlotSignalRenderer implements SignalRenderer {
   #description: SignalDescription | null = null
   #frame: LoadedSignalFrame | null = null
   #overlays: SignalOverlays = { points: [] }
+  #cursors = defaultCursorState()
+  #axisSettings: Record<SignalYAxisId, SignalAxisRangeSetting> = { left: 'auto', right: 'auto' }
   #internalUpdate = false
   #hitPoints: HitPoint[] = []
+  #dragCursor: SignalCursorId | null = null
   #width = 640
   #height = 300
 
@@ -38,6 +46,11 @@ export class UPlotSignalRenderer implements SignalRenderer {
 
   setDescription(description: SignalDescription): void {
     this.#description = description
+    this.#frame = null
+    this.#axisSettings = {
+      left: description.yAxes.left.range ?? 'auto',
+      right: description.yAxes.right?.range ?? 'auto',
+    }
     this.#rebuild()
   }
 
@@ -48,17 +61,13 @@ export class UPlotSignalRenderer implements SignalRenderer {
     this.#frame = frame
     const plot = this.#plot
     if (!plot) return
-    const data = alignedData(frame)
-    const yRange = frameYRange(frame)
     this.#internalUpdate = true
     try {
       plot.batch(() => {
-        plot.setData(data, false)
-        plot.setScale('x', {
-          min: frame.requestedViewport.xMin,
-          max: frame.requestedViewport.xMax,
-        })
-        plot.setScale('y', yRange)
+        plot.setData(alignedData(frame), false)
+        plot.setScale('x', { min: frame.requestedViewport.xMin, max: frame.requestedViewport.xMax })
+        this.#applyAxisRange('left')
+        if (frame.description.yAxes.right) this.#applyAxisRange('right')
       })
     } finally {
       this.#internalUpdate = false
@@ -70,11 +79,34 @@ export class UPlotSignalRenderer implements SignalRenderer {
     this.#overlays = {
       points: overlays.points.map((point) => ({ ...point })),
       ...(overlays.regions ? { regions: overlays.regions.map((region) => ({ ...region })) } : {}),
-      ...(overlays.selectedPointId !== undefined
-        ? { selectedPointId: overlays.selectedPointId }
-        : {}),
+      ...(overlays.selectedPointId !== undefined ? { selectedPointId: overlays.selectedPointId } : {}),
     }
     this.#plot?.redraw(false, false)
+  }
+
+  setCursors(cursors: SignalCursorState): void {
+    this.#cursors = cloneCursorState(cursors)
+    this.#plot?.redraw(false, false)
+  }
+
+  setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void {
+    validateAxisRange(range)
+    if (axis === 'right' && !this.#description?.yAxes.right) {
+      throw new Error('right Y axis is not configured')
+    }
+    this.#axisSettings[axis] = range === 'auto' ? 'auto' : { ...range }
+    this.#internalUpdate = true
+    try {
+      this.#applyAxisRange(axis)
+    } finally {
+      this.#internalUpdate = false
+    }
+    this.#plot?.redraw(false, true)
+  }
+
+  getAxisRange(axis: SignalYAxisId): SignalAxisRange | null {
+    const scale = this.#plot?.scales[axis]
+    return scale?.min == null || scale.max == null ? null : { min: scale.min, max: scale.max }
   }
 
   setViewport(viewport: SignalViewport): void {
@@ -97,6 +129,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
   }
 
   destroy(): void {
+    this.#endCursorDrag(false)
     this.#plot?.destroy()
     this.#plot = null
     this.#host.replaceChildren()
@@ -111,17 +144,27 @@ export class UPlotSignalRenderer implements SignalRenderer {
       width: this.#width,
       height: this.#height,
       legend: { show: description.series.length > 1 },
-      cursor: { drag: { x: true, y: false, setScale: true } },
-      scales: { x: { time: false }, y: { auto: false } },
+      cursor: {
+        drag: { x: true, y: false, setScale: true },
+        bind: { mousedown: (_plot, _target, handler) => (event) => {
+          if (!this.#beginCursorDrag(event)) return handler(event)
+          return null
+        } },
+      },
+      scales: { x: { time: false }, left: { auto: false }, right: { auto: false } },
       axes: [
         { label: axisLabel(description.xLabel, description.xUnit) },
-        { label: axisLabel(description.yLabel, description.yUnit) },
+        { scale: 'left', label: axisLabel(description.yAxes.left.label, description.yAxes.left.unit) },
+        ...(description.yAxes.right
+          ? [{ scale: 'right', side: 1 as const, label: axisLabel(description.yAxes.right.label, description.yAxes.right.unit), grid: { show: false } }]
+          : []),
       ],
       series: [
         {},
-        ...description.series.map((series) => ({
+        ...description.series.map((series, index) => ({
           label: series.label,
-          stroke: series.color,
+          scale: series.yAxis ?? 'left',
+          stroke: resolveTraceStyle(series.style, index).color,
           paths: () => null,
           points: { show: false },
         })),
@@ -136,13 +179,19 @@ export class UPlotSignalRenderer implements SignalRenderer {
     if (this.#frame) this.setFrame(this.#frame)
   }
 
+  #applyAxisRange(axis: SignalYAxisId): void {
+    const plot = this.#plot
+    if (!plot) return
+    const setting = this.#axisSettings[axis]
+    const range = setting === 'auto' ? frameAxisRange(this.#frame, axis) : setting
+    plot.setScale(axis, range ?? { min: -1, max: 1 })
+  }
+
   #onScale(key: string): void {
     if (this.#internalUpdate || key !== 'x' || !this.#plot) return
     const scale = this.#plot.scales['x']
-    if (!scale) return
-    const { min, max } = scale
-    if (min == null || max == null) return
-    this.#callbacks.viewportChange({ xMin: min, xMax: max })
+    if (scale?.min == null || scale.max == null) return
+    this.#callbacks.viewportChange({ xMin: scale.min, xMax: scale.max })
   }
 
   #draw(plot: uPlot): void {
@@ -154,12 +203,16 @@ export class UPlotSignalRenderer implements SignalRenderer {
     ctx.rect(plot.bbox.left, plot.bbox.top, plot.bbox.width, plot.bbox.height)
     ctx.clip()
     this.#drawRegions(plot)
-    frame.result.series.forEach((series, index) => {
-      const color = frame.description.series[index]?.color ?? '#38bdf8'
-      if (series.kind === 'samples') this.#drawSamples(plot, frame, series, color)
-      else this.#drawMinMax(plot, frame, series, color)
-    })
+    for (const result of frame.result.series) {
+      const index = frame.description.series.findIndex(({ id }) => id === result.id)
+      const descriptor = frame.description.series[index]
+      if (!descriptor) continue
+      const style = resolveTraceStyle(descriptor.style, index)
+      if (result.kind === 'samples') this.#drawSamples(plot, frame, result, descriptor.yAxis ?? 'left', style)
+      else this.#drawMinMax(plot, frame, result, descriptor.yAxis ?? 'left', style)
+    }
     this.#drawPoints(plot)
+    this.#drawCursors(plot)
     ctx.restore()
   }
 
@@ -167,20 +220,24 @@ export class UPlotSignalRenderer implements SignalRenderer {
     plot: uPlot,
     frame: LoadedSignalFrame,
     series: SampleSeriesResult,
-    color: string,
+    axis: SignalYAxisId,
+    style: ReturnType<typeof resolveTraceStyle>,
   ): void {
     const { ctx } = plot
     ctx.beginPath()
-    ctx.strokeStyle = color
-    ctx.lineWidth = devicePixelRatio
+    ctx.strokeStyle = style.color
+    ctx.lineWidth = style.lineWidth * devicePixelRatio
+    let started = false
     for (let index = 0; index < series.values.length; index += 1) {
-      const x = sampleX(frame, frame.result.startSample + index)
       const y = series.values[index]
-      if (y === undefined || !Number.isFinite(y)) continue
-      const left = plot.valToPos(x, 'x', true)
-      const top = plot.valToPos(y, 'y', true)
-      if (index === 0) ctx.moveTo(left, top)
-      else ctx.lineTo(left, top)
+      if (y === undefined || !Number.isFinite(y)) { started = false; continue }
+      const left = plot.valToPos(sampleX(frame, frame.result.startSample + index), 'x', true)
+      const top = plot.valToPos(y, axis, true)
+      if (!started) { ctx.moveTo(left, top); started = true } else ctx.lineTo(left, top)
+      if (style.markers) {
+        ctx.moveTo(left + style.markerSize * devicePixelRatio, top)
+        ctx.arc(left, top, style.markerSize * devicePixelRatio, 0, Math.PI * 2)
+      }
     }
     ctx.stroke()
   }
@@ -189,63 +246,132 @@ export class UPlotSignalRenderer implements SignalRenderer {
     plot: uPlot,
     frame: LoadedSignalFrame,
     series: MinMaxSeriesResult,
-    color: string,
+    axis: SignalYAxisId,
+    style: ReturnType<typeof resolveTraceStyle>,
   ): void {
     const { ctx } = plot
     ctx.beginPath()
-    ctx.strokeStyle = color
-    ctx.lineWidth = devicePixelRatio
+    ctx.strokeStyle = style.color
+    ctx.lineWidth = style.lineWidth * devicePixelRatio
     for (let index = 0; index < series.minimum.length; index += 1) {
-      const sample = frame.result.startSample + index * series.factor + series.factor / 2
       const low = series.minimum[index]
       const high = series.maximum[index]
       if (low === undefined || high === undefined || !Number.isFinite(low) || !Number.isFinite(high)) continue
+      const sample = frame.result.startSample + index * series.factor + series.factor / 2
       const left = plot.valToPos(sampleX(frame, sample), 'x', true)
-      ctx.moveTo(left, plot.valToPos(low, 'y', true))
-      ctx.lineTo(left, plot.valToPos(high, 'y', true))
+      ctx.moveTo(left, plot.valToPos(low, axis, true))
+      ctx.lineTo(left, plot.valToPos(high, axis, true))
     }
     ctx.stroke()
   }
 
   #drawRegions(plot: uPlot): void {
-    const { ctx } = plot
     for (const region of this.#overlays.regions ?? []) {
       const left = plot.valToPos(region.xStart, 'x', true)
       const right = plot.valToPos(region.xStop, 'x', true)
-      ctx.fillStyle = region.color ?? 'rgba(148, 163, 184, 0.12)'
-      ctx.fillRect(left, plot.bbox.top, right - left, plot.bbox.height)
+      plot.ctx.fillStyle = region.color ?? 'rgba(148, 163, 184, 0.12)'
+      plot.ctx.fillRect(left, plot.bbox.top, right - left, plot.bbox.height)
     }
   }
 
   #drawPoints(plot: uPlot): void {
-    const { ctx } = plot
     this.#hitPoints = []
     for (const point of this.#overlays.points) {
       if (!visiblePoint(plot, point)) continue
       const left = plot.valToPos(point.x, 'x', true)
-      const top = plot.valToPos(point.y, 'y', true)
+      const top = plot.valToPos(point.y, 'left', true)
       const selected = point.id === this.#overlays.selectedPointId
       const radius = (selected ? 5 : 3.5) * devicePixelRatio
-      ctx.beginPath()
-      ctx.arc(left, top, radius, 0, Math.PI * 2)
-      ctx.fillStyle = point.color ?? '#f97316'
-      ctx.fill()
+      plot.ctx.beginPath()
+      plot.ctx.arc(left, top, radius, 0, Math.PI * 2)
+      plot.ctx.fillStyle = point.color ?? '#f97316'
+      plot.ctx.fill()
       if (selected) {
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 2 * devicePixelRatio
-        ctx.stroke()
+        plot.ctx.strokeStyle = '#ffffff'
+        plot.ctx.lineWidth = 2 * devicePixelRatio
+        plot.ctx.stroke()
       }
-      this.#hitPoints.push({
-        id: point.id,
-        left: plot.valToPos(point.x, 'x', false),
-        top: plot.valToPos(point.y, 'y', false),
-      })
+      this.#hitPoints.push({ id: point.id, left: plot.valToPos(point.x, 'x'), top: plot.valToPos(point.y, 'left') })
     }
+  }
+
+  #drawCursors(plot: uPlot): void {
+    for (const id of ['a', 'b', 'c', 'd'] as const) {
+      const cursor = this.#cursors[id]
+      if (!cursor.visible || cursor.value == null) continue
+      const vertical = id === 'a' || id === 'b'
+      const position = plot.valToPos(cursor.value, vertical ? 'x' : 'left', true)
+      const { ctx } = plot
+      ctx.beginPath()
+      ctx.strokeStyle = cursor.color ?? '#facc15'
+      ctx.lineWidth = 1.5 * devicePixelRatio
+      ctx.setLineDash([5 * devicePixelRatio, 4 * devicePixelRatio])
+      if (vertical) { ctx.moveTo(position, plot.bbox.top); ctx.lineTo(position, plot.bbox.top + plot.bbox.height) }
+      else { ctx.moveTo(plot.bbox.left, position); ctx.lineTo(plot.bbox.left + plot.bbox.width, position) }
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = cursor.color ?? '#facc15'
+      ctx.font = `${11 * devicePixelRatio}px sans-serif`
+      ctx.textBaseline = 'top'
+      ctx.fillText(
+        id.toUpperCase(),
+        vertical ? position + 4 * devicePixelRatio : plot.bbox.left + 4 * devicePixelRatio,
+        vertical ? plot.bbox.top + 3 * devicePixelRatio : position + 3 * devicePixelRatio,
+      )
+    }
+  }
+
+  #beginCursorDrag(event: MouseEvent): boolean {
+    const plot = this.#plot
+    if (!plot) return false
+    const rect = plot.over.getBoundingClientRect()
+    const left = event.clientX - rect.left
+    const top = event.clientY - rect.top
+    let nearest: SignalCursorId | null = null
+    let distance = 8
+    for (const id of ['a', 'b', 'c', 'd'] as const) {
+      const cursor = this.#cursors[id]
+      if (!cursor.visible || cursor.value == null) continue
+      const vertical = id === 'a' || id === 'b'
+      const position = plot.valToPos(cursor.value, vertical ? 'x' : 'left')
+      const next = Math.abs(position - (vertical ? left : top))
+      if (next <= distance) { nearest = id; distance = next }
+    }
+    if (!nearest) return false
+    event.preventDefault()
+    event.stopPropagation()
+    this.#dragCursor = nearest
+    window.addEventListener('mousemove', this.#onCursorMove)
+    window.addEventListener('mouseup', this.#onCursorUp, { once: true })
+    return true
+  }
+
+  #onCursorMove = (event: MouseEvent): void => {
+    const plot = this.#plot
+    const id = this.#dragCursor
+    if (!plot || !id) return
+    const rect = plot.over.getBoundingClientRect()
+    const vertical = id === 'a' || id === 'b'
+    const position = vertical ? event.clientX - rect.left : event.clientY - rect.top
+    const scale = plot.scales[vertical ? 'x' : 'left']
+    if (!scale || scale.min == null || scale.max == null) return
+    const value = plot.posToVal(position, vertical ? 'x' : 'left')
+    this.#cursors[id] = { ...this.#cursors[id], value: Math.max(scale.min, Math.min(scale.max, value)) }
+    plot.redraw(false, false)
+  }
+
+  #onCursorUp = (): void => this.#endCursorDrag(true)
+
+  #endCursorDrag(emit: boolean): void {
+    window.removeEventListener('mousemove', this.#onCursorMove)
+    const id = this.#dragCursor
+    this.#dragCursor = null
+    if (emit && id) this.#callbacks.cursorChange(cursorChange(id, this.#cursors))
   }
 
   #onClick = (event: MouseEvent): void => {
     const plot = this.#plot
-    if (!plot) return
+    if (!plot || this.#dragCursor) return
     const rect = plot.over.getBoundingClientRect()
     const left = event.clientX - rect.left
     const top = event.clientY - rect.top
@@ -253,10 +379,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
     let distance = 9
     for (const point of this.#hitPoints) {
       const next = Math.hypot(point.left - left, point.top - top)
-      if (next <= distance) {
-        distance = next
-        closest = point
-      }
+      if (next <= distance) { distance = next; closest = point }
     }
     this.#callbacks.overlaySelect(closest?.id ?? null)
   }
@@ -268,45 +391,52 @@ function emptyData(seriesCount: number): uPlot.AlignedData {
 
 function alignedData(frame: LoadedSignalFrame): uPlot.AlignedData {
   const first = frame.result.series[0]
-  if (!first) throw new Error('signal frame contains no series')
+  if (!first) return emptyData(frame.description.series.length)
   const length = resultLength(first)
   for (const series of frame.result.series) {
     if (series.kind !== first.kind || resultLength(series) !== length) {
-      throw new Error('all signal series in one track must use the same range representation')
+      throw new Error('all visible series must use the same range representation')
     }
     if (series.kind === 'minmax' && first.kind === 'minmax' && series.factor !== first.factor) {
-      throw new Error('all min/max series in one track must use the same factor')
+      throw new Error('all visible min/max series must use the same factor')
     }
   }
   const factor = first.kind === 'minmax' ? first.factor : 1
   const x = Array.from({ length }, (_, index) =>
     sampleX(frame, frame.result.startSample + index * factor + (factor === 1 ? 0 : factor / 2)),
   )
-  const values = frame.result.series.map((series) =>
-    series.kind === 'samples'
+  const byId = new Map(frame.result.series.map((series) => [series.id, series]))
+  const values = frame.description.series.map(({ id }) => {
+    const series = byId.get(id)
+    if (!series) return Array.from({ length }, () => null)
+    return series.kind === 'samples'
       ? Array.from(series.values)
-      : Array.from(series.minimum, (low, index) => (low + (series.maximum[index] ?? low)) / 2),
-  )
+      : Array.from(series.minimum, (low, index) => (low + (series.maximum[index] ?? low)) / 2)
+  })
   return [x, ...values] as uPlot.AlignedData
 }
 
-function frameYRange(frame: LoadedSignalFrame): { min: number; max: number } {
+function frameAxisRange(frame: LoadedSignalFrame | null, axis: SignalYAxisId): SignalAxisRange | null {
+  if (!frame) return null
+  const descriptors = new Map(frame.description.series.map((series) => [series.id, series]))
   let minimum = Infinity
   let maximum = -Infinity
   for (const series of frame.result.series) {
+    if ((descriptors.get(series.id)?.yAxis ?? 'left') !== axis) continue
     const arrays = series.kind === 'samples' ? [series.values] : [series.minimum, series.maximum]
-    for (const values of arrays) {
-      for (const value of values) {
-        if (Number.isFinite(value)) {
-          minimum = Math.min(minimum, value)
-          maximum = Math.max(maximum, value)
-        }
-      }
+    for (const values of arrays) for (const value of values) if (Number.isFinite(value)) {
+      minimum = Math.min(minimum, value); maximum = Math.max(maximum, value)
     }
   }
-  if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return { min: -1, max: 1 }
+  if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return null
   const padding = Math.max((maximum - minimum) * 0.05, Math.abs(maximum) * 0.01, 1e-9)
   return { min: minimum - padding, max: maximum + padding }
+}
+
+function validateAxisRange(range: SignalAxisRangeSetting): void {
+  if (range !== 'auto' && (!Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min)) {
+    throw new Error('axis range requires finite min < max')
+  }
 }
 
 function resultLength(series: SignalSeriesResult): number {
@@ -317,13 +447,10 @@ function sampleX(frame: LoadedSignalFrame, sample: number): number {
   return frame.description.xStart + sample * frame.description.xStep
 }
 
-function axisLabel(label: string, unit: string): string {
-  return unit ? `${label} (${unit})` : label
-}
+function axisLabel(label: string, unit: string): string { return unit ? `${label} (${unit})` : label }
 
 function visiblePoint(plot: uPlot, point: SignalOverlayPoint): boolean {
-  const x = plot.scales['x']
-  const y = plot.scales['y']
+  const x = plot.scales['x']; const y = plot.scales['left']
   return x != null && y != null && x.min != null && x.max != null && y.min != null && y.max != null &&
     point.x >= x.min && point.x <= x.max && point.y >= y.min && point.y <= y.max
 }

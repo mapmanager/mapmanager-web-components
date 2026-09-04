@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import type { SignalOverlays, SignalSource, SignalViewport } from '../core'
+import type { SignalCursorChange, SignalOverlays, SignalSource, SignalViewport } from '../core'
 import SignalViewerWidget from '../vue/SignalViewerWidget.vue'
 import { SyntheticSignalSource } from './synthetic-source'
 
 interface WidgetApi {
   setSource(source: SignalSource): Promise<void>
   setOverlays(overlays: SignalOverlays): void
+  setCursor(id: 'a' | 'b' | 'c' | 'd', value: number): void
   resetView(): Promise<void>
 }
 
 const widget = ref<WidgetApi | null>(null)
 const viewport = ref<SignalViewport | null>(null)
 const selected = ref<string | null>(null)
+const cursorDelta = ref<string>('—')
 
 const overlays: SignalOverlays = {
   points: Array.from({ length: 20 }, (_, index) => ({
@@ -33,6 +35,8 @@ function onOverlaySelect(id: string | null): void {
 onMounted(async () => {
   await widget.value?.setSource(new SyntheticSignalSource())
   widget.value?.setOverlays(overlays)
+  widget.value?.setCursor('a', 2)
+  widget.value?.setCursor('b', 4)
 })
 </script>
 
@@ -49,10 +53,12 @@ onMounted(async () => {
       ref="widget"
       @view-change="viewport = $event"
       @overlay-select="onOverlaySelect"
+      @cursor-change="cursorDelta = ($event as SignalCursorChange).deltaX?.toFixed(3) ?? '—'"
     />
     <footer>
       <span>Viewport: {{ viewport ? `${viewport.xMin.toFixed(3)}–${viewport.xMax.toFixed(3)} s` : '—' }}</span>
       <span>Selected: {{ selected ?? 'none' }}</span>
+      <span>B − A: {{ cursorDelta }} s</span>
     </footer>
   </main>
 </template>

@@ -3,21 +3,35 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import 'uplot/dist/uPlot.min.css'
 
 import {
+  InMemorySignalSource,
   SignalViewerEngine,
+  cloneCursorState,
+  defaultCursorState,
   fullViewport,
   isAbort,
+  type InMemorySignalSourceOptions,
+  type SignalAxisRange,
+  type SignalAxisRangeSetting,
+  type SignalCursor,
+  type SignalCursorChange,
+  type SignalCursorId,
+  type SignalCursorState,
   type SignalOverlays,
   type SignalSource,
+  type SignalTrace,
+  type SignalTraceUpdate,
   type SignalViewport,
+  type SignalYAxisId,
 } from '../core'
-import { UPlotSignalRenderer } from '../renderers/uplot/uplot-renderer'
 import type { SignalRenderer } from '../renderers/renderer-api'
+import { UPlotSignalRenderer } from '../renderers/uplot/uplot-renderer'
 import './widget.css'
 
 const emit = defineEmits<{
   'source-change': [id: string]
   'view-change': [viewport: SignalViewport]
   'overlay-select': [id: string | null]
+  'cursor-change': [change: SignalCursorChange]
 }>()
 
 const host = ref<HTMLDivElement | null>(null)
@@ -25,33 +39,62 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 let engine = new SignalViewerEngine()
 let renderer: SignalRenderer | null = null
+let inMemorySource: InMemorySignalSource | null = null
 let resizeObserver: ResizeObserver | null = null
 let viewportTimer: ReturnType<typeof setTimeout> | null = null
 let currentViewport: SignalViewport | null = null
 let width = 640
 let height = 300
 let overlays: SignalOverlays = { points: [] }
+let cursors = defaultCursorState()
+let visibleTraceIds = new Set<string>()
 
+/** Replace the complete session with an asynchronous range source. */
 async function setSource(source: SignalSource): Promise<void> {
-  engine.abort()
-  engine = new SignalViewerEngine()
-  loading.value = true
-  error.value = null
-  try {
-    const frame = await engine.setSource(source, targetPoints())
-    renderer?.setDescription(frame.description)
-    renderer?.setOverlays(overlays)
-    renderer?.setFrame(frame)
-    currentViewport = frame.requestedViewport
-    emit('source-change', frame.description.id)
-    emit('view-change', frame.requestedViewport)
-  } catch (reason) {
-    if (!isAbort(reason)) error.value = reason instanceof Error ? reason.message : String(reason)
-  } finally {
-    loading.value = false
-  }
+  inMemorySource = null
+  await replaceSource(source)
 }
 
+/** Replace the complete session with aligned in-memory traces. */
+async function setTraces(
+  traces: readonly SignalTrace[],
+  options: InMemorySignalSourceOptions = {},
+): Promise<void> {
+  inMemorySource = new InMemorySignalSource(traces, options)
+  const visible = traces.filter((trace) => trace.visible !== false).map(({ id }) => id)
+  visibleTraceIds = new Set(visible)
+  await replaceSource(inMemorySource, visible)
+}
+
+/** Add one aligned in-memory trace while preserving the current viewport. */
+async function addTrace(trace: SignalTrace): Promise<void> {
+  requireInMemory().addTrace(trace)
+  if (trace.visible !== false) visibleTraceIds.add(trace.id)
+  await reloadInMemory()
+}
+
+/** Update one in-memory trace while preserving the current viewport. */
+async function updateTrace(id: string, update: SignalTraceUpdate): Promise<void> {
+  requireInMemory().updateTrace(id, update)
+  if (update.visible === true) visibleTraceIds.add(id)
+  else if (update.visible === false) visibleTraceIds.delete(id)
+  await reloadInMemory()
+}
+
+/** Show or hide one source trace and reload only the visible range. */
+async function setTraceVisible(id: string, visible: boolean): Promise<void> {
+  const frame = await engine.setSeriesVisibility(id, visible, targetPoints())
+  if (visible) visibleTraceIds.add(id)
+  else visibleTraceIds.delete(id)
+  renderer?.setFrame(frame)
+}
+
+/** Return visible trace IDs in source declaration order. */
+function getVisibleTraces(): readonly string[] {
+  return engine.getVisibleSeries()
+}
+
+/** Replace the calibrated visible X interval. */
 async function setViewport(viewport: SignalViewport): Promise<void> {
   currentViewport = viewport
   loading.value = true
@@ -67,39 +110,144 @@ async function setViewport(viewport: SignalViewport): Promise<void> {
   }
 }
 
+/** Replace all sparse point and interval overlays. */
 function setOverlays(next: SignalOverlays): void {
   overlays = next
   renderer?.setOverlays(next)
 }
 
+/** Set one Y axis to automatic or explicit range control. */
+function setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void {
+  renderer?.setAxisRange(axis, range)
+}
+
+/** Return the currently rendered range for one Y axis. */
+function getAxisRange(axis: SignalYAxisId): SignalAxisRange | null {
+  return renderer?.getAxisRange(axis) ?? null
+}
+
+/** Set and show one persistent A/B/C/D cursor without emitting an event. */
+function setCursor(id: SignalCursorId, value: number): void {
+  if (!Number.isFinite(value)) throw new Error('cursor value must be finite')
+  cursors[id] = { ...cursors[id], value, visible: true }
+  renderer?.setCursors(cursors)
+}
+
+/** Show or hide one persistent cursor without emitting an event. */
+function setCursorVisible(id: SignalCursorId, visible: boolean): void {
+  if (visible && cursors[id].value == null) throw new Error(`cursor ${id} has no position`)
+  cursors[id] = { ...cursors[id], visible }
+  renderer?.setCursors(cursors)
+}
+
+/** Replace A/B/C/D cursor state without emitting an event. */
+function setCursors(next: readonly SignalCursor[]): void {
+  const state = defaultCursorState()
+  const seen = new Set<SignalCursorId>()
+  for (const cursor of next) {
+    if (seen.has(cursor.id)) throw new Error(`duplicate cursor id: ${cursor.id}`)
+    if (cursor.value != null && !Number.isFinite(cursor.value)) throw new Error('cursor value must be finite or null')
+    if (cursor.visible && cursor.value == null) throw new Error(`visible cursor ${cursor.id} requires a position`)
+    seen.add(cursor.id)
+    state[cursor.id] = { ...state[cursor.id], ...cursor }
+  }
+  cursors = state
+  renderer?.setCursors(cursors)
+}
+
+/** Return a defensive copy of one persistent cursor. */
+function getCursor(id: SignalCursorId): SignalCursor {
+  return { ...cursors[id] }
+}
+
+/** Return defensive copies of complete A/B/C/D cursor state. */
+function getCursors(): SignalCursorState {
+  return cloneCursorState(cursors)
+}
+
+/** Restore the complete calibrated X range. */
 async function resetView(): Promise<void> {
   if (!engine.description) return
   await setViewport(fullViewport(engine.description))
   if (currentViewport) emit('view-change', currentViewport)
 }
 
+/** Return the current calibrated X viewport. */
 function getViewport(): SignalViewport | null {
   return currentViewport ? { ...currentViewport } : null
 }
 
-function targetPoints(): number {
-  return Math.max(500, Math.floor(width * 2))
+async function replaceSource(source: SignalSource, visible?: readonly string[]): Promise<void> {
+  engine.abort()
+  engine = new SignalViewerEngine()
+  loading.value = true
+  error.value = null
+  overlays = { points: [] }
+  cursors = defaultCursorState()
+  renderer?.setOverlays(overlays)
+  renderer?.setCursors(cursors)
+  try {
+    const frame = await engine.setSource(source, targetPoints(), visible)
+    visibleTraceIds = new Set(engine.getVisibleSeries())
+    renderer?.setDescription(frame.description)
+    renderer?.setFrame(frame)
+    currentViewport = frame.requestedViewport
+    emit('source-change', frame.description.id)
+    emit('view-change', frame.requestedViewport)
+  } catch (reason) {
+    if (!isAbort(reason)) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+      throw reason
+    }
+  } finally {
+    loading.value = false
+  }
 }
+
+async function reloadInMemory(): Promise<void> {
+  const source = requireInMemory()
+  const viewport = currentViewport
+  const available = new Set(source.traces.map(({ id }) => id))
+  const visible = [...visibleTraceIds].filter((id) => available.has(id))
+  const savedOverlays = overlays
+  const savedCursors = cloneCursorState(cursors)
+  const frame = await engine.setSource(source, targetPoints(), visible)
+  renderer?.setDescription(frame.description)
+  renderer?.setFrame(frame)
+  if (viewport) {
+    const restored = await engine.setViewport(viewport, targetPoints())
+    renderer?.setFrame(restored)
+    currentViewport = restored.requestedViewport
+  }
+  overlays = savedOverlays
+  cursors = savedCursors
+  renderer?.setOverlays(overlays)
+  renderer?.setCursors(cursors)
+}
+
+function requireInMemory(): InMemorySignalSource {
+  if (!inMemorySource) throw new Error('addTrace and updateTrace require in-memory trace mode')
+  return inMemorySource
+}
+
+function targetPoints(): number { return Math.max(500, Math.floor(width * 2)) }
 
 function requestViewport(viewport: SignalViewport): void {
   currentViewport = viewport
   emit('view-change', viewport)
   if (viewportTimer) clearTimeout(viewportTimer)
-  viewportTimer = setTimeout(() => {
-    viewportTimer = null
-    void setViewport(viewport)
-  }, 80)
+  viewportTimer = setTimeout(() => { viewportTimer = null; void setViewport(viewport) }, 80)
 }
 
 function selectOverlay(id: string | null): void {
   overlays = { ...overlays, selectedPointId: id }
   renderer?.setOverlays(overlays)
   emit('overlay-select', id)
+}
+
+function handleCursorChange(change: SignalCursorChange): void {
+  cursors = cloneCursorState(change.cursors)
+  emit('cursor-change', change)
 }
 
 onMounted(async () => {
@@ -111,8 +259,11 @@ onMounted(async () => {
   renderer = new UPlotSignalRenderer(element, {
     viewportChange: requestViewport,
     overlaySelect: selectOverlay,
+    cursorChange: handleCursorChange,
   })
   renderer.resize(width, height)
+  renderer.setOverlays(overlays)
+  renderer.setCursors(cursors)
   resizeObserver = new ResizeObserver(([entry]) => {
     if (!entry) return
     width = entry.contentRect.width
@@ -129,7 +280,11 @@ onBeforeUnmount(() => {
   renderer?.destroy()
 })
 
-defineExpose({ setSource, setViewport, setOverlays, resetView, getViewport })
+defineExpose({
+  setSource, setTraces, addTrace, updateTrace, setTraceVisible, getVisibleTraces,
+  setViewport, getViewport, resetView, setOverlays, setAxisRange, getAxisRange,
+  setCursor, setCursorVisible, setCursors, getCursor, getCursors,
+})
 </script>
 
 <template>
