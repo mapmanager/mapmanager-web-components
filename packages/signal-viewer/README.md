@@ -5,6 +5,19 @@ regularly sampled scientific signals. It knows nothing about SanPy, Zarr,
 Parquet, or HTTP. Applications either provide complete arrays or implement the
 small asynchronous `SignalSource` range-loading interface.
 
+## Run the demo on macOS
+
+From the `mapmanager-web-components` repository root:
+
+```bash
+cd /Users/cudmore/Sites/cs_project/mapmanager-web-components
+npm install
+npm run dev --workspace=@mapmanager/signal-viewer
+```
+
+Open the local URL printed by Vite, normally <http://localhost:5173/>. If the
+repository dependencies are already installed, skip `npm install`.
+
 ## Data model
 
 Every trace in one viewer has the same `xStart`, `xStep`, and sample count.
@@ -75,6 +88,11 @@ Y axis. Programmatic cursor changes do not emit events. A completed user drag
 emits `cursor-change` with `changedId`, defensive copies of all four cursors,
 `deltaX` (`B - A`), and `deltaY` (`D - C`). Right-axis horizontal cursors are
 outside this API version.
+
+The plot's options button uses these same public operations to show or hide
+traces and cursor pairs and to reset the full view. The first time a pair is
+enabled, A/B are placed at 25% and 75% of the visible X range and C/D at 25%
+and 75% of the visible left Y range. Later toggles preserve their positions.
 
 The other events are `source-change`, `view-change`, and `overlay-select`.
 The custom element exposes the same methods and emits events with the same

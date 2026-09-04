@@ -17,6 +17,7 @@ import {
   type SignalCursorId,
   type SignalCursorState,
   type SignalOverlays,
+  type SignalSeriesDescriptor,
   type SignalSource,
   type SignalTrace,
   type SignalTraceUpdate,
@@ -37,6 +38,10 @@ const emit = defineEmits<{
 const host = ref<HTMLDivElement | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const hasSource = ref(false)
+const traceControls = ref<readonly SignalSeriesDescriptor[]>([])
+const visibleControlIds = ref<readonly string[]>([])
+const cursorControls = ref<SignalCursorState>(defaultCursorState())
 let engine = new SignalViewerEngine()
 let renderer: SignalRenderer | null = null
 let inMemorySource: InMemorySignalSource | null = null
@@ -86,6 +91,7 @@ async function setTraceVisible(id: string, visible: boolean): Promise<void> {
   const frame = await engine.setSeriesVisibility(id, visible, targetPoints())
   if (visible) visibleTraceIds.add(id)
   else visibleTraceIds.delete(id)
+  visibleControlIds.value = engine.getVisibleSeries()
   renderer?.setFrame(frame)
 }
 
@@ -130,6 +136,7 @@ function getAxisRange(axis: SignalYAxisId): SignalAxisRange | null {
 function setCursor(id: SignalCursorId, value: number): void {
   if (!Number.isFinite(value)) throw new Error('cursor value must be finite')
   cursors[id] = { ...cursors[id], value, visible: true }
+  cursorControls.value = cloneCursorState(cursors)
   renderer?.setCursors(cursors)
 }
 
@@ -137,6 +144,7 @@ function setCursor(id: SignalCursorId, value: number): void {
 function setCursorVisible(id: SignalCursorId, visible: boolean): void {
   if (visible && cursors[id].value == null) throw new Error(`cursor ${id} has no position`)
   cursors[id] = { ...cursors[id], visible }
+  cursorControls.value = cloneCursorState(cursors)
   renderer?.setCursors(cursors)
 }
 
@@ -152,6 +160,7 @@ function setCursors(next: readonly SignalCursor[]): void {
     state[cursor.id] = { ...state[cursor.id], ...cursor }
   }
   cursors = state
+  cursorControls.value = cloneCursorState(cursors)
   renderer?.setCursors(cursors)
 }
 
@@ -184,14 +193,21 @@ async function replaceSource(source: SignalSource, visible?: readonly string[]):
   error.value = null
   overlays = { points: [] }
   cursors = defaultCursorState()
+  hasSource.value = false
+  traceControls.value = []
+  visibleControlIds.value = []
+  cursorControls.value = cloneCursorState(cursors)
   renderer?.setOverlays(overlays)
   renderer?.setCursors(cursors)
   try {
     const frame = await engine.setSource(source, targetPoints(), visible)
     visibleTraceIds = new Set(engine.getVisibleSeries())
+    traceControls.value = frame.description.series
+    visibleControlIds.value = engine.getVisibleSeries()
     renderer?.setDescription(frame.description)
     renderer?.setFrame(frame)
     currentViewport = frame.requestedViewport
+    hasSource.value = true
     emit('source-change', frame.description.id)
     emit('view-change', frame.requestedViewport)
   } catch (reason) {
@@ -212,6 +228,8 @@ async function reloadInMemory(): Promise<void> {
   const savedOverlays = overlays
   const savedCursors = cloneCursorState(cursors)
   const frame = await engine.setSource(source, targetPoints(), visible)
+  traceControls.value = frame.description.series
+  visibleControlIds.value = engine.getVisibleSeries()
   renderer?.setDescription(frame.description)
   renderer?.setFrame(frame)
   if (viewport) {
@@ -247,7 +265,43 @@ function selectOverlay(id: string | null): void {
 
 function handleCursorChange(change: SignalCursorChange): void {
   cursors = cloneCursorState(change.cursors)
+  cursorControls.value = cloneCursorState(cursors)
   emit('cursor-change', change)
+}
+
+async function toggleTraceFromPanel(id: string, event: Event): Promise<void> {
+  try {
+    await setTraceVisible(id, eventChecked(event))
+  } catch (reason) {
+    if (!isAbort(reason)) error.value = reason instanceof Error ? reason.message : String(reason)
+  }
+}
+
+function toggleCursorPair(first: SignalCursorId, second: SignalCursorId, event: Event): void {
+  const visible = eventChecked(event)
+  if (visible) initializeCursorPair(first, second)
+  setCursorVisible(first, visible)
+  setCursorVisible(second, visible)
+}
+
+function initializeCursorPair(first: SignalCursorId, second: SignalCursorId): void {
+  if (cursors[first].value != null && cursors[second].value != null) return
+  const range = first === 'a' ? currentViewport : getAxisRange('left')
+  if (!range) throw new Error(`cannot initialize cursor pair ${first.toUpperCase()}/${second.toUpperCase()} without a visible range`)
+  const minimum = 'xMin' in range ? range.xMin : range.min
+  const maximum = 'xMax' in range ? range.xMax : range.max
+  const span = maximum - minimum
+  if (cursors[first].value == null) setCursor(first, minimum + span * 0.25)
+  if (cursors[second].value == null) setCursor(second, minimum + span * 0.75)
+}
+
+function eventChecked(event: Event): boolean {
+  if (!(event.target instanceof HTMLInputElement)) throw new Error('expected checkbox input')
+  return event.target.checked
+}
+
+function pairVisible(first: SignalCursorId, second: SignalCursorId): boolean {
+  return cursorControls.value[first].visible && cursorControls.value[second].visible
 }
 
 onMounted(async () => {
@@ -290,6 +344,34 @@ defineExpose({
 <template>
   <div class="mm-signal-viewer">
     <div ref="host" class="mm-signal-viewer__plot" />
+    <details class="mm-signal-viewer__options">
+      <summary aria-label="Viewer options" title="Viewer options">☰</summary>
+      <div class="mm-signal-viewer__options-panel">
+        <fieldset v-if="traceControls.length">
+          <legend>Traces</legend>
+          <label v-for="trace in traceControls" :key="trace.id">
+            <input
+              type="checkbox"
+              :checked="visibleControlIds.includes(trace.id)"
+              @change="toggleTraceFromPanel(trace.id, $event)"
+            >
+            {{ trace.label }}
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Cursors</legend>
+          <label>
+            <input type="checkbox" :checked="pairVisible('a', 'b')" @change="toggleCursorPair('a', 'b', $event)">
+            A/B cursors
+          </label>
+          <label>
+            <input type="checkbox" :checked="pairVisible('c', 'd')" @change="toggleCursorPair('c', 'd', $event)">
+            C/D cursors
+          </label>
+        </fieldset>
+        <button type="button" :disabled="!hasSource" @click="resetView">Reset full view</button>
+      </div>
+    </details>
     <div v-if="loading" class="mm-signal-viewer__status">Loading…</div>
     <div v-if="error" class="mm-signal-viewer__error" role="alert">{{ error }}</div>
   </div>
