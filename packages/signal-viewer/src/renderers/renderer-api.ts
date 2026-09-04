@@ -18,6 +18,7 @@ export interface SignalRendererCallbacks {
   overlaySelect(id: string | null): void
   cursorChange(change: SignalCursorChange): void
   resetViewRequest(): void
+  traceVisibilityRequest(id: string, visible: boolean): void
 }
 
 /** Optional policies for installing a newly loaded frame. */
@@ -40,6 +41,9 @@ export interface SignalRenderer {
   getGridVisible(axis: SignalAxisId): boolean
   setHoverVisible(visible: boolean): void
   getHoverVisible(): boolean
+  setLegendVisible(visible: boolean): void
+  getLegendVisible(): boolean
+  setSeriesVisible(id: string, visible: boolean): void
   setTheme(theme: SignalViewerTheme): void
   getTheme(): SignalViewerTheme
   setViewport(viewport: SignalViewport): void

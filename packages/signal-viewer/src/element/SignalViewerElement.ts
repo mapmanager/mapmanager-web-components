@@ -34,6 +34,8 @@ interface WidgetApi {
   getGridVisible(axis: SignalAxisId): boolean
   setHoverVisible(visible: boolean): void
   getHoverVisible(): boolean
+  setLegendVisible(visible: boolean): void
+  getLegendVisible(): boolean
   setTheme(theme: SignalViewerTheme): void
   getTheme(): SignalViewerTheme
   setCursor(id: SignalCursorId, value: number): void
@@ -184,6 +186,12 @@ export class SignalViewerElement extends HTMLElement {
   getHoverVisible(): boolean {
     return this.#requireWidget().getHoverVisible()
   }
+
+  /** Show or hide the trace legend. */
+  setLegendVisible(visible: boolean): void { this.#requireWidget().setLegendVisible(visible) }
+
+  /** Return whether the trace legend is visible. */
+  getLegendVisible(): boolean { return this.#requireWidget().getLegendVisible() }
 
   /** Apply the centralized light or dark viewer palette. */
   setTheme(theme: SignalViewerTheme): void { this.#requireWidget().setTheme(theme) }

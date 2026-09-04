@@ -41,6 +41,7 @@ The component exposes these methods through a template ref:
 - `setGridVisible('x' | 'y', visible)` and `getGridVisible()`;
 - `setHoverVisible(visible)` and `getHoverVisible()`;
 - `setAxisRange('left' | 'right', 'auto' | { min, max })` and `getAxisRange()`;
+- `setLegendVisible()` and `getLegendVisible()`;
 - `setCursor()`, `setCursorVisible()`, `setCursors()`, `getCursor()`, and
   `getCursors()`.
 
@@ -128,6 +129,10 @@ Dragging chooses the dominant direction and zooms only X or only both Y
 scales. A visible selection band previews that range. When hover is enabled,
 uPlot shows the crosshair and one trace-colored position marker per visible
 trace.
+Shift-drag pans X and both Y axes freely. X panning is clamped to the complete
+recording, and a lazy range request is issued once when the gesture ends. The
+built-in uPlot legend delegates trace toggles to the same source-aware
+visibility operation used by the options panel.
 
 The other events are `source-change`, `view-change`, and `overlay-select`.
 The custom element exposes the same methods and emits events with the same

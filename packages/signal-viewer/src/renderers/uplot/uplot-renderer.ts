@@ -24,8 +24,17 @@ import {
 } from '../../core'
 import type { SignalViewerThemeTokens } from '../../core/theme'
 import type { SignalFrameOptions, SignalRenderer, SignalRendererCallbacks } from '../renderer-api'
+import { clampRange, translateRange } from './pan'
 
 interface HitPoint { id: string; left: number; top: number }
+interface PanState {
+  left: number
+  top: number
+  x: SignalAxisRange
+  leftY: SignalAxisRange
+  rightY: SignalAxisRange | null
+  moved: boolean
+}
 
 /** uPlot adapter. Sources, session state, and application policy stay outside. */
 export class UPlotSignalRenderer implements SignalRenderer {
@@ -40,10 +49,13 @@ export class UPlotSignalRenderer implements SignalRenderer {
   #axisVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
   #gridVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
   #hoverVisible = true
+  #legendVisible = true
   #theme: SignalViewerTheme = 'dark'
   #internalUpdate = false
   #hitPoints: HitPoint[] = []
   #dragCursor: SignalCursorId | null = null
+  #pan: PanState | null = null
+  #suppressClick = false
   #width = 640
   #height = 300
 
@@ -74,6 +86,10 @@ export class UPlotSignalRenderer implements SignalRenderer {
     try {
       plot.batch(() => {
         plot.setData(alignedData(frame), false)
+        const loadedIds = new Set(frame.result.series.map((series) => series.id))
+        frame.description.series.forEach((series, index) => {
+          plot.setSeries(index + 1, { show: loadedIds.has(series.id) }, false)
+        })
         plot.setScale('x', { min: frame.requestedViewport.xMin, max: frame.requestedViewport.xMax })
         this.#applyAxisRange('left', preservedRanges?.left ?? null)
         if (frame.description.yAxes.right) this.#applyAxisRange('right', preservedRanges?.right ?? null)
@@ -166,6 +182,27 @@ export class UPlotSignalRenderer implements SignalRenderer {
     return this.#hoverVisible
   }
 
+  setLegendVisible(visible: boolean): void {
+    if (this.#legendVisible === visible) return
+    this.#legendVisible = visible
+    this.#rebuild()
+  }
+
+  getLegendVisible(): boolean {
+    return this.#legendVisible
+  }
+
+  setSeriesVisible(id: string, visible: boolean): void {
+    const index = this.#description?.series.findIndex((series) => series.id === id) ?? -1
+    if (index < 0 || !this.#plot) return
+    this.#internalUpdate = true
+    try {
+      this.#plot.setSeries(index + 1, { show: visible })
+    } finally {
+      this.#internalUpdate = false
+    }
+  }
+
   setTheme(theme: SignalViewerTheme): void {
     if (this.#theme === theme) return
     this.#theme = theme
@@ -197,6 +234,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
 
   destroy(): void {
     this.#endCursorDrag(false)
+    this.#endPan(false)
     this.#plot?.destroy()
     this.#plot = null
     this.#host.replaceChildren()
@@ -212,12 +250,13 @@ export class UPlotSignalRenderer implements SignalRenderer {
     const options: uPlot.Options = {
       width: this.#width,
       height: this.#height,
-      legend: { show: description.series.length > 1 },
+      legend: { show: this.#legendVisible },
       cursor: {
         show: true,
         ...(this.#hoverVisible ? {} : { x: false, y: false, points: { show: false } }),
         drag: { x: true, y: true, uni: Infinity, setScale: true },
         bind: { mousedown: (_plot, _target, handler) => (event) => {
+          if (event.shiftKey && this.#beginPan(event)) return null
           if (!this.#beginCursorDrag(event)) return handler(event)
           return null
         }, dblclick: () => (event) => {
@@ -251,6 +290,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
       ],
       hooks: {
         setScale: [(_plot, key) => this.#onScale(key)],
+        setSeries: [(plot, index) => this.#onSeries(plot, index)],
         draw: [(plot) => this.#draw(plot)],
         ready: [(plot) => plot.over.addEventListener('click', this.#onClick)],
       },
@@ -308,6 +348,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
       const index = frame.description.series.findIndex(({ id }) => id === result.id)
       const descriptor = frame.description.series[index]
       if (!descriptor) continue
+      if (plot.series[index + 1]?.show === false) continue
       const style = resolveTraceStyle(descriptor.style, index)
       if (result.kind === 'samples') this.#drawSamples(plot, frame, result, descriptor.yAxis ?? 'left', style)
       else this.#drawMinMax(plot, frame, result, descriptor.yAxis ?? 'left', style)
@@ -476,6 +517,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
   #onClick = (event: MouseEvent): void => {
     const plot = this.#plot
     if (!plot || this.#dragCursor) return
+    if (this.#suppressClick) { this.#suppressClick = false; return }
     const rect = plot.over.getBoundingClientRect()
     const left = event.clientX - rect.left
     const top = event.clientY - rect.top
@@ -487,6 +529,79 @@ export class UPlotSignalRenderer implements SignalRenderer {
     }
     this.#callbacks.overlaySelect(closest?.id ?? null)
   }
+
+  #beginPan(event: MouseEvent): boolean {
+    const plot = this.#plot
+    const x = scaleRange(plot, 'x')
+    const leftY = scaleRange(plot, 'left')
+    if (!plot || !x || !leftY) return false
+    const rect = plot.over.getBoundingClientRect()
+    this.#pan = {
+      left: event.clientX - rect.left,
+      top: event.clientY - rect.top,
+      x,
+      leftY,
+      rightY: scaleRange(plot, 'right'),
+      moved: false,
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    plot.over.style.cursor = 'grabbing'
+    window.addEventListener('mousemove', this.#onPanMove)
+    window.addEventListener('mouseup', this.#onPanUp, { once: true })
+    return true
+  }
+
+  #onPanMove = (event: MouseEvent): void => {
+    const plot = this.#plot
+    const pan = this.#pan
+    const description = this.#description
+    if (!plot || !pan || !description) return
+    const rect = plot.over.getBoundingClientRect()
+    const dx = event.clientX - rect.left - pan.left
+    const dy = event.clientY - rect.top - pan.top
+    pan.moved ||= Math.hypot(dx, dy) >= 2
+    const x = translateRange(pan.x, -dx / plot.bbox.width)
+    const full = {
+      min: description.xStart,
+      max: description.xStart + description.xStep * (description.sampleCount - 1),
+    }
+    const clampedX = clampRange(x, full)
+    this.#internalUpdate = true
+    try {
+      plot.batch(() => {
+        plot.setScale('x', clampedX)
+        plot.setScale('left', translateRange(pan.leftY, dy / plot.bbox.height))
+        if (pan.rightY) plot.setScale('right', translateRange(pan.rightY, dy / plot.bbox.height))
+      })
+    } finally {
+      this.#internalUpdate = false
+    }
+  }
+
+  #onPanUp = (): void => this.#endPan(true)
+
+  #endPan(commit: boolean): void {
+    window.removeEventListener('mousemove', this.#onPanMove)
+    const pan = this.#pan
+    this.#pan = null
+    if (this.#plot) this.#plot.over.style.cursor = ''
+    if (!commit || !pan?.moved || !this.#plot) return
+    this.#suppressClick = true
+    const x = scaleRange(this.#plot, 'x')
+    if (x) this.#callbacks.viewportChange({ xMin: x.min, xMax: x.max })
+  }
+
+  #onSeries(plot: uPlot, index: number | null): void {
+    if (this.#internalUpdate || index == null || index < 1) return
+    const descriptor = this.#description?.series[index - 1]
+    if (descriptor) this.#callbacks.traceVisibilityRequest(descriptor.id, plot.series[index]?.show !== false)
+  }
+}
+
+function scaleRange(plot: uPlot | null, key: string): SignalAxisRange | null {
+  const scale = plot?.scales[key]
+  return scale?.min == null || scale.max == null ? null : { min: scale.min, max: scale.max }
 }
 
 function emptyData(seriesCount: number): uPlot.AlignedData {

@@ -51,6 +51,7 @@ const scatterControls = ref<readonly SignalScatterSeries[]>([])
 const axisControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
 const gridControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
 const hoverControl = ref(true)
+const legendControl = ref(true)
 const activeTheme = ref<SignalViewerTheme>('dark')
 let engine = new SignalViewerEngine()
 let renderer: SignalRenderer | null = null
@@ -103,6 +104,7 @@ async function setTraceVisible(id: string, visible: boolean): Promise<void> {
   else visibleTraceIds.delete(id)
   visibleControlIds.value = engine.getVisibleSeries()
   renderer?.setFrame(frame, { preserveYAxisRange: true })
+  renderer?.setSeriesVisible(id, visible)
 }
 
 /** Return visible trace IDs in source declaration order. */
@@ -204,6 +206,17 @@ function setHoverVisible(visible: boolean): void {
 /** Return whether the hover crosshair and trace-position symbols are visible. */
 function getHoverVisible(): boolean {
   return hoverControl.value
+}
+
+/** Show or hide the uPlot trace legend. */
+function setLegendVisible(visible: boolean): void {
+  renderer?.setLegendVisible(visible)
+  legendControl.value = visible
+}
+
+/** Return whether the trace legend is visible. */
+function getLegendVisible(): boolean {
+  return legendControl.value
 }
 
 /** Apply a complete centralized light or dark palette. */
@@ -366,6 +379,16 @@ function toggleHoverFromPanel(event: Event): void {
   setHoverVisible(eventChecked(event))
 }
 
+function toggleLegendFromPanel(event: Event): void {
+  setLegendVisible(eventChecked(event))
+}
+
+function requestTraceVisibility(id: string, visible: boolean): void {
+  void setTraceVisible(id, visible).catch((reason) => {
+    if (!isAbort(reason)) error.value = reason instanceof Error ? reason.message : String(reason)
+  })
+}
+
 function handleCursorChange(change: SignalCursorChange): void {
   cursors = cloneCursorState(change.cursors)
   cursorControls.value = cloneCursorState(cursors)
@@ -440,6 +463,7 @@ onMounted(async () => {
     overlaySelect: selectOverlay,
     cursorChange: handleCursorChange,
     resetViewRequest: () => { void resetView() },
+    traceVisibilityRequest: requestTraceVisibility,
   })
   renderer.setTheme(activeTheme.value)
   renderer.resize(width, height)
@@ -468,6 +492,7 @@ defineExpose({
   setScatterSeriesVisible, getVisibleScatterSeries,
   setAxisRange, getAxisRange, setAxisVisible, getAxisVisible,
   setGridVisible, getGridVisible, setHoverVisible, getHoverVisible,
+  setLegendVisible, getLegendVisible,
   setTheme, getTheme,
   setCursor, setCursorVisible, setCursors, getCursor, getCursors,
 })
@@ -525,6 +550,13 @@ defineExpose({
           <label>
             <input type="checkbox" :checked="gridControls.y" @change="toggleGridFromPanel('y', $event)">
             Y grid lines
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Display</legend>
+          <label>
+            <input type="checkbox" :checked="legendControl" @change="toggleLegendFromPanel($event)">
+            Trace legend
           </label>
         </fieldset>
         <fieldset>

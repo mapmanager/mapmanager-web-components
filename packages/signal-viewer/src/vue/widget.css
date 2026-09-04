@@ -45,11 +45,11 @@
 
 .mm-signal-viewer__options-panel {
   display: grid;
-  width: 190px;
+  width: 178px;
   max-height: calc(100vh - 70px);
-  gap: 10px;
+  gap: 7px;
   margin-top: 5px;
-  padding: 10px;
+  padding: 8px;
   color: var(--sv-text);
   background: var(--sv-panel);
   border: 1px solid var(--sv-border);
@@ -88,6 +88,11 @@
 
 .mm-signal-viewer .uplot {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.mm-signal-viewer .u-legend {
+  color: var(--sv-text);
+  font-size: 12px;
 }
 
 .mm-signal-viewer .u-select {
