@@ -12,11 +12,14 @@ import {
   type InMemorySignalSourceOptions,
   type SignalAxisRange,
   type SignalAxisRangeSetting,
+  type SignalAxisId,
   type SignalCursor,
   type SignalCursorChange,
   type SignalCursorId,
   type SignalCursorState,
   type SignalOverlays,
+  type SignalScatterSeries,
+  type SignalScatterSeriesUpdate,
   type SignalSeriesDescriptor,
   type SignalSource,
   type SignalTrace,
@@ -42,6 +45,8 @@ const hasSource = ref(false)
 const traceControls = ref<readonly SignalSeriesDescriptor[]>([])
 const visibleControlIds = ref<readonly string[]>([])
 const cursorControls = ref<SignalCursorState>(defaultCursorState())
+const scatterControls = ref<readonly SignalScatterSeries[]>([])
+const axisControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
 let engine = new SignalViewerEngine()
 let renderer: SignalRenderer | null = null
 let inMemorySource: InMemorySignalSource | null = null
@@ -50,7 +55,7 @@ let viewportTimer: ReturnType<typeof setTimeout> | null = null
 let currentViewport: SignalViewport | null = null
 let width = 640
 let height = 300
-let overlays: SignalOverlays = { points: [] }
+let overlays: SignalOverlays = { scatterSeries: [] }
 let cursors = defaultCursorState()
 let visibleTraceIds = new Set<string>()
 
@@ -118,8 +123,39 @@ async function setViewport(viewport: SignalViewport): Promise<void> {
 
 /** Replace all sparse point and interval overlays. */
 function setOverlays(next: SignalOverlays): void {
-  overlays = next
-  renderer?.setOverlays(next)
+  validateScatterSeries(next.scatterSeries)
+  overlays = cloneOverlays(next)
+  scatterControls.value = overlays.scatterSeries
+  renderer?.setOverlays(overlays)
+}
+
+/** Replace all named scatter overlays while preserving interval overlays. */
+function setScatterSeries(series: readonly SignalScatterSeries[]): void {
+  setOverlays({ ...overlays, scatterSeries: series })
+}
+
+/** Add one named scatter overlay with a stable ID. */
+function addScatterSeries(series: SignalScatterSeries): void {
+  setScatterSeries([...overlays.scatterSeries, series])
+}
+
+/** Update one named scatter overlay without changing its stable ID. */
+function updateScatterSeries(id: string, update: SignalScatterSeriesUpdate): void {
+  const index = overlays.scatterSeries.findIndex((series) => series.id === id)
+  if (index < 0) throw new Error(`unknown scatter series id: ${id}`)
+  setScatterSeries(overlays.scatterSeries.map((series, seriesIndex) =>
+    seriesIndex === index ? { ...series, ...update, id } : series,
+  ))
+}
+
+/** Show or hide one named scatter overlay without affecting point hit identities. */
+function setScatterSeriesVisible(id: string, visible: boolean): void {
+  updateScatterSeries(id, { visible })
+}
+
+/** Return visible scatter-series IDs in declaration order. */
+function getVisibleScatterSeries(): readonly string[] {
+  return overlays.scatterSeries.filter((series) => series.visible !== false).map(({ id }) => id)
 }
 
 /** Set one Y axis to automatic or explicit range control. */
@@ -130,6 +166,17 @@ function setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void 
 /** Return the currently rendered range for one Y axis. */
 function getAxisRange(axis: SignalYAxisId): SignalAxisRange | null {
   return renderer?.getAxisRange(axis) ?? null
+}
+
+/** Show or hide X-axis or combined Y-axis chrome. */
+function setAxisVisible(axis: SignalAxisId, visible: boolean): void {
+  renderer?.setAxisVisible(axis, visible)
+  axisControls.value = { ...axisControls.value, [axis]: visible }
+}
+
+/** Return whether X-axis or combined Y-axis chrome is visible. */
+function getAxisVisible(axis: SignalAxisId): boolean {
+  return axisControls.value[axis]
 }
 
 /** Set and show one persistent A/B/C/D cursor without emitting an event. */
@@ -191,11 +238,12 @@ async function replaceSource(source: SignalSource, visible?: readonly string[]):
   engine = new SignalViewerEngine()
   loading.value = true
   error.value = null
-  overlays = { points: [] }
+  overlays = { scatterSeries: [] }
   cursors = defaultCursorState()
   hasSource.value = false
   traceControls.value = []
   visibleControlIds.value = []
+  scatterControls.value = []
   cursorControls.value = cloneCursorState(cursors)
   renderer?.setOverlays(overlays)
   renderer?.setCursors(cursors)
@@ -263,6 +311,14 @@ function selectOverlay(id: string | null): void {
   emit('overlay-select', id)
 }
 
+function toggleScatterFromPanel(id: string, event: Event): void {
+  setScatterSeriesVisible(id, eventChecked(event))
+}
+
+function toggleAxisFromPanel(axis: SignalAxisId, event: Event): void {
+  setAxisVisible(axis, eventChecked(event))
+}
+
 function handleCursorChange(change: SignalCursorChange): void {
   cursors = cloneCursorState(change.cursors)
   cursorControls.value = cloneCursorState(cursors)
@@ -304,6 +360,28 @@ function pairVisible(first: SignalCursorId, second: SignalCursorId): boolean {
   return cursorControls.value[first].visible && cursorControls.value[second].visible
 }
 
+function cloneOverlays(source: SignalOverlays): SignalOverlays {
+  return {
+    scatterSeries: source.scatterSeries.map((series) => ({
+      ...series,
+      points: series.points.map((point) => ({ ...point })),
+    })),
+    ...(source.regions ? { regions: source.regions.map((region) => ({ ...region })) } : {}),
+    ...(source.selectedPointId !== undefined ? { selectedPointId: source.selectedPointId } : {}),
+  }
+}
+
+function validateScatterSeries(series: readonly SignalScatterSeries[]): void {
+  const seriesIds = series.map(({ id }) => id)
+  if (seriesIds.some((id) => !id) || new Set(seriesIds).size !== seriesIds.length) {
+    throw new Error('scatter series ids must be non-empty and unique')
+  }
+  const pointIds = series.flatMap(({ points }) => points.map(({ id }) => id))
+  if (pointIds.some((id) => !id) || new Set(pointIds).size !== pointIds.length) {
+    throw new Error('scatter point ids must be non-empty and unique across series')
+  }
+}
+
 onMounted(async () => {
   await nextTick()
   const element = host.value
@@ -314,6 +392,7 @@ onMounted(async () => {
     viewportChange: requestViewport,
     overlaySelect: selectOverlay,
     cursorChange: handleCursorChange,
+    resetViewRequest: () => { void resetView() },
   })
   renderer.resize(width, height)
   renderer.setOverlays(overlays)
@@ -336,7 +415,10 @@ onBeforeUnmount(() => {
 
 defineExpose({
   setSource, setTraces, addTrace, updateTrace, setTraceVisible, getVisibleTraces,
-  setViewport, getViewport, resetView, setOverlays, setAxisRange, getAxisRange,
+  setViewport, getViewport, resetView, setOverlays,
+  setScatterSeries, addScatterSeries, updateScatterSeries,
+  setScatterSeriesVisible, getVisibleScatterSeries,
+  setAxisRange, getAxisRange, setAxisVisible, getAxisVisible,
   setCursor, setCursorVisible, setCursors, getCursor, getCursors,
 })
 </script>
@@ -356,6 +438,28 @@ defineExpose({
               @change="toggleTraceFromPanel(trace.id, $event)"
             >
             {{ trace.label }}
+          </label>
+        </fieldset>
+        <fieldset v-if="scatterControls.length">
+          <legend>Overlays</legend>
+          <label v-for="series in scatterControls" :key="series.id">
+            <input
+              type="checkbox"
+              :checked="series.visible !== false"
+              @change="toggleScatterFromPanel(series.id, $event)"
+            >
+            {{ series.label ?? series.id }}
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Axes</legend>
+          <label>
+            <input type="checkbox" :checked="axisControls.x" @change="toggleAxisFromPanel('x', $event)">
+            X axis
+          </label>
+          <label>
+            <input type="checkbox" :checked="axisControls.y" @change="toggleAxisFromPanel('y', $event)">
+            Y axes
           </label>
         </fieldset>
         <fieldset>

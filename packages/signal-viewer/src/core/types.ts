@@ -4,6 +4,9 @@ export type SignalValues = readonly number[] | Float32Array | Float64Array
 /** The two supported independent Y axes. */
 export type SignalYAxisId = 'left' | 'right'
 
+/** Independently visible axis chrome controlled by callers. */
+export type SignalAxisId = 'x' | 'y'
+
 /** Explicit numeric range for one Y axis. */
 export interface SignalAxisRange { min: number; max: number }
 
@@ -127,6 +130,19 @@ export interface SignalOverlayPoint {
   metadata?: Readonly<Record<string, unknown>>
 }
 
+/** A named scatter overlay whose individual points remain independently selectable. */
+export interface SignalScatterSeries {
+  /** Stable programmatic identity. */
+  id: string
+  label?: string
+  points: readonly SignalOverlayPoint[]
+  visible?: boolean
+  color?: string
+}
+
+/** Mutable fields accepted when updating a named scatter overlay. */
+export type SignalScatterSeriesUpdate = Partial<Omit<SignalScatterSeries, 'id'>>
+
 /** Read-only interval drawn behind signal data. */
 export interface SignalOverlayRegion {
   id: string
@@ -140,7 +156,7 @@ export interface SignalOverlayRegion {
 
 /** Complete read-only overlay replacement. */
 export interface SignalOverlays {
-  points: readonly SignalOverlayPoint[]
+  scatterSeries: readonly SignalScatterSeries[]
   regions?: readonly SignalOverlayRegion[]
   selectedPointId?: string | null
 }

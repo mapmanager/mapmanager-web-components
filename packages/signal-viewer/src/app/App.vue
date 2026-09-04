@@ -3,7 +3,13 @@ import { onMounted, ref } from 'vue'
 
 import type { SignalCursorChange, SignalOverlays, SignalSource, SignalViewport } from '../core'
 import SignalViewerWidget from '../vue/SignalViewerWidget.vue'
-import { SyntheticSignalSource } from './synthetic-source'
+import {
+  SYNTHETIC_DATASETS,
+  SYNTHETIC_DURATION,
+  SYNTHETIC_PERIOD,
+  SyntheticSignalSource,
+  type SyntheticDatasetId,
+} from './synthetic-source'
 
 interface WidgetApi {
   setSource(source: SignalSource): Promise<void>
@@ -16,28 +22,44 @@ const widget = ref<WidgetApi | null>(null)
 const viewport = ref<SignalViewport | null>(null)
 const selected = ref<string | null>(null)
 const cursorDelta = ref<string>('—')
+const datasetId = ref<SyntheticDatasetId>('recording-a')
 
-const overlays: SignalOverlays = {
-  points: Array.from({ length: 20 }, (_, index) => ({
-    id: `peak-${index}`,
-    x: index * 2 + 1,
-    y: 20,
-    kind: 'peak',
-    label: `Peak ${index + 1}`,
-  })),
-  regions: [{ id: 'epoch-1', xStart: 4, xStop: 8, kind: 'epoch', color: 'rgba(168, 85, 247, 0.12)' }],
+function datasetOverlays(id: SyntheticDatasetId): SignalOverlays {
+  const dataset = SYNTHETIC_DATASETS.find((candidate) => candidate.id === id)
+  if (!dataset) throw new Error(`unknown synthetic dataset: ${id}`)
+  const count = Math.floor(SYNTHETIC_DURATION / SYNTHETIC_PERIOD)
+  return {
+    scatterSeries: [{
+      id: 'peaks',
+      label: 'Peaks',
+      color: '#22d3ee',
+      points: Array.from({ length: count }, (_, index) => ({
+        id: `${id}-peak-${index}`,
+        x: dataset.phaseSeconds + index * SYNTHETIC_PERIOD,
+        y: dataset.baseline + dataset.spikeAmplitude,
+        kind: 'peak',
+        label: `Peak ${index + 1}`,
+      })),
+    }],
+    regions: [{
+      id: `${id}-epoch-1`, xStart: 4, xStop: 8, kind: 'epoch',
+      color: 'rgba(168, 85, 247, 0.12)',
+    }],
+  }
 }
 
-function onOverlaySelect(id: string | null): void {
-  selected.value = id
+async function loadDataset(): Promise<void> {
+  selected.value = null
+  cursorDelta.value = '—'
+  await widget.value?.setSource(new SyntheticSignalSource(datasetId.value))
+  widget.value?.setOverlays(datasetOverlays(datasetId.value))
+  widget.value?.setCursor('a', 60)
+  widget.value?.setCursor('b', 120)
 }
 
-onMounted(async () => {
-  await widget.value?.setSource(new SyntheticSignalSource())
-  widget.value?.setOverlays(overlays)
-  widget.value?.setCursor('a', 2)
-  widget.value?.setCursor('b', 4)
-})
+function onOverlaySelect(id: string | null): void { selected.value = id }
+
+onMounted(loadDataset)
 </script>
 
 <template>
@@ -45,9 +67,19 @@ onMounted(async () => {
     <header>
       <div>
         <h1>MapManager Signal Viewer</h1>
-        <p>Lazy three-million-sample source with min/max overview and peak overlays.</p>
+        <p>Lazy three-million-sample recordings with min/max overview and named peak overlays.</p>
       </div>
-      <button type="button" @click="widget?.resetView()">Reset view</button>
+      <div class="demo-controls">
+        <label>
+          Dataset
+          <select v-model="datasetId" @change="loadDataset">
+            <option v-for="dataset in SYNTHETIC_DATASETS" :key="dataset.id" :value="dataset.id">
+              {{ dataset.label }}
+            </option>
+          </select>
+        </label>
+        <button type="button" @click="widget?.resetView()">Reset view</button>
+      </div>
     </header>
     <SignalViewerWidget
       ref="widget"
@@ -67,9 +99,11 @@ onMounted(async () => {
 html, body, #app { height: 100%; margin: 0; }
 body { background: #020617; }
 main { display: grid; grid-template-rows: auto 1fr auto; height: 100%; color: #e2e8f0; font-family: Inter, system-ui, sans-serif; }
-header, footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; }
+header, footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; }
 h1, p { margin: 0; }
 p, footer { color: #94a3b8; font-size: 13px; }
-button { padding: 6px 10px; color: #e2e8f0; background: #1e293b; border: 1px solid #475569; border-radius: 5px; cursor: pointer; }
+.demo-controls, .demo-controls label { display: flex; align-items: center; gap: 8px; }
+button, select { padding: 6px 10px; color: #e2e8f0; background: #1e293b; border: 1px solid #475569; border-radius: 5px; }
+button { cursor: pointer; }
 .mm-signal-viewer { min-height: 0; }
 </style>

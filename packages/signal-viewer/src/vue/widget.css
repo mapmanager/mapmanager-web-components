@@ -43,6 +43,7 @@
 .mm-signal-viewer__options-panel {
   display: grid;
   width: 190px;
+  max-height: calc(100vh - 70px);
   gap: 10px;
   margin-top: 5px;
   padding: 10px;
@@ -51,6 +52,7 @@
   border: 1px solid #475569;
   border-radius: 5px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  overflow-y: auto;
 }
 
 .mm-signal-viewer__options-panel fieldset {

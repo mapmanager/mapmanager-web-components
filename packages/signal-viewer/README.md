@@ -35,6 +35,9 @@ The component exposes these methods through a template ref:
 - `setTraceVisible(id, visible)` and `getVisibleTraces()`;
 - `setViewport(viewport)`, `getViewport()`, and `resetView()`;
 - `setOverlays(overlays)`;
+- `setScatterSeries()`, `addScatterSeries()`, and `updateScatterSeries()`;
+- `setScatterSeriesVisible(id, visible)` and `getVisibleScatterSeries()`;
+- `setAxisVisible('x' | 'y', visible)` and `getAxisVisible()`;
 - `setAxisRange('left' | 'right', 'auto' | { min, max })` and `getAxisRange()`;
 - `setCursor()`, `setCursorVisible()`, `setCursors()`, `getCursor()`, and
   `getCursors()`.
@@ -79,7 +82,24 @@ await viewer.value?.setTraces([
     right: { label: 'Command', unit: 'pA' },
   },
 })
+
+viewer.value?.setScatterSeries([{
+  id: 'peaks',
+  label: 'Peaks',
+  color: '#22d3ee',
+  points: peakResults.map((peak) => ({
+    id: peak.id,
+    x: peak.time,
+    y: peak.vm,
+    kind: 'peak',
+  })),
+}])
 ```
+
+Scatter visibility is series-level while selection and hit testing remain
+point-level. X-axis chrome and combined left/right Y-axis chrome can be toggled
+independently. uPlot chooses tick intervals automatically from the visible
+range and available pixel space.
 
 ## Cursors and events
 
@@ -90,7 +110,8 @@ emits `cursor-change` with `changedId`, defensive copies of all four cursors,
 outside this API version.
 
 The plot's options button uses these same public operations to show or hide
-traces and cursor pairs and to reset the full view. The first time a pair is
+traces, named scatter series, axes, and cursor pairs and to reset the full view.
+Double-clicking the plot uses the same full-view reset operation. The first time a pair is
 enabled, A/B are placed at 25% and 75% of the visible X range and C/D at 25%
 and 75% of the visible left Y range. Later toggles preserve their positions.
 

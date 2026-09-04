@@ -1,9 +1,10 @@
 import { createApp, h, ref, type App, type ComponentPublicInstance } from 'vue'
 
 import type {
-  InMemorySignalSourceOptions, SignalAxisRange, SignalAxisRangeSetting, SignalCursor,
+  InMemorySignalSourceOptions, SignalAxisId, SignalAxisRange, SignalAxisRangeSetting, SignalCursor,
   SignalCursorChange, SignalCursorId, SignalCursorState, SignalOverlays, SignalSource,
-  SignalTrace, SignalTraceUpdate, SignalViewport, SignalYAxisId,
+  SignalScatterSeries, SignalScatterSeriesUpdate, SignalTrace, SignalTraceUpdate,
+  SignalViewport, SignalYAxisId,
 } from '../core'
 import SignalViewerWidget from '../vue/SignalViewerWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
@@ -19,8 +20,15 @@ interface WidgetApi {
   getViewport(): SignalViewport | null
   resetView(): Promise<void>
   setOverlays(overlays: SignalOverlays): void
+  setScatterSeries(series: readonly SignalScatterSeries[]): void
+  addScatterSeries(series: SignalScatterSeries): void
+  updateScatterSeries(id: string, update: SignalScatterSeriesUpdate): void
+  setScatterSeriesVisible(id: string, visible: boolean): void
+  getVisibleScatterSeries(): readonly string[]
   setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void
   getAxisRange(axis: SignalYAxisId): SignalAxisRange | null
+  setAxisVisible(axis: SignalAxisId, visible: boolean): void
+  getAxisVisible(axis: SignalAxisId): boolean
   setCursor(id: SignalCursorId, value: number): void
   setCursorVisible(id: SignalCursorId, visible: boolean): void
   setCursors(cursors: readonly SignalCursor[]): void
@@ -107,6 +115,31 @@ export class SignalViewerElement extends HTMLElement {
   /** Replace all sparse point and interval overlays. */
   setOverlays(overlays: SignalOverlays): void { this.#requireWidget().setOverlays(overlays) }
 
+  /** Replace all named scatter overlays while preserving interval overlays. */
+  setScatterSeries(series: readonly SignalScatterSeries[]): void {
+    this.#requireWidget().setScatterSeries(series)
+  }
+
+  /** Add one named scatter overlay with a stable ID. */
+  addScatterSeries(series: SignalScatterSeries): void {
+    this.#requireWidget().addScatterSeries(series)
+  }
+
+  /** Update one named scatter overlay without changing its stable ID. */
+  updateScatterSeries(id: string, update: SignalScatterSeriesUpdate): void {
+    this.#requireWidget().updateScatterSeries(id, update)
+  }
+
+  /** Show or hide one named scatter overlay. */
+  setScatterSeriesVisible(id: string, visible: boolean): void {
+    this.#requireWidget().setScatterSeriesVisible(id, visible)
+  }
+
+  /** Return visible scatter-series IDs in declaration order. */
+  getVisibleScatterSeries(): readonly string[] {
+    return this.#requireWidget().getVisibleScatterSeries()
+  }
+
   /** Set one Y axis to automatic or explicit range control. */
   setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void {
     this.#requireWidget().setAxisRange(axis, range)
@@ -114,6 +147,16 @@ export class SignalViewerElement extends HTMLElement {
 
   /** Return the currently rendered range for one Y axis. */
   getAxisRange(axis: SignalYAxisId): SignalAxisRange | null { return this.#requireWidget().getAxisRange(axis) }
+
+  /** Show or hide X-axis or combined Y-axis chrome. */
+  setAxisVisible(axis: SignalAxisId, visible: boolean): void {
+    this.#requireWidget().setAxisVisible(axis, visible)
+  }
+
+  /** Return whether X-axis or combined Y-axis chrome is visible. */
+  getAxisVisible(axis: SignalAxisId): boolean {
+    return this.#requireWidget().getAxisVisible(axis)
+  }
 
   /** Set and show one A/B/C/D cursor without emitting an event. */
   setCursor(id: SignalCursorId, value: number): void { this.#requireWidget().setCursor(id, value) }

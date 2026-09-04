@@ -10,6 +10,7 @@ import {
   type SampleSeriesResult,
   type SignalAxisRange,
   type SignalAxisRangeSetting,
+  type SignalAxisId,
   type SignalCursorId,
   type SignalCursorState,
   type SignalDescription,
@@ -30,9 +31,10 @@ export class UPlotSignalRenderer implements SignalRenderer {
   #plot: uPlot | null = null
   #description: SignalDescription | null = null
   #frame: LoadedSignalFrame | null = null
-  #overlays: SignalOverlays = { points: [] }
+  #overlays: SignalOverlays = { scatterSeries: [] }
   #cursors = defaultCursorState()
   #axisSettings: Record<SignalYAxisId, SignalAxisRangeSetting> = { left: 'auto', right: 'auto' }
+  #axisVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
   #internalUpdate = false
   #hitPoints: HitPoint[] = []
   #dragCursor: SignalCursorId | null = null
@@ -77,7 +79,10 @@ export class UPlotSignalRenderer implements SignalRenderer {
 
   setOverlays(overlays: SignalOverlays): void {
     this.#overlays = {
-      points: overlays.points.map((point) => ({ ...point })),
+      scatterSeries: overlays.scatterSeries.map((series) => ({
+        ...series,
+        points: series.points.map((point) => ({ ...point })),
+      })),
       ...(overlays.regions ? { regions: overlays.regions.map((region) => ({ ...region })) } : {}),
       ...(overlays.selectedPointId !== undefined ? { selectedPointId: overlays.selectedPointId } : {}),
     }
@@ -107,6 +112,16 @@ export class UPlotSignalRenderer implements SignalRenderer {
   getAxisRange(axis: SignalYAxisId): SignalAxisRange | null {
     const scale = this.#plot?.scales[axis]
     return scale?.min == null || scale.max == null ? null : { min: scale.min, max: scale.max }
+  }
+
+  setAxisVisible(axis: SignalAxisId, visible: boolean): void {
+    if (this.#axisVisibility[axis] === visible) return
+    this.#axisVisibility[axis] = visible
+    this.#rebuild()
+  }
+
+  getAxisVisible(axis: SignalAxisId): boolean {
+    return this.#axisVisibility[axis]
   }
 
   setViewport(viewport: SignalViewport): void {
@@ -149,14 +164,23 @@ export class UPlotSignalRenderer implements SignalRenderer {
         bind: { mousedown: (_plot, _target, handler) => (event) => {
           if (!this.#beginCursorDrag(event)) return handler(event)
           return null
+        }, dblclick: () => (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          this.#callbacks.resetViewRequest()
+          return null
         } },
       },
       scales: { x: { time: false }, left: { auto: false }, right: { auto: false } },
       axes: [
-        { label: axisLabel(description.xLabel, description.xUnit) },
-        { scale: 'left', label: axisLabel(description.yAxes.left.label, description.yAxes.left.unit) },
+        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x),
+        axisOptions('left', axisLabel(description.yAxes.left.label, description.yAxes.left.unit), this.#axisVisibility.y),
         ...(description.yAxes.right
-          ? [{ scale: 'right', side: 1 as const, label: axisLabel(description.yAxes.right.label, description.yAxes.right.unit), grid: { show: false } }]
+          ? [{
+              ...axisOptions('right', axisLabel(description.yAxes.right.label, description.yAxes.right.unit), this.#axisVisibility.y),
+              side: 1 as const,
+              grid: { show: false },
+            }]
           : []),
       ],
       series: [
@@ -276,22 +300,25 @@ export class UPlotSignalRenderer implements SignalRenderer {
 
   #drawPoints(plot: uPlot): void {
     this.#hitPoints = []
-    for (const point of this.#overlays.points) {
-      if (!visiblePoint(plot, point)) continue
-      const left = plot.valToPos(point.x, 'x', true)
-      const top = plot.valToPos(point.y, 'left', true)
-      const selected = point.id === this.#overlays.selectedPointId
-      const radius = (selected ? 5 : 3.5) * devicePixelRatio
-      plot.ctx.beginPath()
-      plot.ctx.arc(left, top, radius, 0, Math.PI * 2)
-      plot.ctx.fillStyle = point.color ?? '#f97316'
-      plot.ctx.fill()
-      if (selected) {
-        plot.ctx.strokeStyle = '#ffffff'
-        plot.ctx.lineWidth = 2 * devicePixelRatio
-        plot.ctx.stroke()
+    for (const series of this.#overlays.scatterSeries) {
+      if (series.visible === false) continue
+      for (const point of series.points) {
+        if (!visiblePoint(plot, point)) continue
+        const left = plot.valToPos(point.x, 'x', true)
+        const top = plot.valToPos(point.y, 'left', true)
+        const selected = point.id === this.#overlays.selectedPointId
+        const radius = (selected ? 5 : 3.5) * devicePixelRatio
+        plot.ctx.beginPath()
+        plot.ctx.arc(left, top, radius, 0, Math.PI * 2)
+        plot.ctx.fillStyle = point.color ?? series.color ?? '#22d3ee'
+        plot.ctx.fill()
+        if (selected) {
+          plot.ctx.strokeStyle = '#ffffff'
+          plot.ctx.lineWidth = 2 * devicePixelRatio
+          plot.ctx.stroke()
+        }
+        this.#hitPoints.push({ id: point.id, left: plot.valToPos(point.x, 'x'), top: plot.valToPos(point.y, 'left') })
       }
-      this.#hitPoints.push({ id: point.id, left: plot.valToPos(point.x, 'x'), top: plot.valToPos(point.y, 'left') })
     }
   }
 
@@ -448,6 +475,18 @@ function sampleX(frame: LoadedSignalFrame, sample: number): number {
 }
 
 function axisLabel(label: string, unit: string): string { return unit ? `${label} (${unit})` : label }
+
+function axisOptions(scale: string, label: string, show: boolean): uPlot.Axis {
+  return {
+    scale,
+    label,
+    show,
+    stroke: '#94a3b8',
+    ticks: { show: true, stroke: '#64748b', width: 1 },
+    border: { show: true, stroke: '#64748b', width: 1 },
+    grid: { show: true, stroke: 'rgba(100, 116, 139, 0.22)', width: 1 },
+  }
+}
 
 function visiblePoint(plot: uPlot, point: SignalOverlayPoint): boolean {
   const x = plot.scales['x']; const y = plot.scales['left']
