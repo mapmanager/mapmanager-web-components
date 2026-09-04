@@ -1,5 +1,5 @@
 export * from './core'
-export type { SignalRenderer, SignalRendererCallbacks } from './renderers/renderer-api'
+export type { SignalFrameOptions, SignalRenderer, SignalRendererCallbacks } from './renderers/renderer-api'
 export { UPlotSignalRenderer } from './renderers/uplot/uplot-renderer'
 export { default as SignalViewerWidget } from './vue/SignalViewerWidget.vue'
 export { SignalViewerElement } from './element/SignalViewerElement'

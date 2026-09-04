@@ -38,6 +38,8 @@ The component exposes these methods through a template ref:
 - `setScatterSeries()`, `addScatterSeries()`, and `updateScatterSeries()`;
 - `setScatterSeriesVisible(id, visible)` and `getVisibleScatterSeries()`;
 - `setAxisVisible('x' | 'y', visible)` and `getAxisVisible()`;
+- `setGridVisible('x' | 'y', visible)` and `getGridVisible()`;
+- `setHoverVisible(visible)` and `getHoverVisible()`;
 - `setAxisRange('left' | 'right', 'auto' | { min, max })` and `getAxisRange()`;
 - `setCursor()`, `setCursorVisible()`, `setCursors()`, `getCursor()`, and
   `getCursors()`.
@@ -98,8 +100,10 @@ viewer.value?.setScatterSeries([{
 
 Scatter visibility is series-level while selection and hit testing remain
 point-level. X-axis chrome and combined left/right Y-axis chrome can be toggled
-independently. uPlot chooses tick intervals automatically from the visible
-range and available pixel space.
+independently without changing the inner plot bounds. Configured axes reserve a
+fixed amount of layout space even while hidden. X and Y grid lines and the
+hover crosshair can also be toggled independently. uPlot chooses tick intervals
+automatically from the visible range and available pixel space.
 
 ## Cursors and events
 

@@ -29,6 +29,10 @@ interface WidgetApi {
   getAxisRange(axis: SignalYAxisId): SignalAxisRange | null
   setAxisVisible(axis: SignalAxisId, visible: boolean): void
   getAxisVisible(axis: SignalAxisId): boolean
+  setGridVisible(axis: SignalAxisId, visible: boolean): void
+  getGridVisible(axis: SignalAxisId): boolean
+  setHoverVisible(visible: boolean): void
+  getHoverVisible(): boolean
   setCursor(id: SignalCursorId, value: number): void
   setCursorVisible(id: SignalCursorId, visible: boolean): void
   setCursors(cursors: readonly SignalCursor[]): void
@@ -156,6 +160,26 @@ export class SignalViewerElement extends HTMLElement {
   /** Return whether X-axis or combined Y-axis chrome is visible. */
   getAxisVisible(axis: SignalAxisId): boolean {
     return this.#requireWidget().getAxisVisible(axis)
+  }
+
+  /** Show or hide vertical X or horizontal Y grid lines. */
+  setGridVisible(axis: SignalAxisId, visible: boolean): void {
+    this.#requireWidget().setGridVisible(axis, visible)
+  }
+
+  /** Return whether vertical X or horizontal Y grid lines are visible. */
+  getGridVisible(axis: SignalAxisId): boolean {
+    return this.#requireWidget().getGridVisible(axis)
+  }
+
+  /** Show or hide the hover crosshair and trace-position symbols. */
+  setHoverVisible(visible: boolean): void {
+    this.#requireWidget().setHoverVisible(visible)
+  }
+
+  /** Return whether the hover crosshair and trace-position symbols are visible. */
+  getHoverVisible(): boolean {
+    return this.#requireWidget().getHoverVisible()
   }
 
   /** Set and show one A/B/C/D cursor without emitting an event. */

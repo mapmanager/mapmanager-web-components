@@ -47,6 +47,8 @@ const visibleControlIds = ref<readonly string[]>([])
 const cursorControls = ref<SignalCursorState>(defaultCursorState())
 const scatterControls = ref<readonly SignalScatterSeries[]>([])
 const axisControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
+const gridControls = ref<Record<SignalAxisId, boolean>>({ x: true, y: true })
+const hoverControl = ref(true)
 let engine = new SignalViewerEngine()
 let renderer: SignalRenderer | null = null
 let inMemorySource: InMemorySignalSource | null = null
@@ -97,7 +99,7 @@ async function setTraceVisible(id: string, visible: boolean): Promise<void> {
   if (visible) visibleTraceIds.add(id)
   else visibleTraceIds.delete(id)
   visibleControlIds.value = engine.getVisibleSeries()
-  renderer?.setFrame(frame)
+  renderer?.setFrame(frame, { preserveYAxisRange: true })
 }
 
 /** Return visible trace IDs in source declaration order. */
@@ -177,6 +179,28 @@ function setAxisVisible(axis: SignalAxisId, visible: boolean): void {
 /** Return whether X-axis or combined Y-axis chrome is visible. */
 function getAxisVisible(axis: SignalAxisId): boolean {
   return axisControls.value[axis]
+}
+
+/** Show or hide vertical X or horizontal Y grid lines. */
+function setGridVisible(axis: SignalAxisId, visible: boolean): void {
+  renderer?.setGridVisible(axis, visible)
+  gridControls.value = { ...gridControls.value, [axis]: visible }
+}
+
+/** Return whether vertical X or horizontal Y grid lines are visible. */
+function getGridVisible(axis: SignalAxisId): boolean {
+  return gridControls.value[axis]
+}
+
+/** Show or hide the hover crosshair and trace-position symbols. */
+function setHoverVisible(visible: boolean): void {
+  renderer?.setHoverVisible(visible)
+  hoverControl.value = visible
+}
+
+/** Return whether the hover crosshair and trace-position symbols are visible. */
+function getHoverVisible(): boolean {
+  return hoverControl.value
 }
 
 /** Set and show one persistent A/B/C/D cursor without emitting an event. */
@@ -319,6 +343,14 @@ function toggleAxisFromPanel(axis: SignalAxisId, event: Event): void {
   setAxisVisible(axis, eventChecked(event))
 }
 
+function toggleGridFromPanel(axis: SignalAxisId, event: Event): void {
+  setGridVisible(axis, eventChecked(event))
+}
+
+function toggleHoverFromPanel(event: Event): void {
+  setHoverVisible(eventChecked(event))
+}
+
 function handleCursorChange(change: SignalCursorChange): void {
   cursors = cloneCursorState(change.cursors)
   cursorControls.value = cloneCursorState(cursors)
@@ -419,6 +451,7 @@ defineExpose({
   setScatterSeries, addScatterSeries, updateScatterSeries,
   setScatterSeriesVisible, getVisibleScatterSeries,
   setAxisRange, getAxisRange, setAxisVisible, getAxisVisible,
+  setGridVisible, getGridVisible, setHoverVisible, getHoverVisible,
   setCursor, setCursorVisible, setCursors, getCursor, getCursors,
 })
 </script>
@@ -460,6 +493,24 @@ defineExpose({
           <label>
             <input type="checkbox" :checked="axisControls.y" @change="toggleAxisFromPanel('y', $event)">
             Y axes
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Grid</legend>
+          <label>
+            <input type="checkbox" :checked="gridControls.x" @change="toggleGridFromPanel('x', $event)">
+            X grid lines
+          </label>
+          <label>
+            <input type="checkbox" :checked="gridControls.y" @change="toggleGridFromPanel('y', $event)">
+            Y grid lines
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Pointer</legend>
+          <label>
+            <input type="checkbox" :checked="hoverControl" @change="toggleHoverFromPanel($event)">
+            Hover cursor
           </label>
         </fieldset>
         <fieldset>

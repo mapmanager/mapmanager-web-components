@@ -19,16 +19,25 @@ export interface SignalRendererCallbacks {
   resetViewRequest(): void
 }
 
+/** Optional policies for installing a newly loaded frame. */
+export interface SignalFrameOptions {
+  preserveYAxisRange?: boolean
+}
+
 /** Replaceable visual boundary used by the signal-viewer widget. */
 export interface SignalRenderer {
   setDescription(description: SignalDescription): void
-  setFrame(frame: LoadedSignalFrame): void
+  setFrame(frame: LoadedSignalFrame, options?: SignalFrameOptions): void
   setOverlays(overlays: SignalOverlays): void
   setCursors(cursors: SignalCursorState): void
   setAxisRange(axis: SignalYAxisId, range: SignalAxisRangeSetting): void
   getAxisRange(axis: SignalYAxisId): SignalAxisRange | null
   setAxisVisible(axis: SignalAxisId, visible: boolean): void
   getAxisVisible(axis: SignalAxisId): boolean
+  setGridVisible(axis: SignalAxisId, visible: boolean): void
+  getGridVisible(axis: SignalAxisId): boolean
+  setHoverVisible(visible: boolean): void
+  getHoverVisible(): boolean
   setViewport(viewport: SignalViewport): void
   resize(width: number, height: number): void
   destroy(): void

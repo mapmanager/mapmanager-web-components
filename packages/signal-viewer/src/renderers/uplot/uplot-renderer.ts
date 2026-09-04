@@ -20,7 +20,7 @@ import {
   type SignalViewport,
   type SignalYAxisId,
 } from '../../core'
-import type { SignalRenderer, SignalRendererCallbacks } from '../renderer-api'
+import type { SignalFrameOptions, SignalRenderer, SignalRendererCallbacks } from '../renderer-api'
 
 interface HitPoint { id: string; left: number; top: number }
 
@@ -35,6 +35,8 @@ export class UPlotSignalRenderer implements SignalRenderer {
   #cursors = defaultCursorState()
   #axisSettings: Record<SignalYAxisId, SignalAxisRangeSetting> = { left: 'auto', right: 'auto' }
   #axisVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
+  #gridVisibility: Record<SignalAxisId, boolean> = { x: true, y: true }
+  #hoverVisible = true
   #internalUpdate = false
   #hitPoints: HitPoint[] = []
   #dragCursor: SignalCursorId | null = null
@@ -56,20 +58,21 @@ export class UPlotSignalRenderer implements SignalRenderer {
     this.#rebuild()
   }
 
-  setFrame(frame: LoadedSignalFrame): void {
+  setFrame(frame: LoadedSignalFrame, options: SignalFrameOptions = {}): void {
     if (!this.#description || this.#description.id !== frame.description.id) {
       this.setDescription(frame.description)
     }
     this.#frame = frame
     const plot = this.#plot
     if (!plot) return
+    const preservedRanges = options.preserveYAxisRange ? this.#currentAxisRanges() : null
     this.#internalUpdate = true
     try {
       plot.batch(() => {
         plot.setData(alignedData(frame), false)
         plot.setScale('x', { min: frame.requestedViewport.xMin, max: frame.requestedViewport.xMax })
-        this.#applyAxisRange('left')
-        if (frame.description.yAxes.right) this.#applyAxisRange('right')
+        this.#applyAxisRange('left', preservedRanges?.left ?? null)
+        if (frame.description.yAxes.right) this.#applyAxisRange('right', preservedRanges?.right ?? null)
       })
     } finally {
       this.#internalUpdate = false
@@ -124,6 +127,26 @@ export class UPlotSignalRenderer implements SignalRenderer {
     return this.#axisVisibility[axis]
   }
 
+  setGridVisible(axis: SignalAxisId, visible: boolean): void {
+    if (this.#gridVisibility[axis] === visible) return
+    this.#gridVisibility[axis] = visible
+    this.#rebuild()
+  }
+
+  getGridVisible(axis: SignalAxisId): boolean {
+    return this.#gridVisibility[axis]
+  }
+
+  setHoverVisible(visible: boolean): void {
+    if (this.#hoverVisible === visible) return
+    this.#hoverVisible = visible
+    this.#rebuild()
+  }
+
+  getHoverVisible(): boolean {
+    return this.#hoverVisible
+  }
+
   setViewport(viewport: SignalViewport): void {
     if (!this.#plot) return
     this.#internalUpdate = true
@@ -151,6 +174,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
   }
 
   #rebuild(): void {
+    const preservedRanges = this.#frame ? this.#currentAxisRanges() : null
     this.#plot?.destroy()
     this.#host.replaceChildren()
     const description = this.#description
@@ -160,6 +184,10 @@ export class UPlotSignalRenderer implements SignalRenderer {
       height: this.#height,
       legend: { show: description.series.length > 1 },
       cursor: {
+        show: true,
+        x: this.#hoverVisible,
+        y: this.#hoverVisible,
+        points: { show: this.#hoverVisible },
         drag: { x: true, y: false, setScale: true },
         bind: { mousedown: (_plot, _target, handler) => (event) => {
           if (!this.#beginCursorDrag(event)) return handler(event)
@@ -173,11 +201,11 @@ export class UPlotSignalRenderer implements SignalRenderer {
       },
       scales: { x: { time: false }, left: { auto: false }, right: { auto: false } },
       axes: [
-        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x),
-        axisOptions('left', axisLabel(description.yAxes.left.label, description.yAxes.left.unit), this.#axisVisibility.y),
+        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x, this.#gridVisibility.x, 55),
+        axisOptions('left', axisLabel(description.yAxes.left.label, description.yAxes.left.unit), this.#axisVisibility.y, this.#gridVisibility.y, 65),
         ...(description.yAxes.right
           ? [{
-              ...axisOptions('right', axisLabel(description.yAxes.right.label, description.yAxes.right.unit), this.#axisVisibility.y),
+              ...axisOptions('right', axisLabel(description.yAxes.right.label, description.yAxes.right.unit), this.#axisVisibility.y, false, 65),
               side: 1 as const,
               grid: { show: false },
             }]
@@ -200,15 +228,36 @@ export class UPlotSignalRenderer implements SignalRenderer {
       },
     }
     this.#plot = new uPlot(options, emptyData(description.series.length), this.#host)
-    if (this.#frame) this.setFrame(this.#frame)
+    if (this.#frame) {
+      this.setFrame(this.#frame)
+      if (preservedRanges) this.#restoreAxisRanges(preservedRanges)
+    }
   }
 
-  #applyAxisRange(axis: SignalYAxisId): void {
+  #applyAxisRange(axis: SignalYAxisId, preserved: SignalAxisRange | null = null): void {
     const plot = this.#plot
     if (!plot) return
     const setting = this.#axisSettings[axis]
-    const range = setting === 'auto' ? frameAxisRange(this.#frame, axis) : setting
-    plot.setScale(axis, range ?? { min: -1, max: 1 })
+    const range = preserved ?? (setting === 'auto' ? frameAxisRange(this.#frame, axis) : setting)
+    const current = this.getAxisRange(axis)
+    plot.setScale(axis, range ?? current ?? { min: -1, max: 1 })
+  }
+
+  #currentAxisRanges(): Record<SignalYAxisId, SignalAxisRange | null> {
+    return { left: this.getAxisRange('left'), right: this.getAxisRange('right') }
+  }
+
+  #restoreAxisRanges(ranges: Record<SignalYAxisId, SignalAxisRange | null>): void {
+    const plot = this.#plot
+    if (!plot) return
+    this.#internalUpdate = true
+    try {
+      if (ranges.left) plot.setScale('left', ranges.left)
+      if (ranges.right && this.#description?.yAxes.right) plot.setScale('right', ranges.right)
+    } finally {
+      this.#internalUpdate = false
+    }
+    plot.redraw(false, true)
   }
 
   #onScale(key: string): void {
@@ -476,15 +525,22 @@ function sampleX(frame: LoadedSignalFrame, sample: number): number {
 
 function axisLabel(label: string, unit: string): string { return unit ? `${label} (${unit})` : label }
 
-function axisOptions(scale: string, label: string, show: boolean): uPlot.Axis {
+function axisOptions(
+  scale: string,
+  label: string,
+  axisVisible: boolean,
+  gridVisible: boolean,
+  size: number,
+): uPlot.Axis {
   return {
     scale,
-    label,
-    show,
-    stroke: '#94a3b8',
-    ticks: { show: true, stroke: '#64748b', width: 1 },
-    border: { show: true, stroke: '#64748b', width: 1 },
-    grid: { show: true, stroke: 'rgba(100, 116, 139, 0.22)', width: 1 },
+    label: axisVisible ? label : '',
+    show: true,
+    size,
+    stroke: axisVisible ? '#94a3b8' : 'transparent',
+    ticks: { show: axisVisible, stroke: '#64748b', width: 1 },
+    border: { show: axisVisible, stroke: '#64748b', width: 1 },
+    grid: { show: gridVisible, stroke: 'rgba(100, 116, 139, 0.22)', width: 1 },
   }
 }
 
