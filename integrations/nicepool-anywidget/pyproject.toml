@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nicepool-anywidget"
+version = "0.1.0"
+description = "Thin anywidget adapter for the MapManager NicePool web component"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-only" }
+dependencies = [
+  "anywidget>=0.9",
+  "traitlets>=5.14",
+]
+
+[project.optional-dependencies]
+dataframe = ["pandas>=2.0"]
+dev = ["pytest>=8"]
+demo = ["jupyterlab>=4"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nicepool_anywidget"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/nicepool_anywidget/static/widget.js" = "nicepool_anywidget/static/widget.js"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,81 @@
+import type { SignalDescription, SignalRangeResult, SignalViewport } from './types'
+
+export function fullViewport(description: SignalDescription): SignalViewport {
+  return {
+    xMin: description.xStart,
+    xMax: description.xStart + Math.max(description.sampleCount - 1, 0) * description.xStep,
+  }
+}
+
+export function normalizeViewport(
+  description: SignalDescription,
+  viewport: SignalViewport,
+): SignalViewport {
+  const full = fullViewport(description)
+  const low = Math.max(full.xMin, Math.min(viewport.xMin, viewport.xMax))
+  const high = Math.min(full.xMax, Math.max(viewport.xMin, viewport.xMax))
+  if (high <= low) return full
+  return { xMin: low, xMax: high }
+}
+
+export function viewportSamples(
+  description: SignalDescription,
+  viewport: SignalViewport,
+  overscanFraction = 0.15,
+): { startSample: number; stopSample: number } {
+  const normalized = normalizeViewport(description, viewport)
+  const first = Math.floor((normalized.xMin - description.xStart) / description.xStep)
+  const lastInclusive = Math.ceil((normalized.xMax - description.xStart) / description.xStep)
+  const visibleCount = Math.max(lastInclusive - first + 1, 1)
+  const overscan = Math.ceil(visibleCount * overscanFraction)
+  return {
+    startSample: Math.max(0, first - overscan),
+    stopSample: Math.min(description.sampleCount, lastInclusive + 1 + overscan),
+  }
+}
+
+export function validateDescription(description: SignalDescription): void {
+  if (!description.id) throw new Error('signal description requires an id')
+  if (!Number.isInteger(description.sampleCount) || description.sampleCount < 2) {
+    throw new Error('signal sampleCount must be an integer >= 2')
+  }
+  if (!Number.isFinite(description.xStart) || !(description.xStep > 0)) {
+    throw new Error('signal xStart must be finite and xStep must be positive')
+  }
+  if (description.series.length === 0) throw new Error('signal requires at least one series')
+  const ids = description.series.map(({ id }) => id)
+  if (ids.some((id) => !id) || new Set(ids).size !== ids.length) {
+    throw new Error('signal series ids must be non-empty and unique')
+  }
+}
+
+export function validateRangeResult(
+  description: SignalDescription,
+  result: SignalRangeResult,
+  expectedIds: readonly string[],
+): void {
+  if (
+    !Number.isInteger(result.startSample) ||
+    !Number.isInteger(result.stopSample) ||
+    result.startSample < 0 ||
+    result.stopSample <= result.startSample ||
+    result.stopSample > description.sampleCount
+  ) {
+    throw new Error('signal source returned an invalid sample range')
+  }
+  const resultsById = new Map(result.series.map((series) => [series.id, series]))
+  for (const id of expectedIds) {
+    const series = resultsById.get(id)
+    if (!series) throw new Error(`signal source omitted requested series: ${id}`)
+    const length = series.kind === 'samples' ? series.values.length : series.minimum.length
+    if (series.kind === 'samples' && length !== result.stopSample - result.startSample) {
+      throw new Error(`sample series ${id} has the wrong length`)
+    }
+    if (
+      series.kind === 'minmax' &&
+      (!(series.factor > 1) || series.maximum.length !== length || length === 0)
+    ) {
+      throw new Error(`min/max series ${id} is invalid`)
+    }
+  }
+}

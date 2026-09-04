@@ -1,29 +1,25 @@
 {
-  "name": "@mapmanager/nicepool",
+  "name": "@mapmanager/signal-viewer",
   "version": "0.1.0",
   "private": true,
-  "description": "Reusable browser-native NicePool data exploration component.",
+  "description": "Reusable range-loaded scientific signal viewer.",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mapmanager/mapmanager-web-components.git",
-    "directory": "packages/nicepool"
+    "directory": "packages/signal-viewer"
   },
   "type": "module",
-  "files": [
-    "dist-lib",
-    "dist-element",
-    "README.md"
-  ],
+  "files": ["dist-lib", "dist-element", "README.md"],
   "types": "./dist-lib/types/public-api.d.ts",
-  "module": "./dist-lib/nicepool-web.js",
+  "module": "./dist-lib/signal-viewer-web.js",
   "exports": {
     ".": {
       "types": "./dist-lib/types/public-api.d.ts",
-      "import": "./dist-lib/nicepool-web.js"
+      "import": "./dist-lib/signal-viewer-web.js"
     },
-    "./register": "./dist-element/nicepool-element.js",
-    "./style.css": "./dist-lib/nicepool-web.css"
+    "./register": "./dist-element/signal-viewer-element.js",
+    "./style.css": "./dist-lib/signal-viewer-web.css"
   },
   "scripts": {
     "dev": "vite",
@@ -32,16 +28,14 @@
     "build:lib": "vite build --config vite.lib.config.ts && npm run build:types",
     "build:types": "vue-tsc --project tsconfig.build.json --declaration --emitDeclarationOnly --noEmit false",
     "build:element": "vite build --config vite.element.config.ts",
-    "build:notebook": "vite build --config vite.notebook.config.ts",
     "test": "vitest run",
     "typecheck": "vue-tsc --build --force"
   },
   "dependencies": {
-    "plotly.js-dist-min": "^3.7.0",
+    "uplot": "^1.6.32",
     "vue": "^3.5.41"
   },
   "devDependencies": {
-    "@types/plotly.js": "^3.0.13",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
     "typescript": "^6.0.3",

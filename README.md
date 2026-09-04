@@ -14,6 +14,18 @@ Reusable browser components shared by MapManager web and Python/NiceGUI clients.
 Both packages are actively developed and pre-1.0. Their APIs may change when
 that improves the design; user-visible changes belong in the changelog.
 
+## Integrations and examples
+
+- [`nicepool-anywidget`](integrations/nicepool-anywidget/) is a thin Python and
+  Jupyter adapter around the existing NicePool custom element.
+- [`examples/jupyter/nicepool-anywidget.ipynb`](examples/jupyter/nicepool-anywidget.ipynb)
+  demonstrates that adapter from Python.
+- [`packages/nicepool/notebooks/01-nicepool-engine.ipynb`](packages/nicepool/notebooks/01-nicepool-engine.ipynb)
+  demonstrates the framework-independent NicePool engine using a Deno kernel.
+
+Integration-specific Python dependencies are isolated from the normal npm
+installation. See each integration's README for its setup commands.
+
 ## Documentation
 
 The complete documentation is published at

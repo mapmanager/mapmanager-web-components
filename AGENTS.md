@@ -7,7 +7,11 @@ Python/NiceGUI clients. It is an npm workspace; each component under
 `packages/` is an independent package with its own public API and dependencies.
 
 Do not add CloudScope-specific orchestration, AcqStore transport behavior, or
-Python adapter code here. Those concerns belong to their consuming repositories.
+application-specific Python behavior here. Generic, isolated Python adapters
+that expose these browser components to environments such as Jupyter or
+NiceGUI may live under `integrations/`; they must consume the components'
+public browser APIs and must not duplicate analysis, rendering, state, or
+transport behavior owned elsewhere.
 
 ## Architecture
 

@@ -1,0 +1,15 @@
+{
+  "extends": "../../packages/nicepool/tsconfig.json",
+  "include": [
+    "frontend/**/*.ts",
+    "vite.config.ts",
+    "../../packages/nicepool/src/env.d.ts"
+  ],
+  "compilerOptions": {
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
+    "paths": {
+      "@mapmanager/nicepool": ["../../packages/nicepool/src/public-api.ts"]
+    }
+  }
+}

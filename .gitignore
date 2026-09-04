@@ -11,5 +11,6 @@ playwright-report/
 test-results/
 site/
 __pycache__/
+.ipynb_checkpoints/
 .venv/
 .venv-docs/

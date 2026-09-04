@@ -8,6 +8,7 @@ dist-element/
 coverage/
 playwright-report/
 test-results/
+notebooks/nicepool-core.js
 
 # TypeScript and tool caches
 *.tsbuildinfo
