@@ -41,6 +41,7 @@ const emit = defineEmits<{
 }>()
 
 const host = ref<HTMLDivElement | null>(null)
+const options = ref<HTMLDetailsElement | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const hasSource = ref(false)
@@ -64,6 +65,11 @@ let height = 300
 let overlays: SignalOverlays = { scatterSeries: [] }
 let cursors = defaultCursorState()
 let visibleTraceIds = new Set<string>()
+
+function closeOptionsOutside(event: PointerEvent): void {
+  const element = options.value
+  if (element?.open && event.target instanceof Node && !element.contains(event.target)) element.open = false
+}
 
 /** Replace the complete session with an asynchronous range source. */
 async function setSource(source: SignalSource): Promise<void> {
@@ -452,6 +458,7 @@ function validateScatterSeries(series: readonly SignalScatterSeries[]): void {
 }
 
 onMounted(async () => {
+  document.addEventListener('pointerdown', closeOptionsOutside)
   await nextTick()
   const element = host.value
   if (!element) return
@@ -478,6 +485,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeOptionsOutside)
   if (viewportTimer) clearTimeout(viewportTimer)
   engine.abort()
   resizeObserver?.disconnect()
@@ -504,9 +512,10 @@ defineExpose({
     :style="signalViewerThemeVariables(activeTheme)"
   >
     <div ref="host" class="mm-signal-viewer__plot" />
-    <details class="mm-signal-viewer__options">
+    <details ref="options" class="mm-signal-viewer__options">
       <summary aria-label="Viewer options" title="Viewer options">☰</summary>
       <div class="mm-signal-viewer__options-panel">
+        <slot name="options" />
         <fieldset v-if="traceControls.length">
           <legend>Traces</legend>
           <label v-for="trace in traceControls" :key="trace.id">

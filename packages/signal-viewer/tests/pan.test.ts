@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { clampRange, translateRange } from '../src/renderers/uplot/pan'
+import { clampRange, translateRange, zoomRange } from '../src/renderers/uplot/pan'
 
 describe('pan ranges', () => {
   it('translates without changing the visible span', () => {
@@ -14,5 +14,10 @@ describe('pan ranges', () => {
 
   it('uses the complete range when the viewport is already wider', () => {
     expect(clampRange({ min: -10, max: 110 }, { min: 0, max: 100 })).toEqual({ min: 0, max: 100 })
+  })
+
+  it('zooms around the pointer anchor', () => {
+    expect(zoomRange({ min: 0, max: 100 }, 0.5, 0.25)).toEqual({ min: 12.5, max: 62.5 })
+    expect(zoomRange({ min: 0, max: 100 }, 2, 0)).toEqual({ min: 0, max: 200 })
   })
 })

@@ -6,6 +6,21 @@ export function translateRange(range: SignalAxisRange, fraction: number): Signal
   return { min: range.min + offset, max: range.max + offset }
 }
 
+/** Scale a range around an anchor expressed as a fraction from its minimum. */
+export function zoomRange(
+  range: SignalAxisRange,
+  scale: number,
+  anchorFraction: number,
+): SignalAxisRange {
+  const span = range.max - range.min
+  const anchor = range.min + span * anchorFraction
+  const nextSpan = span * scale
+  return {
+    min: anchor - nextSpan * anchorFraction,
+    max: anchor + nextSpan * (1 - anchorFraction),
+  }
+}
+
 /** Keep a translated range inside fixed bounds without changing its span. */
 export function clampRange(range: SignalAxisRange, bounds: SignalAxisRange): SignalAxisRange {
   const span = range.max - range.min

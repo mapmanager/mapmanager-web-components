@@ -1,4 +1,5 @@
 .mm-signal-viewer {
+  container-type: size;
   position: relative;
   width: 100%;
   height: 100%;
@@ -46,7 +47,7 @@
 .mm-signal-viewer__options-panel {
   display: grid;
   width: 178px;
-  max-height: calc(100vh - 70px);
+  max-height: min(calc(100vh - 70px), calc(100cqh - 49px));
   gap: 7px;
   margin-top: 5px;
   padding: 8px;

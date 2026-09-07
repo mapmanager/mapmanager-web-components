@@ -24,7 +24,7 @@ import {
 } from '../../core'
 import type { SignalViewerThemeTokens } from '../../core/theme'
 import type { SignalFrameOptions, SignalRenderer, SignalRendererCallbacks } from '../renderer-api'
-import { clampRange, translateRange } from './pan'
+import { clampRange, translateRange, zoomRange } from './pan'
 
 interface HitPoint { id: string; left: number; top: number }
 interface PanState {
@@ -284,6 +284,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
         draw: [(plot) => this.#draw(plot)],
         ready: [(plot) => {
           plot.over.addEventListener('click', this.#onClick)
+          plot.over.addEventListener('wheel', this.#onWheel, { passive: false })
           this.#configureLegend(plot)
         }],
       },
@@ -357,6 +358,26 @@ export class UPlotSignalRenderer implements SignalRenderer {
     const scale = this.#plot.scales['x']
     if (scale?.min == null || scale.max == null) return
     this.#callbacks.viewportChange({ xMin: scale.min, xMax: scale.max })
+  }
+
+  #onWheel = (event: WheelEvent): void => {
+    const plot = this.#plot
+    const description = this.#description
+    const scale = plot?.scales['x']
+    if (!plot || !description || scale?.min == null || scale.max == null || event.deltaY === 0) return
+    event.preventDefault()
+    const rect = plot.over.getBoundingClientRect()
+    const anchorFraction = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+    const current = { min: scale.min, max: scale.max }
+    const bounds = {
+      min: description.xStart,
+      max: description.xStart + (description.sampleCount - 1) * description.xStep,
+    }
+    const currentSpan = current.max - current.min
+    const deltaPixels = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 24 : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1)
+    const requestedSpan = currentSpan * Math.exp(Math.max(-1000, Math.min(1000, deltaPixels)) * 0.002)
+    const nextSpan = Math.max(description.xStep, Math.min(bounds.max - bounds.min, requestedSpan))
+    plot.setScale('x', clampRange(zoomRange(current, nextSpan / currentSpan, anchorFraction), bounds))
   }
 
   #draw(plot: uPlot): void {
