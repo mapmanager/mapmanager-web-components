@@ -24,7 +24,7 @@ function inferColumn(name: string, rows: readonly NicePoolRow[]): ColumnSchema {
     : values.length > 0 && values.every((value) => typeof value === 'boolean')
       ? 'boolean'
       : 'string'
-  return { name, type }
+  return { name, type, axis_label: name }
 }
 
 function validateValue(value: unknown, rowIndex: number, column: string): asserts value is NicePoolValue {
@@ -71,6 +71,12 @@ export class DatasetStore {
     for (const column of declared) {
       if (!columnNames.has(column.name)) throw new DatasetValidationError(`Schema declares unknown column ${JSON.stringify(column.name)}`)
       if (!COLUMN_TYPES.has(column.type)) throw new DatasetValidationError(`Schema column ${JSON.stringify(column.name)} has an invalid type`)
+      if (typeof column.axis_label !== 'string' || !column.axis_label.trim()) {
+        throw new DatasetValidationError(`Schema column ${JSON.stringify(column.name)} axis_label must be a nonempty string`)
+      }
+      if (column.category !== undefined && (typeof column.category !== 'string' || !column.category.trim())) {
+        throw new DatasetValidationError(`Schema column ${JSON.stringify(column.name)} category must be a nonempty string`)
+      }
       if (column.categorical !== undefined && typeof column.categorical !== 'boolean') {
         throw new DatasetValidationError(`Schema column ${JSON.stringify(column.name)} categorical flag must be boolean`)
       }
@@ -95,6 +101,18 @@ export class DatasetStore {
   /** Return columns explicitly or conventionally suitable for prefilters. */
   preFilterColumns(): readonly string[] {
     return this.#preFilterColumns
+  }
+
+  /** Return the resolved schema entry for one known column. */
+  columnSchema(name: string): ColumnSchema {
+    const column = this.schema.find((entry) => entry.name === name)
+    if (!column) throw new DatasetValidationError(`Unknown column ${JSON.stringify(name)}`)
+    return column
+  }
+
+  /** Return the caller-owned axis label for one known column. */
+  axisLabel(name: string): string {
+    return this.columnSchema(name).axis_label
   }
 
   /** Return finite numeric columns from the resolved schema. */

@@ -10,9 +10,15 @@ export interface PreparedPoint {
   colorValue: string | null
 }
 
+export interface PreparedAxisLabels {
+  x: string
+  y: string
+}
+
 export interface PreparedScatterData {
   type: 'scatter'
   state: PlotState
+  axisLabels: PreparedAxisLabels
   points: readonly PreparedPoint[]
 }
 
@@ -25,6 +31,7 @@ export interface PreparedSwarmPoint extends PreparedPoint {
 export interface PreparedSwarmData {
   type: 'swarm'
   state: PlotState
+  axisLabels: PreparedAxisLabels
   categories: readonly string[]
   points: readonly PreparedSwarmPoint[]
 }
@@ -32,6 +39,7 @@ export interface PreparedSwarmData {
 export interface PreparedDistributionData {
   type: 'box' | 'violin'
   state: PlotState
+  axisLabels: PreparedAxisLabels
   categories: readonly string[]
   points: readonly PreparedPoint[]
 }
@@ -50,6 +58,7 @@ export interface PreparedHistogramBin {
 export interface PreparedHistogramData {
   type: 'histogram' | 'cumulativeHistogram'
   state: PlotState
+  axisLabels: PreparedAxisLabels
   points: readonly PreparedPoint[]
   bins: readonly PreparedHistogramBin[]
 }

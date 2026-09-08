@@ -81,13 +81,40 @@ describe('plot preparation and summaries', () => {
       rowIdColumn: 'id',
       rows: [{ id: 'a', epochLevel: 10, y: 1 }, { id: 'b', epochLevel: 2, y: 2 }],
       schema: [
-        { name: 'id', type: 'string' },
-        { name: 'epochLevel', type: 'number', categorical: true },
-        { name: 'y', type: 'number' },
+        { name: 'id', type: 'string', axis_label: 'ID' },
+        { name: 'epochLevel', type: 'number', axis_label: 'Epoch level', categorical: true },
+        { name: 'y', type: 'number', axis_label: 'Response' },
       ],
     })
     const state = { ...defaultPlotState(dataset), plotType: 'swarm' as const, groupColumn: 'epochLevel', yColumn: 'y' }
-    expect(prepareSwarm(dataset, state).categories).toEqual(['2', '10'])
+    const data = prepareSwarm(dataset, state)
+    expect(data.categories).toEqual(['2', '10'])
+    const specification = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] })
+    expect(specification.layout.xaxis).toMatchObject({ title: { text: 'Epoch level' } })
+    expect(specification.layout.yaxis).toMatchObject({ title: { text: 'Response' } })
+  })
+
+  it('uses schema axis labels across scatter and histogram plots', () => {
+    const dataset = new DatasetStore({
+      rowIdColumn: 'id',
+      rows: [{ id: 'a', x: 1, y: 2 }],
+      schema: [
+        { name: 'id', type: 'string', axis_label: 'ID' },
+        { name: 'x', type: 'number', axis_label: 'Elapsed time' },
+        { name: 'y', type: 'number', axis_label: 'Voltage' },
+      ],
+    })
+    const selection = { primaryRowId: null, selectedRowIds: [] }
+    const scatterState = { ...defaultPlotState(dataset), xColumn: 'x', yColumn: 'y' }
+    const scatter = buildPlotlySpecification(prepareScatter(dataset, scatterState), selection)
+    expect(scatter.layout.xaxis).toMatchObject({ title: { text: 'Elapsed time' } })
+    expect(scatter.layout.yaxis).toMatchObject({ title: { text: 'Voltage' } })
+    const histogramState = { ...scatterState, plotType: 'histogram' as const }
+    const histogram = buildPlotlySpecification(prepareHistogram(dataset, histogramState), selection)
+    expect(histogram.layout.xaxis).toMatchObject({ title: { text: 'Elapsed time' } })
+    expect(histogram.layout.yaxis).toMatchObject({ title: { text: 'Count' } })
+    const cumulative = buildPlotlySpecification(prepareHistogram(dataset, { ...histogramState, plotType: 'cumulativeHistogram' }), selection)
+    expect(cumulative.layout.yaxis).toMatchObject({ title: { text: 'Cumulative proportion' } })
   })
 
   it('shares distribution preparation while adding box quartiles', () => {

@@ -2,11 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NicePoolEngine } from '../core/engine'
 import { validateNicePoolPreset, validateNicePoolPresets, visiblePlotCount } from '../core/state'
-import type { DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
+import type { ColumnSchema, DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
 import type { PreparedPlot, PlotSummary } from '../plots/types'
 import { describeEmptyPlot } from '../plots/diagnostics'
 import { formatPlotSummaryToTsv } from '../plots/summary-format'
 import PlotlyView from './PlotlyView.vue'
+import ColumnSelectionTable from './ColumnSelectionTable.vue'
 import './widget.css'
 
 const props = withDefaults(defineProps<{ dataset?: DatasetInput; presetStorageKey?: string; theme?: NicePoolTheme; showPresetEditing?: boolean; controlsCollapsed?: boolean }>(), {
@@ -32,8 +33,8 @@ const error = ref<string | null>(null)
 const revision = ref(0)
 const activeTheme = ref<NicePoolTheme>(props.theme)
 const presetEditingVisible = ref(props.showPresetEditing)
-const defaultControlsWidth = 290
-const maximumControlsWidth = 520
+const defaultControlsWidth = 520
+const maximumControlsWidth = 720
 const controlsWidth = ref(props.controlsCollapsed ? 0 : defaultControlsWidth)
 const expandedControlsWidth = ref(defaultControlsWidth)
 const plotHeight = ref(620)
@@ -118,12 +119,15 @@ const state = computed(() => { revision.value; return preparedPlots.value.length
 const plotState = computed(() => state.value?.plots[state.value.activePlotIndex] ?? null)
 const activeSummary = computed(() => state.value ? preparedPlots.value[state.value.activePlotIndex]?.summary ?? null : null)
 const visibleIndexes = computed(() => state.value ? Array.from({ length: visiblePlotCount(state.value.layout) }, (_, index) => index) : [])
-const numericColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.numericColumns() : [] })
+function columnSchemas(names: readonly string[]): readonly ColumnSchema[] {
+  return names.map((name) => engine.dataset.columnSchema(name))
+}
+const numericColumns = computed(() => { revision.value; return preparedPlots.value.length ? columnSchemas(engine.dataset.numericColumns()) : [] })
 const scatterXColumns = computed(() => {
   revision.value
-  return preparedPlots.value.length ? engine.dataset.schema.map(({ name }) => name).filter((name) => name !== engine.dataset.rowIdColumn) : []
+  return preparedPlots.value.length ? engine.dataset.schema.filter(({ name }) => name !== engine.dataset.rowIdColumn) : []
 })
-const categoricalColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.categoricalColumns() : [] })
+const categoricalColumns = computed(() => { revision.value; return preparedPlots.value.length ? columnSchemas(engine.dataset.categoricalColumns()) : [] })
 const filterColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.preFilterColumns() : [] })
 const isHistogram = computed(() => plotState.value?.plotType === 'histogram' || plotState.value?.plotType === 'cumulativeHistogram')
 const isDistribution = computed(() => plotState.value?.plotType === 'swarm' || plotState.value?.plotType === 'box' || plotState.value?.plotType === 'violin')
@@ -190,12 +194,12 @@ function changePlotType(plotType: PlotState['plotType']): void {
   const requiresGroup = ['swarm', 'box', 'violin'].includes(plotType)
   const histogram = ['histogram', 'cumulativeHistogram'].includes(plotType)
   const groupColumn = requiresGroup && plotState.value?.groupColumn === null
-    ? categoricalColumns.value[0] ?? null
+    ? categoricalColumns.value[0]?.name ?? null
     : histogram
       ? null
       : plotState.value?.groupColumn
-  const xColumn = histogram && plotState.value && !numericColumns.value.includes(plotState.value.xColumn)
-    ? numericColumns.value[0] ?? plotState.value.xColumn
+  const xColumn = histogram && plotState.value && !numericColumns.value.some(({ name }) => name === plotState.value?.xColumn)
+    ? numericColumns.value[0]?.name ?? plotState.value.xColumn
     : plotState.value?.xColumn
   updatePlotState({ plotType, ...(groupColumn !== undefined ? { groupColumn } : {}), ...(xColumn !== undefined ? { xColumn } : {}) })
 }
@@ -323,18 +327,14 @@ onBeforeUnmount(() => {
       <label>Plot type<select :value="plotState.plotType" @change="changePlotType(($event.target as HTMLSelectElement).value as PlotState['plotType'])">
         <option value="scatter">Scatter</option><option value="swarm">Swarm</option><option value="box">Box</option><option value="violin">Violin</option><option value="histogram">Histogram</option><option value="cumulativeHistogram">Cumulative histogram</option>
       </select></label>
-      <label :class="{ 'nicepool-control-disabled': isDistribution }">X column<select :disabled="isDistribution" :value="plotState.xColumn" @change="updatePlotState({ xColumn: ($event.target as HTMLSelectElement).value })">
-        <option v-for="column in availableXColumns" :key="column">{{ column }}</option>
-      </select></label>
-      <label :class="{ 'nicepool-control-disabled': isHistogram }">Y column<select :disabled="isHistogram" :value="plotState.yColumn" @change="updatePlotState({ yColumn: ($event.target as HTMLSelectElement).value })">
-        <option v-for="column in numericColumns" :key="column">{{ column }}</option>
-      </select></label>
-      <label :class="{ 'nicepool-control-disabled': plotState.plotType === 'scatter' }">Group<select :disabled="plotState.plotType === 'scatter'" :value="plotState.groupColumn ?? ''" @change="updatePlotState({ groupColumn: ($event.target as HTMLSelectElement).value || null })">
-        <option value="">Choose a group</option><option v-for="column in categoricalColumns" :key="column">{{ column }}</option>
-      </select></label>
-      <label>Color by<select :value="plotState.colorColumn ?? ''" @change="updatePlotState({ colorColumn: ($event.target as HTMLSelectElement).value || null })">
-        <option value="">None</option><option v-for="column in categoricalColumns" :key="column">{{ column }}</option>
-      </select></label>
+      <div class="nicepool-selector-pair">
+        <ColumnSelectionTable title="X column" :columns="availableXColumns" :selected-name="plotState.xColumn" :disabled="isDistribution" :allow-none="false" @select="updatePlotState({ xColumn: $event! })" />
+        <ColumnSelectionTable title="Y column" :columns="numericColumns" :selected-name="plotState.yColumn" :disabled="isHistogram" :allow-none="false" @select="updatePlotState({ yColumn: $event! })" />
+      </div>
+      <div class="nicepool-selector-pair">
+        <ColumnSelectionTable title="Group" :columns="categoricalColumns" :selected-name="plotState.groupColumn" :disabled="plotState.plotType === 'scatter'" :allow-none="true" @select="updatePlotState({ groupColumn: $event })" />
+        <ColumnSelectionTable title="Color by" :columns="categoricalColumns" :selected-name="plotState.colorColumn" :disabled="false" :allow-none="true" @select="updatePlotState({ colorColumn: $event })" />
+      </div>
       <fieldset v-if="filterColumns.length"><legend>Filters</legend>
         <label v-for="column in filterColumns" :key="column">{{ column }}<select :value="String(plotState.preFilters[column] ?? '')" @change="updateFilter(column, ($event.target as HTMLSelectElement).value)">
           <option value="">All</option><option v-for="value in engine.dataset.uniqueValues(column)" :key="String(value)" :value="String(value)">{{ value }}</option>

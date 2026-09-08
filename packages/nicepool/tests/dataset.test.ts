@@ -28,13 +28,15 @@ describe('DatasetStore', () => {
       rowIdColumn: 'id',
       rows: [{ id: 1, epochLevel: 10 }, { id: 2, epochLevel: 2 }],
       schema: [
-        { name: 'id', type: 'number' },
-        { name: 'epochLevel', type: 'number', categorical: true },
+        { name: 'id', type: 'number', axis_label: 'ID', category: 'identity' },
+        { name: 'epochLevel', type: 'number', axis_label: 'Epoch level', category: 'stimulus', categorical: true },
       ],
     })
     expect(dataset.numericColumns()).toEqual(['epochLevel'])
     expect(dataset.categoricalColumns()).toEqual(['epochLevel'])
     expect(dataset.uniqueValues('epochLevel')).toEqual([2, 10])
+    expect(dataset.axisLabel('epochLevel')).toBe('Epoch level')
+    expect(dataset.columnSchema('epochLevel').category).toBe('stimulus')
   })
 
   it('rejects unknown or duplicate prefilter columns', () => {
@@ -44,9 +46,13 @@ describe('DatasetStore', () => {
 
   it('strictly validates caller-supplied column schemas', () => {
     const input = { rowIdColumn: 'id', rows: [{ id: 'a', value: 1 }] }
-    expect(() => new DatasetStore({ ...input, schema: [{ name: 'id', type: 'string' }, { name: 'id', type: 'string' }, { name: 'value', type: 'number' }] })).toThrow(DatasetValidationError)
-    expect(() => new DatasetStore({ ...input, schema: [{ name: 'id', type: 'string' }, { name: 'value', type: 'number' }, { name: 'extra', type: 'string' }] })).toThrow(DatasetValidationError)
-    expect(() => new DatasetStore({ ...input, schema: [{ name: 'id', type: 'string' }, { name: 'value', type: 'number', categorical: 'yes' }] as never })).toThrow(DatasetValidationError)
+    const id = { name: 'id', type: 'string' as const, axis_label: 'ID' }
+    const value = { name: 'value', type: 'number' as const, axis_label: 'Value' }
+    expect(() => new DatasetStore({ ...input, schema: [id, id, value] })).toThrow(DatasetValidationError)
+    expect(() => new DatasetStore({ ...input, schema: [id, value, { name: 'extra', type: 'string', axis_label: 'Extra' }] })).toThrow(DatasetValidationError)
+    expect(() => new DatasetStore({ ...input, schema: [id, { ...value, categorical: 'yes' }] as never })).toThrow(DatasetValidationError)
+    expect(() => new DatasetStore({ ...input, schema: [id, { ...value, axis_label: '' }] })).toThrow(DatasetValidationError)
+    expect(() => new DatasetStore({ ...input, schema: [id, { ...value, category: '' }] })).toThrow(DatasetValidationError)
   })
 
   it('retains null but rejects implicit or non-JSON missing values', () => {

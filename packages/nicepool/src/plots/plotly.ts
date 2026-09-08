@@ -187,7 +187,7 @@ export function buildPlotlySpecification(
     xaxis: data.type === 'swarm'
       ? {
           ...axisStyle,
-          title: { text: data.state.showAxes ? data.state.groupColumn ?? '' : '' },
+          title: { text: data.state.showAxes ? data.axisLabels.x : '' },
           showgrid: data.state.showVerticalGrid,
           tickmode: 'array',
           tickvals: data.categories.map((_, index) => index),
@@ -196,12 +196,12 @@ export function buildPlotlySpecification(
         }
       : {
           ...axisStyle,
-          title: { text: data.state.showAxes ? (data.type === 'box' || data.type === 'violin' ? data.state.groupColumn ?? '' : data.state.xColumn) : '' },
+          title: { text: data.state.showAxes ? data.axisLabels.x : '' },
           showgrid: data.state.showVerticalGrid,
         },
     yaxis: {
       ...axisStyle,
-      title: { text: data.state.showAxes ? (data.type === 'histogram' ? 'Count' : data.type === 'cumulativeHistogram' ? 'Cumulative proportion' : data.state.yColumn) : '' },
+      title: { text: data.state.showAxes ? data.axisLabels.y : '' },
       showgrid: data.state.showHorizontalGrid,
     },
     ...(data.type === 'histogram' ? { barmode: 'overlay' as const } : {}),

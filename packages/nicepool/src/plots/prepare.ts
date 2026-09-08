@@ -85,7 +85,7 @@ export function prepareScatter(dataset: DatasetStore, state: PlotState): Prepare
     if (x === null || typeof x === 'boolean') continue
     points.push({ rowId, sourceIndex, x, y, groupValue, colorValue })
   }
-  return Object.freeze({ type: 'scatter', state, points: Object.freeze(points) })
+  return Object.freeze({ type: 'scatter', state, axisLabels: { x: dataset.axisLabel(state.xColumn), y: dataset.axisLabel(state.yColumn) }, points: Object.freeze(points) })
 }
 
 function hashString(value: string, seed: number): number {
@@ -132,7 +132,7 @@ export function prepareSwarm(dataset: DatasetStore, state: PlotState): PreparedS
       colorValue,
     }
   })
-  return Object.freeze({ type: 'swarm', state, categories: Object.freeze(categories), points: Object.freeze(points) })
+  return Object.freeze({ type: 'swarm', state, axisLabels: { x: dataset.axisLabel(state.groupColumn!), y: dataset.axisLabel(state.yColumn) }, categories: Object.freeze(categories), points: Object.freeze(points) })
 }
 
 /** Prepare categorical observations shared by box and violin rendering. */
@@ -144,7 +144,7 @@ export function prepareDistribution(dataset: DatasetStore, state: PlotState): Pr
   const points: PreparedPoint[] = candidates.map(({ sourceIndex, rowId, groupValue, colorValue, y }) => ({
     sourceIndex, rowId, x: groupValue, y, groupValue, colorValue,
   }))
-  return Object.freeze({ type: state.plotType, state, categories: Object.freeze(categories), points: Object.freeze(points) })
+  return Object.freeze({ type: state.plotType, state, axisLabels: { x: dataset.axisLabel(state.groupColumn!), y: dataset.axisLabel(state.yColumn) }, categories: Object.freeze(categories), points: Object.freeze(points) })
 }
 
 /** Prepare globally aligned bins shared by histogram rendering and summaries. */
@@ -159,7 +159,8 @@ export function prepareHistogram(dataset: DatasetStore, state: PlotState): Prepa
     if (value === null || (state.groupColumn !== null && groupValue === null) || (state.colorColumn !== null && colorValue === null)) continue
     points.push({ sourceIndex, rowId, x: value, y: value, groupValue, colorValue })
   }
-  if (!points.length) return Object.freeze({ type: state.plotType, state, points: Object.freeze([]), bins: Object.freeze([]) })
+  const axisLabels = { x: dataset.axisLabel(state.xColumn), y: state.plotType === 'histogram' ? 'Count' : 'Cumulative proportion' }
+  if (!points.length) return Object.freeze({ type: state.plotType, state, axisLabels, points: Object.freeze([]), bins: Object.freeze([]) })
 
   const values = points.map(({ x }) => x as number)
   let minimum = Math.min(...values)
@@ -200,7 +201,7 @@ export function prepareHistogram(dataset: DatasetStore, state: PlotState): Prepa
       })
     })
   }
-  return Object.freeze({ type: state.plotType, state, points: Object.freeze(points), bins: Object.freeze(bins) })
+  return Object.freeze({ type: state.plotType, state, axisLabels, points: Object.freeze(points), bins: Object.freeze(bins) })
 }
 
 /** Dispatch Slice 1 plot preparation without importing Plotly or Vue. */

@@ -10,7 +10,8 @@ export type ColumnType = 'number' | 'string' | 'boolean' | 'categorical'
 export interface ColumnSchema {
   name: string
   type: ColumnType
-  label?: string
+  axis_label: string
+  category?: string
   categorical?: boolean
 }
 

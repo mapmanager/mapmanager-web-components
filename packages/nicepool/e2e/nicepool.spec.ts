@@ -24,9 +24,9 @@ test.beforeEach(async ({ page }) => {
 test('changing X and Y updates the rendered Plotly specification', async ({ page }) => {
   const before = await plotSnapshot(page)
 
-  await page.getByLabel('X column').selectOption('velocity')
+  await page.getByLabel('X column: velocity').check({ force: true })
   await expect.poll(async () => (await plotSnapshot(page)).xTitle).toBe('velocity')
-  await page.getByLabel('Y column').selectOption('duration')
+  await page.getByLabel('Y column: duration').check({ force: true })
   await expect.poll(async () => (await plotSnapshot(page)).yTitle).toBe('duration')
 
   const after = await plotSnapshot(page)
@@ -58,7 +58,7 @@ test('collapses and restores controls through the public element API', async ({ 
   const pool = page.locator('nice-pool')
   const controls = pool.locator('.nicepool-controls')
 
-  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(290)
+  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(520)
   await pool.evaluate((element) => {
     (element as HTMLElement & { setControlsCollapsed(collapsed: boolean): void }).setControlsCollapsed(true)
   })
@@ -70,5 +70,5 @@ test('collapses and restores controls through the public element API', async ({ 
   await pool.evaluate((element) => {
     (element as HTMLElement & { setControlsCollapsed(collapsed: boolean): void }).setControlsCollapsed(false)
   })
-  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(290)
+  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(520)
 })

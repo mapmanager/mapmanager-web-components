@@ -18,6 +18,11 @@ its conventional `accept`, `channel`, and `roi_id` filters when those columns
 exist. Supplying `[]` disables prefilters. A listed column appears in the
 Filters panel with **All** selected until a `PlotState.preFilters` value is set.
 
+Each declared column provides a nonempty `axis_label` used for rendered plot
+axes and may provide a nonempty `category`. The four column selectors present
+eligible columns in category groups while preserving schema order. Category is
+presentation metadata and is independent of the `categorical` capability flag.
+
 Column storage type and categorical presentation are independent. A numeric
 column declared with `categorical: true` remains available to numeric plots and
 also appears in Group and Color controls. Numeric categories are ordered by
