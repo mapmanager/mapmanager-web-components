@@ -14,6 +14,8 @@ interface WidgetApi {
   applyNicePoolPreset(name: string): void
   setShowPresetEditing(visible: boolean): void
   getShowPresetEditing(): boolean
+  setControlsCollapsed(collapsed: boolean): void
+  getControlsCollapsed(): boolean
   setSelection(selection: NicePoolSelection): void
   setPrimarySelection(rowId: RowId | null): void
   clearSelection(): void
@@ -31,6 +33,7 @@ export class NicePoolElement extends HTMLElement {
   #pendingState: NicePoolState | null = null
   #pendingPresets: readonly NicePoolPreset[] | null = null
   #showPresetEditing = true
+  #controlsCollapsed = false
 
   connectedCallback(): void {
     if (this.#app) return
@@ -43,6 +46,7 @@ export class NicePoolElement extends HTMLElement {
       render: () => h(NicePoolWidget, {
         ref: this.#widget,
         showPresetEditing: this.#showPresetEditing,
+        controlsCollapsed: this.#controlsCollapsed,
         onSelectionChange: (selection: NicePoolSelection) => {
           this.dispatchEvent(new CustomEvent('nicepool-selection-change', {
             detail: selection,
@@ -138,6 +142,11 @@ export class NicePoolElement extends HTMLElement {
     this.#widget.value?.setShowPresetEditing(visible)
   }
   getShowPresetEditing(): boolean { return this.#widget.value?.getShowPresetEditing() ?? this.#showPresetEditing }
+  setControlsCollapsed(collapsed: boolean): void {
+    this.#controlsCollapsed = collapsed
+    this.#widget.value?.setControlsCollapsed(collapsed)
+  }
+  getControlsCollapsed(): boolean { return this.#widget.value?.getControlsCollapsed() ?? this.#controlsCollapsed }
   setTheme(theme: NicePoolTheme): void { this.#widget.value?.setTheme(theme) }
   getTheme(): NicePoolTheme { return this.#widget.value?.getTheme() ?? 'dark' }
 

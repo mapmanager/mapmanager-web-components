@@ -47,3 +47,23 @@ test('keeps preset selection visible while preset editing is toggled', async ({ 
   await expect(pool.getByLabel('Preset')).toBeVisible()
   await expect(pool.getByRole('group', { name: 'Saved workspace' })).toHaveCount(0)
 })
+
+test('collapses and restores controls through the public element API', async ({ page }) => {
+  await page.goto('/element-demo.html')
+  const pool = page.locator('nice-pool')
+  const controls = pool.locator('.nicepool-controls')
+
+  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(290)
+  await pool.evaluate((element) => {
+    (element as HTMLElement & { setControlsCollapsed(collapsed: boolean): void }).setControlsCollapsed(true)
+  })
+  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(0)
+  await expect.poll(() => pool.evaluate((element) =>
+    (element as HTMLElement & { getControlsCollapsed(): boolean }).getControlsCollapsed(),
+  )).toBe(true)
+
+  await pool.evaluate((element) => {
+    (element as HTMLElement & { setControlsCollapsed(collapsed: boolean): void }).setControlsCollapsed(false)
+  })
+  await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(290)
+})

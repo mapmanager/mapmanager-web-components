@@ -67,6 +67,9 @@ selection methods. `setShowPresetEditing` toggles the optional Name, Save, and
 Delete controls without hiding preset selection. `setTheme('dark' | 'light')`
 and `getTheme()` expose the presentation theme without changing serialized
 workspace state.
+`setControlsCollapsed(true | false)` and `getControlsCollapsed()` control the
+left controls panel without changing plot state or presets. Expanding restores
+the most recent nonzero controls width.
 
 ## NiceGUI boundary
 

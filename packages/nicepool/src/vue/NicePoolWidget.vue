@@ -9,10 +9,11 @@ import { formatPlotSummaryToTsv } from '../plots/summary-format'
 import PlotlyView from './PlotlyView.vue'
 import './widget.css'
 
-const props = withDefaults(defineProps<{ dataset?: DatasetInput; presetStorageKey?: string; theme?: NicePoolTheme; showPresetEditing?: boolean }>(), {
+const props = withDefaults(defineProps<{ dataset?: DatasetInput; presetStorageKey?: string; theme?: NicePoolTheme; showPresetEditing?: boolean; controlsCollapsed?: boolean }>(), {
   presetStorageKey: '',
   theme: 'dark',
   showPresetEditing: true,
+  controlsCollapsed: false,
 })
 const emit = defineEmits<{
   'selection-change': [selection: NicePoolSelection]
@@ -31,7 +32,10 @@ const error = ref<string | null>(null)
 const revision = ref(0)
 const activeTheme = ref<NicePoolTheme>(props.theme)
 const presetEditingVisible = ref(props.showPresetEditing)
-const controlsWidth = ref(290)
+const defaultControlsWidth = 290
+const maximumControlsWidth = 520
+const controlsWidth = ref(props.controlsCollapsed ? 0 : defaultControlsWidth)
+const expandedControlsWidth = ref(defaultControlsWidth)
 const plotHeight = ref(620)
 const summaryCopyStatus = ref('')
 const showSummaryPlotState = ref(true)
@@ -54,6 +58,25 @@ function getTheme(): NicePoolTheme {
   return activeTheme.value
 }
 
+function setControlsWidth(width: number): void {
+  const next = Math.min(maximumControlsWidth, Math.max(0, width))
+  controlsWidth.value = next
+  if (next > 0) expandedControlsWidth.value = next
+}
+
+function setControlsCollapsed(collapsed: boolean): void {
+  if (collapsed) {
+    if (controlsWidth.value > 0) expandedControlsWidth.value = controlsWidth.value
+    controlsWidth.value = 0
+  } else if (controlsWidth.value === 0) {
+    controlsWidth.value = expandedControlsWidth.value
+  }
+}
+
+function getControlsCollapsed(): boolean {
+  return controlsWidth.value === 0
+}
+
 function startResize(axis: 'horizontal' | 'vertical', event: PointerEvent): void {
   event.preventDefault()
   stopPointerResize?.()
@@ -62,7 +85,7 @@ function startResize(axis: 'horizontal' | 'vertical', event: PointerEvent): void
   const onMove = (moveEvent: PointerEvent): void => {
     const position = axis === 'vertical' ? moveEvent.clientX : moveEvent.clientY
     const next = startValue + position - startPosition
-    if (axis === 'vertical') controlsWidth.value = Math.min(520, Math.max(0, next))
+    if (axis === 'vertical') setControlsWidth(next)
     else plotHeight.value = Math.min(1400, Math.max(320, next))
   }
   const stop = (): void => {
@@ -83,7 +106,7 @@ function resizeWithKeyboard(axis: 'horizontal' | 'vertical', event: KeyboardEven
   const step = event.shiftKey ? 50 : 10
   if (axis === 'vertical' && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
     event.preventDefault()
-    controlsWidth.value = Math.min(520, Math.max(0, controlsWidth.value + (event.key === 'ArrowRight' ? step : -step)))
+    setControlsWidth(controlsWidth.value + (event.key === 'ArrowRight' ? step : -step))
   }
   if (axis === 'horizontal' && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
     event.preventDefault()
@@ -273,10 +296,11 @@ function displaySummaryValue(value: unknown): string {
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
-defineExpose({ setData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
+defineExpose({ setData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setControlsCollapsed, getControlsCollapsed, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
 watch(() => props.dataset, (dataset) => { if (dataset) setData(dataset) }, { immediate: true })
 watch(() => props.theme, (theme) => setTheme(theme))
 watch(() => props.showPresetEditing, (visible) => setShowPresetEditing(visible))
+watch(() => props.controlsCollapsed, (collapsed) => setControlsCollapsed(collapsed))
 onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onBeforeUnmount(() => {
   stopPointerResize?.()
