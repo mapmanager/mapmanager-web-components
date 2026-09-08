@@ -39,6 +39,7 @@ export class DatasetStore {
   readonly rows: readonly NicePoolRow[]
   readonly rowIdColumn: string
   readonly schema: readonly ColumnSchema[]
+  readonly #preFilterColumns: readonly string[]
   readonly rowIndexById: ReadonlyMap<RowId, number>
 
   constructor(input: DatasetInput) {
@@ -68,16 +69,23 @@ export class DatasetStore {
     for (const name of columnNames) {
       if (!declaredNames.has(name)) throw new DatasetValidationError(`Schema does not declare column ${JSON.stringify(name)}`)
     }
+    const preFilterColumns = input.preFilterColumns ?? AUTO_FILTER_COLUMNS.filter((name) => declaredNames.has(name))
+    for (const name of preFilterColumns) {
+      if (!declaredNames.has(name)) throw new DatasetValidationError(`Prefilter references unknown column ${JSON.stringify(name)}`)
+    }
+    if (new Set(preFilterColumns).size !== preFilterColumns.length) {
+      throw new DatasetValidationError('Prefilter columns must be unique')
+    }
     this.rows = Object.freeze(rows)
     this.rowIdColumn = input.rowIdColumn
     this.schema = Object.freeze(declared)
+    this.#preFilterColumns = Object.freeze([...preFilterColumns])
     this.rowIndexById = rowIndexById
   }
 
   /** Return columns explicitly or conventionally suitable for prefilters. */
-  preFilterColumns(explicit?: readonly string[]): readonly string[] {
-    const available = new Set(this.schema.map(({ name }) => name))
-    return (explicit ?? AUTO_FILTER_COLUMNS).filter((name) => available.has(name))
+  preFilterColumns(): readonly string[] {
+    return this.#preFilterColumns
   }
 
   /** Return finite numeric columns from the resolved schema. */

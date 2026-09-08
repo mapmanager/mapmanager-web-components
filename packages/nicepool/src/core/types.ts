@@ -18,6 +18,7 @@ export interface DatasetInput {
   rows: readonly NicePoolRow[]
   rowIdColumn: string
   schema?: readonly ColumnSchema[]
+  preFilterColumns?: readonly string[]
 }
 
 /** Stable external row identity. */

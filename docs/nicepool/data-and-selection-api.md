@@ -12,6 +12,12 @@ Rows are rectangular JSON-compatible records containing only `string`, finite
 and contain unique, non-empty string or finite-number values. IDs are normalized
 to strings. Invalid input rejects the complete replacement.
 
+Callers may provide a complete column `schema` and an ordered
+`preFilterColumns` list. When `preFilterColumns` is omitted, NicePool retains
+its conventional `accept`, `channel`, and `roi_id` filters when those columns
+exist. Supplying `[]` disables prefilters. A listed column appears in the
+Filters panel with **All** selected until a `PlotState.preFilters` value is set.
+
 ## Missing values
 
 `null` is the only missing-value representation. Every row must include every
