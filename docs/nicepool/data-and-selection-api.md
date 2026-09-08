@@ -18,6 +18,12 @@ its conventional `accept`, `channel`, and `roi_id` filters when those columns
 exist. Supplying `[]` disables prefilters. A listed column appears in the
 Filters panel with **All** selected until a `PlotState.preFilters` value is set.
 
+Column storage type and categorical presentation are independent. A numeric
+column declared with `categorical: true` remains available to numeric plots and
+also appears in Group and Color controls. Numeric categories are ordered by
+numeric value; other categories retain canonical string ordering. The row-ID
+column is never offered as an X, Y, Group, or Color choice.
+
 ## Missing values
 
 `null` is the only missing-value representation. Every row must include every

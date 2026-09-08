@@ -23,6 +23,7 @@ describe('versioned state contracts', () => {
     const dataset = new DatasetStore(edgeDataset)
     const state = defaultNicePoolState(dataset)
     expect(state).toMatchObject({ schemaVersion: 1, layout: '1x1', activePlotIndex: 0 })
+    expect(state.plots[0].groupColumn).toBeNull()
     expect(state.plots[0]).toMatchObject({
       showLegend: true,
       legendPosition: 'bottom',
@@ -36,6 +37,18 @@ describe('versioned state contracts', () => {
     expect(state.plots).toHaveLength(4)
     state.plots[0].pointSize = 12
     expect(state.plots[1].pointSize).toBe(7)
+  })
+
+  it('builds presets when a numeric prefilter is not a group column', () => {
+    const input = {
+      rowIdColumn: 'id',
+      rows: [{ id: 1, epoch: 0, x: 1, y: 2 }],
+      preFilterColumns: ['epoch'],
+    }
+    const state = createNicePoolState(input, { layout: '2x1', plots: [{ xColumn: 'x', yColumn: 'y' }, { xColumn: 'x', yColumn: 'y' }] })
+    expect(state.layout).toBe('2x1')
+    expect(state.plots[0].preFilters).toEqual({})
+    expect(state.plots[0].groupColumn).toBeNull()
   })
 
   it('rejects plot states that omit current required fields', () => {

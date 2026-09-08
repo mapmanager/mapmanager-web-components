@@ -11,6 +11,7 @@ export interface ColumnSchema {
   name: string
   type: ColumnType
   label?: string
+  categorical?: boolean
 }
 
 /** Complete replacement payload accepted by {@link NicePoolEngine.setData}. */

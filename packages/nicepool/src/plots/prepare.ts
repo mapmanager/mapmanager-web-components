@@ -109,9 +109,11 @@ function unitRandom(value: string, seed: number): number {
 /** Prepare deterministic categorical swarm coordinates and row identity. */
 export function prepareSwarm(dataset: DatasetStore, state: PlotState): PreparedSwarmData {
   const candidates = groupedCandidates(dataset, state)
-  const categories = [...new Set(candidates.map(({ groupValue }) => groupValue))].sort()
+  const categories = [...new Set(candidates.map(({ groupValue }) => groupValue))]
+    .sort((left, right) => dataset.compareCategories(state.groupColumn!, left, right))
   const categoryPositions = new Map(categories.map((category, index) => [category, index]))
-  const colors = [...new Set(candidates.map(({ colorValue }) => colorValue).filter((value) => value !== null))].sort()
+  const colors = [...new Set(candidates.map(({ colorValue }) => colorValue).filter((value) => value !== null))]
+    .sort((left, right) => dataset.compareCategories(state.colorColumn!, left, right))
   const colorPositions = new Map(colors.map((color, index) => [color, index]))
   const points: PreparedSwarmPoint[] = candidates.map(({ sourceIndex, rowId, groupValue, colorValue, y }) => {
     const categoryPosition = categoryPositions.get(groupValue)!
@@ -137,7 +139,8 @@ export function prepareSwarm(dataset: DatasetStore, state: PlotState): PreparedS
 export function prepareDistribution(dataset: DatasetStore, state: PlotState): PreparedDistributionData {
   if (state.plotType !== 'box' && state.plotType !== 'violin') throw new PlotConfigurationError('Distribution preparation requires box or violin state')
   const candidates = groupedCandidates(dataset, state)
-  const categories = [...new Set(candidates.map(({ groupValue }) => groupValue))].sort()
+  const categories = [...new Set(candidates.map(({ groupValue }) => groupValue))]
+    .sort((left, right) => dataset.compareCategories(state.groupColumn!, left, right))
   const points: PreparedPoint[] = candidates.map(({ sourceIndex, rowId, groupValue, colorValue, y }) => ({
     sourceIndex, rowId, x: groupValue, y, groupValue, colorValue,
   }))

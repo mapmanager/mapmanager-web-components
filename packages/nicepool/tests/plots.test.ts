@@ -76,6 +76,20 @@ describe('plot preparation and summaries', () => {
     expect(summarizePlot(first).representedRows).toHaveLength(4)
   })
 
+  it('orders numeric categorical groups numerically', () => {
+    const dataset = new DatasetStore({
+      rowIdColumn: 'id',
+      rows: [{ id: 'a', epochLevel: 10, y: 1 }, { id: 'b', epochLevel: 2, y: 2 }],
+      schema: [
+        { name: 'id', type: 'string' },
+        { name: 'epochLevel', type: 'number', categorical: true },
+        { name: 'y', type: 'number' },
+      ],
+    })
+    const state = { ...defaultPlotState(dataset), plotType: 'swarm' as const, groupColumn: 'epochLevel', yColumn: 'y' }
+    expect(prepareSwarm(dataset, state).categories).toEqual(['2', '10'])
+  })
+
   it('shares distribution preparation while adding box quartiles', () => {
     const dataset = new DatasetStore(edgeDataset)
     const state = {

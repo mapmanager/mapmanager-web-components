@@ -8,6 +8,7 @@ import {
 } from './types'
 
 const AUTO_FILTER_COLUMNS = ['accept', 'channel', 'roi_id'] as const
+const COLUMN_TYPES = new Set(['number', 'string', 'boolean', 'categorical'])
 
 function normalizedId(value: NicePoolValue | undefined, rowIndex: number, column: string): RowId {
   if (value === null || value === undefined || String(value).length === 0) {
@@ -66,6 +67,14 @@ export class DatasetStore {
     })
     const declared = input.schema ? [...input.schema] : [...columnNames].map((name) => inferColumn(name, rows))
     const declaredNames = new Set(declared.map(({ name }) => name))
+    if (declaredNames.size !== declared.length) throw new DatasetValidationError('Schema column names must be unique')
+    for (const column of declared) {
+      if (!columnNames.has(column.name)) throw new DatasetValidationError(`Schema declares unknown column ${JSON.stringify(column.name)}`)
+      if (!COLUMN_TYPES.has(column.type)) throw new DatasetValidationError(`Schema column ${JSON.stringify(column.name)} has an invalid type`)
+      if (column.categorical !== undefined && typeof column.categorical !== 'boolean') {
+        throw new DatasetValidationError(`Schema column ${JSON.stringify(column.name)} categorical flag must be boolean`)
+      }
+    }
     for (const name of columnNames) {
       if (!declaredNames.has(name)) throw new DatasetValidationError(`Schema does not declare column ${JSON.stringify(name)}`)
     }
@@ -90,13 +99,13 @@ export class DatasetStore {
 
   /** Return finite numeric columns from the resolved schema. */
   numericColumns(): readonly string[] {
-    return this.schema.filter(({ type }) => type === 'number').map(({ name }) => name)
+    return this.schema.filter(({ name, type }) => name !== this.rowIdColumn && type === 'number').map(({ name }) => name)
   }
 
   /** Return nonnumeric columns suitable for group and color controls. */
   categoricalColumns(): readonly string[] {
     return this.schema
-      .filter(({ name, type }) => name !== this.rowIdColumn && type !== 'number')
+      .filter(({ name, type, categorical }) => name !== this.rowIdColumn && (type !== 'number' || categorical === true))
       .map(({ name }) => name)
   }
 
@@ -107,7 +116,14 @@ export class DatasetStore {
       const value = row[column]
       if (value !== null && value !== undefined) values.set(categoryKey(value), value)
     }
-    return [...values.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, value]) => value)
+    return [...values.entries()].sort(([a], [b]) => this.compareCategories(column, a, b)).map(([, value]) => value)
+  }
+
+  /** Compare canonical category keys using the column's declared storage type. */
+  compareCategories(column: string, left: string, right: string): number {
+    const schema = this.schema.find(({ name }) => name === column)
+    if (schema?.type === 'number') return Number(left) - Number(right)
+    return left.localeCompare(right)
   }
 }
 

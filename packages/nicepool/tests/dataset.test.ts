@@ -23,9 +23,30 @@ describe('DatasetStore', () => {
     expect(dataset.preFilterColumns()).toEqual(['condition', 'accept'])
   })
 
+  it('supports numeric columns with categorical presentation capability', () => {
+    const dataset = new DatasetStore({
+      rowIdColumn: 'id',
+      rows: [{ id: 1, epochLevel: 10 }, { id: 2, epochLevel: 2 }],
+      schema: [
+        { name: 'id', type: 'number' },
+        { name: 'epochLevel', type: 'number', categorical: true },
+      ],
+    })
+    expect(dataset.numericColumns()).toEqual(['epochLevel'])
+    expect(dataset.categoricalColumns()).toEqual(['epochLevel'])
+    expect(dataset.uniqueValues('epochLevel')).toEqual([2, 10])
+  })
+
   it('rejects unknown or duplicate prefilter columns', () => {
     expect(() => new DatasetStore({ ...edgeDataset, preFilterColumns: ['missing'] })).toThrow(DatasetValidationError)
     expect(() => new DatasetStore({ ...edgeDataset, preFilterColumns: ['accept', 'accept'] })).toThrow(DatasetValidationError)
+  })
+
+  it('strictly validates caller-supplied column schemas', () => {
+    const input = { rowIdColumn: 'id', rows: [{ id: 'a', value: 1 }] }
+    expect(() => new DatasetStore({ ...input, schema: [{ name: 'id', type: 'string' }, { name: 'id', type: 'string' }, { name: 'value', type: 'number' }] })).toThrow(DatasetValidationError)
+    expect(() => new DatasetStore({ ...input, schema: [{ name: 'id', type: 'string' }, { name: 'value', type: 'number' }, { name: 'extra', type: 'string' }] })).toThrow(DatasetValidationError)
+    expect(() => new DatasetStore({ ...input, schema: [{ name: 'id', type: 'string' }, { name: 'value', type: 'number', categorical: 'yes' }] as never })).toThrow(DatasetValidationError)
   })
 
   it('retains null but rejects implicit or non-JSON missing values', () => {

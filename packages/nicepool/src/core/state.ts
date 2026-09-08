@@ -35,13 +35,12 @@ export function defaultPlotState(dataset: DatasetStore): PlotState {
   const numeric = dataset.numericColumns()
   const xColumn = numeric[0] ?? ''
   const yColumn = numeric[1] ?? numeric[0] ?? ''
-  const groupColumn = dataset.preFilterColumns()[0] ?? null
   return {
     plotType: 'scatter',
     preFilters: {},
     xColumn,
     yColumn,
-    groupColumn,
+    groupColumn: null,
     colorColumn: null,
     useAbsoluteValue: false,
     removeValuesThreshold: null,
