@@ -38,6 +38,11 @@ test('keeps preset selection visible while preset editing is toggled', async ({ 
   await page.goto('/element-demo.html')
   const pool = page.locator('nice-pool')
   await expect(pool.getByLabel('Preset')).toBeVisible()
+  const presetBox = await pool.getByLabel('Preset').boundingBox()
+  const layoutBox = await pool.getByLabel('Layout').boundingBox()
+  expect(presetBox).not.toBeNull()
+  expect(layoutBox).not.toBeNull()
+  expect(presetBox!.y).toBeLessThan(layoutBox!.y)
   await expect(pool.getByRole('group', { name: 'Saved workspace' })).toBeVisible()
 
   await pool.evaluate((element) => {

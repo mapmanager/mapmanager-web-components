@@ -311,6 +311,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="nicepool-shell" :class="`nicepool-theme-${activeTheme}`" :style="{ '--nicepool-controls-width': `${controlsWidth}px`, '--nicepool-plot-height': `${plotHeight}px` }">
     <aside v-if="state && plotState" class="nicepool-controls" :class="{ 'nicepool-controls-collapsed': controlsWidth === 0 }">
+      <label>Preset<select :value="selectedPresetName" @change="applyPreset(($event.target as HTMLSelectElement).value)"><option value="">None</option><option v-for="preset in presets" :key="preset.name" :value="preset.name">{{ preset.name }}</option></select></label>
       <div class="nicepool-control-row">
         <label>Layout<select :value="state.layout" @change="setLayout(($event.target as HTMLSelectElement).value as PlotLayout)">
           <option value="1x1">1×1</option><option value="1x2">1×2</option><option value="2x1">2×1</option><option value="2x2">2×2</option>
@@ -363,7 +364,6 @@ onBeforeUnmount(() => {
           <label><span>Vertical grid</span><input type="checkbox" :checked="plotState.showVerticalGrid" @change="updatePlotState({ showVerticalGrid: ($event.target as HTMLInputElement).checked })" /></label>
         </div>
       </details>
-      <label>Preset<select :value="selectedPresetName" @change="applyPreset(($event.target as HTMLSelectElement).value)"><option value="">None</option><option v-for="preset in presets" :key="preset.name" :value="preset.name">{{ preset.name }}</option></select></label>
       <fieldset v-if="presetEditingVisible"><legend>Saved workspace</legend>
         <label>Name<input v-model="presetName" type="text" placeholder="Preset name" /></label>
         <div class="nicepool-control-row"><button type="button" @click="savePreset">Save</button><button type="button" :disabled="!selectedPresetName" @click="deletePreset">Delete</button></div>
