@@ -30,14 +30,14 @@ Light/dark theme, splitter positions, and the open/closed Display options panel
 are workspace presentation settings rather than analytical plot state. They do
 not enter presets or summaries. The default theme is dark.
 
-## Plot presets
+## Workspace presets
 
-A `PlotPreset` has a version, name, and one complete `PlotState`. Applying it
-replaces only the active plot. The standalone demo may persist presets in
-browser local storage, but persistence is optional presentation behavior; the
-engine only validates and applies values supplied by its caller.
+A `NicePoolPreset` has a version, name, and one complete `NicePoolState`.
+Applying it replaces the complete workspace. The standalone demo may persist
+presets in browser local storage, but persistence is optional presentation
+behavior; the engine only validates and applies values supplied by its caller.
 
 Preset validation is dataset-aware. A preset referring to an absent or
 incompatible column fails as a whole rather than partially changing the plot.
-Complete workspace save/load is intentionally deferred until a concrete client
-workflow requires it.
+The Preset selector is always visible. Hosts without a persistence destination
+can hide the Name, Save, and Delete controls with `showPresetEditing`.

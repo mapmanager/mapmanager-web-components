@@ -2,7 +2,7 @@
 
 `@mapmanager/nicepool` is a browser-native statistical exploration component.
 It owns dataset validation, filtering, linked selection, plot preparation,
-summaries, four persistent plot slots, and saved single-plot presets.
+summaries, four persistent plot slots, and saved workspace presets.
 
 It provides a Vue component and a framework-neutral `<nice-pool>` Custom
 Element. [CloudScope Web](https://mapmanager.github.io/cloudscope-web/) is the

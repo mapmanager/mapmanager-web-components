@@ -1,6 +1,6 @@
 import { createApp, h, ref, type App, type ComponentPublicInstance } from 'vue'
 
-import type { DatasetInput, NicePoolSelection, NicePoolState, NicePoolTheme, PlotPreset, RowId } from '../core/types'
+import type { DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, NicePoolTheme, RowId } from '../core/types'
 import type { PlotSummary } from '../plots/types'
 import NicePoolWidget from '../vue/NicePoolWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
@@ -9,8 +9,11 @@ interface WidgetApi {
   setData(input: DatasetInput): void
   setState(state: NicePoolState): void
   getState(): NicePoolState
-  setPlotPresets(presets: readonly PlotPreset[]): void
-  getPlotPresets(): PlotPreset[]
+  setNicePoolPresets(presets: readonly NicePoolPreset[]): void
+  getNicePoolPresets(): NicePoolPreset[]
+  applyNicePoolPreset(name: string): void
+  setShowPresetEditing(visible: boolean): void
+  getShowPresetEditing(): boolean
   setSelection(selection: NicePoolSelection): void
   setPrimarySelection(rowId: RowId | null): void
   clearSelection(): void
@@ -26,6 +29,8 @@ export class NicePoolElement extends HTMLElement {
   #widget = ref<(ComponentPublicInstance & WidgetApi) | null>(null)
   #pendingDataset: DatasetInput | null = null
   #pendingState: NicePoolState | null = null
+  #pendingPresets: readonly NicePoolPreset[] | null = null
+  #showPresetEditing = true
 
   connectedCallback(): void {
     if (this.#app) return
@@ -37,6 +42,7 @@ export class NicePoolElement extends HTMLElement {
     this.#app = createApp({
       render: () => h(NicePoolWidget, {
         ref: this.#widget,
+        showPresetEditing: this.#showPresetEditing,
         onSelectionChange: (selection: NicePoolSelection) => {
           this.dispatchEvent(new CustomEvent('nicepool-selection-change', {
             detail: selection,
@@ -54,7 +60,7 @@ export class NicePoolElement extends HTMLElement {
             composed: true,
           }))
         },
-        onPresetsChange: (presets: PlotPreset[]) => {
+        onPresetsChange: (presets: NicePoolPreset[]) => {
           this.dispatchEvent(new CustomEvent('nicepool-presets-change', {
             detail: presets,
             bubbles: true,
@@ -80,6 +86,11 @@ export class NicePoolElement extends HTMLElement {
           const state = this.#pendingState
           this.#pendingState = null
           this.#widget.value?.setState(state)
+        }
+        if (this.#pendingPresets) {
+          const presets = this.#pendingPresets
+          this.#pendingPresets = null
+          this.#widget.value?.setNicePoolPresets(presets)
         }
       })
     }
@@ -116,8 +127,17 @@ export class NicePoolElement extends HTMLElement {
     if (!this.#widget.value) throw new Error('NicePool element is not connected')
     return this.#widget.value.getState()
   }
-  setPlotPresets(presets: readonly PlotPreset[]): void { this.#widget.value?.setPlotPresets(presets) }
-  getPlotPresets(): PlotPreset[] { return this.#widget.value?.getPlotPresets() ?? [] }
+  setNicePoolPresets(presets: readonly NicePoolPreset[]): void {
+    if (!this.#widget.value) { this.#pendingPresets = presets; return }
+    this.#widget.value.setNicePoolPresets(presets)
+  }
+  getNicePoolPresets(): NicePoolPreset[] { return this.#widget.value?.getNicePoolPresets() ?? [] }
+  applyNicePoolPreset(name: string): void { this.#widget.value?.applyNicePoolPreset(name) }
+  setShowPresetEditing(visible: boolean): void {
+    this.#showPresetEditing = visible
+    this.#widget.value?.setShowPresetEditing(visible)
+  }
+  getShowPresetEditing(): boolean { return this.#widget.value?.getShowPresetEditing() ?? this.#showPresetEditing }
   setTheme(theme: NicePoolTheme): void { this.#widget.value?.setTheme(theme) }
   getTheme(): NicePoolTheme { return this.#widget.value?.getTheme() ?? 'dark' }
 

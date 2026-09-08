@@ -5,7 +5,7 @@ NicePool widget.
 The first usable slice supports authoritative dataset replacement, stable row
 identity, filtering, scatter, swarm, box, violin, histogram, and cumulative
 histogram preparation, plot-specific summaries,
-linked selection, four persistent plot slots, saved single-plot presets, a Vue
+linked selection, four persistent plot slots, saved workspace presets, a Vue
 component, and a framework-neutral Custom Element.
 
 Scatter supports numeric or categorical X columns, numeric Y columns, and an

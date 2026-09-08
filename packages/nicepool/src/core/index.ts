@@ -4,9 +4,11 @@ export { SelectionModel } from './selection'
 export { descriptiveStatistics, quartileStatistics } from './statistics'
 export { defaultPlotState } from './state'
 export {
+  createNicePoolState,
   defaultNicePoolState,
   validateNicePoolState,
-  validatePlotPreset,
+  validateNicePoolPreset,
+  validateNicePoolPresets,
   validatePlotState,
   visiblePlotCount,
 } from './state'

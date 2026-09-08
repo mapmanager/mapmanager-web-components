@@ -4,7 +4,7 @@ import {
   type NicePoolSelection,
   type NicePoolState,
   type NicePoolTheme,
-  type PlotPreset,
+  type NicePoolPreset,
 } from '@mapmanager/nicepool'
 
 interface AnyWidgetModel {
@@ -19,7 +19,7 @@ interface NicePoolDomElement extends HTMLElement {
   setData(input: DatasetInput): void
   setState(state: NicePoolState): void
   setSelection(selection: NicePoolSelection): void
-  setPlotPresets(presets: readonly PlotPreset[]): void
+  setNicePoolPresets(presets: readonly NicePoolPreset[]): void
   setTheme(theme: NicePoolTheme): void
 }
 
@@ -52,7 +52,7 @@ function render({ model, el }: RenderContext): () => void {
     if (state?.schemaVersion === 1) pool.setState(state as NicePoolState)
   }
   const updateSelection = (): void => pool.setSelection(model.get('selection') as NicePoolSelection)
-  const updatePresets = (): void => pool.setPlotPresets(model.get('plot_presets') as PlotPreset[])
+  const updatePresets = (): void => pool.setNicePoolPresets(model.get('nicepool_presets') as NicePoolPreset[])
   const updateTheme = (): void => pool.setTheme(model.get('theme') as NicePoolTheme)
   const updateHeight = (): void => {
     pool.style.height = `${String(model.get('height'))}px`
@@ -62,7 +62,7 @@ function render({ model, el }: RenderContext): () => void {
     ['change:data', updateData],
     ['change:state', updateState],
     ['change:selection', updateSelection],
-    ['change:plot_presets', updatePresets],
+    ['change:nicepool_presets', updatePresets],
     ['change:theme', updateTheme],
     ['change:height', updateHeight],
   ]
@@ -77,7 +77,7 @@ function render({ model, el }: RenderContext): () => void {
     updateModel(model, 'state', (event as CustomEvent<NicePoolState>).detail)
   }, eventOptions)
   pool.addEventListener('nicepool-presets-change', (event) => {
-    updateModel(model, 'plot_presets', (event as CustomEvent<PlotPreset[]>).detail)
+    updateModel(model, 'nicepool_presets', (event as CustomEvent<NicePoolPreset[]>).detail)
   }, eventOptions)
   pool.addEventListener('nicepool-theme-change', (event) => {
     updateModel(model, 'theme', (event as CustomEvent<NicePoolTheme>).detail)

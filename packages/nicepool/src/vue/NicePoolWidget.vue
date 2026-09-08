@@ -1,34 +1,36 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NicePoolEngine } from '../core/engine'
-import { validatePlotPreset, visiblePlotCount } from '../core/state'
-import type { DatasetInput, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotPreset, PlotState, RowId } from '../core/types'
+import { validateNicePoolPreset, validateNicePoolPresets, visiblePlotCount } from '../core/state'
+import type { DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
 import type { PreparedPlot, PlotSummary } from '../plots/types'
 import { describeEmptyPlot } from '../plots/diagnostics'
 import { formatPlotSummaryToTsv } from '../plots/summary-format'
 import PlotlyView from './PlotlyView.vue'
 import './widget.css'
 
-const props = withDefaults(defineProps<{ dataset?: DatasetInput; presetStorageKey?: string; theme?: NicePoolTheme }>(), {
+const props = withDefaults(defineProps<{ dataset?: DatasetInput; presetStorageKey?: string; theme?: NicePoolTheme; showPresetEditing?: boolean }>(), {
   presetStorageKey: '',
   theme: 'dark',
+  showPresetEditing: true,
 })
 const emit = defineEmits<{
   'selection-change': [selection: NicePoolSelection]
   'state-change': [state: NicePoolState]
-  'presets-change': [presets: readonly PlotPreset[]]
+  'presets-change': [presets: readonly NicePoolPreset[]]
   'theme-change': [theme: NicePoolTheme]
   'data-reset': []
 }>()
 const engine = new NicePoolEngine()
 const preparedPlots = shallowRef<readonly PreparedPlot[]>([])
 const selection = ref<NicePoolSelection>({ primaryRowId: null, selectedRowIds: [] })
-const presets = ref<PlotPreset[]>([])
+const presets = ref<NicePoolPreset[]>([])
 const selectedPresetName = ref('')
 const presetName = ref('')
 const error = ref<string | null>(null)
 const revision = ref(0)
 const activeTheme = ref<NicePoolTheme>(props.theme)
+const presetEditingVisible = ref(props.showPresetEditing)
 const controlsWidth = ref(290)
 const plotHeight = ref(620)
 const summaryCopyStatus = ref('')
@@ -127,13 +129,13 @@ function refresh(): void {
   } catch (reason) { error.value = reason instanceof Error ? reason.message : String(reason) }
 }
 
-function persistedPresets(): PlotPreset[] {
+function persistedPresets(): NicePoolPreset[] {
   if (!props.presetStorageKey) return []
   try {
     const value: unknown = JSON.parse(localStorage.getItem(props.presetStorageKey) ?? '[]')
     if (!Array.isArray(value)) return []
     return value.flatMap((item) => {
-      try { return [validatePlotPreset(engine.dataset, item as PlotPreset)] }
+      try { return [validateNicePoolPreset(engine.dataset, item as NicePoolPreset)] }
       catch { return [] }
     })
   } catch { return [] }
@@ -141,7 +143,7 @@ function persistedPresets(): PlotPreset[] {
 
 function persistPresets(): void {
   if (props.presetStorageKey) localStorage.setItem(props.presetStorageKey, JSON.stringify(presets.value))
-  emit('presets-change', getPlotPresets())
+  emit('presets-change', getNicePoolPresets())
 }
 
 /** Fully replace the dataset and reset every dataset-dependent view state. */
@@ -200,7 +202,7 @@ function savePreset(): void {
   if (!plotState.value) return
   const name = presetName.value.trim()
   if (!name) { error.value = 'Enter a preset name before saving.'; return }
-  const preset = validatePlotPreset(engine.dataset, { schemaVersion: 1, name, plotState: structuredClone(plotState.value) })
+  const preset = validateNicePoolPreset(engine.dataset, { schemaVersion: 1, name, state: getState() })
   const index = presets.value.findIndex((item) => item.name === name)
   if (index >= 0) presets.value.splice(index, 1, preset)
   else presets.value.push(preset)
@@ -215,7 +217,7 @@ function applyPreset(name: string): void {
   if (!name) return
   const preset = presets.value.find((item) => item.name === name)
   if (!preset) return
-  try { engine.applyPlotPreset(jsonClone(preset)); refresh(); emit('state-change', getState()) }
+  try { engine.applyNicePoolPreset(jsonClone(preset)); refresh(); emit('state-change', getState()) }
   catch (reason) { error.value = reason instanceof Error ? reason.message : String(reason) }
 }
 
@@ -228,8 +230,11 @@ function deletePreset(): void {
 
 function setState(next: NicePoolState): void { engine.setState(next); refresh() }
 function getState(): NicePoolState { return structuredClone(engine.state) }
-function setPlotPresets(next: readonly PlotPreset[]): void { presets.value = next.map((preset) => validatePlotPreset(engine.dataset, preset)); persistPresets() }
-function getPlotPresets(): PlotPreset[] { return jsonClone(presets.value) }
+function setNicePoolPresets(next: readonly NicePoolPreset[]): void { presets.value = validateNicePoolPresets(engine.dataset, next); persistPresets() }
+function getNicePoolPresets(): NicePoolPreset[] { return jsonClone(presets.value) }
+function applyNicePoolPreset(name: string): void { applyPreset(name) }
+function setShowPresetEditing(visible: boolean): void { presetEditingVisible.value = visible }
+function getShowPresetEditing(): boolean { return presetEditingVisible.value }
 function setSelection(next: NicePoolSelection): void { engine.setSelection(next); refresh() }
 function setPrimarySelection(rowId: RowId | null): void { engine.setPrimarySelection(rowId); refresh() }
 function clearSelection(userInitiated = false): void {
@@ -268,9 +273,10 @@ function displaySummaryValue(value: unknown): string {
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
-defineExpose({ setData, setState, getState, setPlotPresets, getPlotPresets, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
+defineExpose({ setData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
 watch(() => props.dataset, (dataset) => { if (dataset) setData(dataset) }, { immediate: true })
 watch(() => props.theme, (theme) => setTheme(theme))
+watch(() => props.showPresetEditing, (visible) => setShowPresetEditing(visible))
 onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onBeforeUnmount(() => {
   stopPointerResize?.()
@@ -333,8 +339,8 @@ onBeforeUnmount(() => {
           <label><span>Vertical grid</span><input type="checkbox" :checked="plotState.showVerticalGrid" @change="updatePlotState({ showVerticalGrid: ($event.target as HTMLInputElement).checked })" /></label>
         </div>
       </details>
-      <fieldset><legend>Saved plot</legend>
-        <label>Preset<select :value="selectedPresetName" @change="applyPreset(($event.target as HTMLSelectElement).value)"><option value="">None</option><option v-for="preset in presets" :key="preset.name" :value="preset.name">{{ preset.name }}</option></select></label>
+      <label>Preset<select :value="selectedPresetName" @change="applyPreset(($event.target as HTMLSelectElement).value)"><option value="">None</option><option v-for="preset in presets" :key="preset.name" :value="preset.name">{{ preset.name }}</option></select></label>
+      <fieldset v-if="presetEditingVisible"><legend>Saved workspace</legend>
         <label>Name<input v-model="presetName" type="text" placeholder="Preset name" /></label>
         <div class="nicepool-control-row"><button type="button" @click="savePreset">Save</button><button type="button" :disabled="!selectedPresetName" @click="deletePreset">Delete</button></div>
       </fieldset>

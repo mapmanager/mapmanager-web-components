@@ -33,7 +33,7 @@ class NicePoolAnyWidget(anywidget.AnyWidget):
     data = traitlets.Dict().tag(sync=True)
     state = traitlets.Dict().tag(sync=True)
     selection = traitlets.Dict().tag(sync=True)
-    plot_presets = traitlets.List().tag(sync=True)
+    nicepool_presets = traitlets.List().tag(sync=True)
     theme = traitlets.Enum(["dark", "light"], default_value="dark").tag(sync=True)
     height = traitlets.Int(default_value=720, min=240).tag(sync=True)
 
@@ -45,8 +45,8 @@ class NicePoolAnyWidget(anywidget.AnyWidget):
     def _default_selection(self) -> dict[str, Any]:
         return {"primaryRowId": None, "selectedRowIds": []}
 
-    @traitlets.default("plot_presets")
-    def _default_plot_presets(self) -> list[dict[str, Any]]:
+    @traitlets.default("nicepool_presets")
+    def _default_nicepool_presets(self) -> list[dict[str, Any]]:
         return []
 
     def __init__(

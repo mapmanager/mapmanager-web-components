@@ -1,9 +1,11 @@
-import type { DatasetStore } from './dataset'
+import { DatasetStore } from './dataset'
 import {
   StateValidationError,
+  type DatasetInput,
+  type NicePoolPreset,
   type NicePoolState,
+  type NicePoolStateOverrides,
   type PlotLayout,
-  type PlotPreset,
   type PlotState,
 } from './types'
 
@@ -72,6 +74,28 @@ export function defaultNicePoolState(dataset: DatasetStore): NicePoolState {
     PlotState,
   ]
   return { schemaVersion: 1, layout: '1x1', activePlotIndex: 0, plots }
+}
+
+/** Build a complete valid workspace from dataset-aware defaults and narrow overrides. */
+export function createNicePoolState(input: DatasetInput, overrides: NicePoolStateOverrides = {}): NicePoolState {
+  const dataset = new DatasetStore(input)
+  const defaults = defaultNicePoolState(dataset)
+  const unknownKeys = Object.keys(overrides).filter((key) => !['layout', 'activePlotIndex', 'plots'].includes(key))
+  if (unknownKeys.length) throw new StateValidationError(`Unknown NicePoolState override ${JSON.stringify(unknownKeys[0])}`)
+  if (overrides.plots && overrides.plots.length > 4) {
+    throw new StateValidationError('NicePoolState overrides may contain at most four plots')
+  }
+  const plots = defaults.plots.map((plot, index) => ({
+    ...plot,
+    ...(overrides.plots?.[index] ?? {}),
+    preFilters: { ...plot.preFilters, ...(overrides.plots?.[index]?.preFilters ?? {}) },
+  })) as unknown as NicePoolState['plots']
+  return validateNicePoolState(dataset, {
+    ...defaults,
+    layout: overrides.layout ?? defaults.layout,
+    activePlotIndex: overrides.activePlotIndex ?? defaults.activePlotIndex,
+    plots,
+  })
 }
 
 function requiredColumn(dataset: DatasetStore, column: string, label: string): void {
@@ -160,15 +184,26 @@ export function validateNicePoolState(dataset: DatasetStore, state: NicePoolStat
   }
 }
 
-/** Validate a named single-plot preset against the active dataset. */
-export function validatePlotPreset(dataset: DatasetStore, preset: PlotPreset): PlotPreset {
+/** Validate a named complete workspace against the active dataset. */
+export function validateNicePoolPreset(dataset: DatasetStore, preset: NicePoolPreset): NicePoolPreset {
   if (!preset || typeof preset !== 'object' || Array.isArray(preset)) {
-    throw new StateValidationError('PlotPreset must be an object')
+    throw new StateValidationError('NicePoolPreset must be an object')
   }
-  const unknownKeys = Object.keys(preset).filter((key) => !['schemaVersion', 'name', 'plotState'].includes(key))
-  if (unknownKeys.length) throw new StateValidationError(`Unknown PlotPreset field ${JSON.stringify(unknownKeys[0])}`)
+  const unknownKeys = Object.keys(preset).filter((key) => !['schemaVersion', 'name', 'state'].includes(key))
+  if (unknownKeys.length) throw new StateValidationError(`Unknown NicePoolPreset field ${JSON.stringify(unknownKeys[0])}`)
   const name = preset.name.trim()
-  if (preset.schemaVersion !== 1) throw new StateValidationError('PlotPreset schemaVersion must be 1')
-  if (!name) throw new StateValidationError('PlotPreset name must not be empty')
-  return { schemaVersion: 1, name, plotState: validatePlotState(dataset, preset.plotState) }
+  if (preset.schemaVersion !== 1) throw new StateValidationError('NicePoolPreset schemaVersion must be 1')
+  if (!name) throw new StateValidationError('NicePoolPreset name must not be empty')
+  return { schemaVersion: 1, name, state: validateNicePoolState(dataset, preset.state) }
+}
+
+/** Validate an ordered preset collection atomically and require unique names. */
+export function validateNicePoolPresets(dataset: DatasetStore, presets: readonly NicePoolPreset[]): NicePoolPreset[] {
+  const validated = presets.map((preset) => validateNicePoolPreset(dataset, preset))
+  const names = new Set<string>()
+  for (const preset of validated) {
+    if (names.has(preset.name)) throw new StateValidationError(`Duplicate NicePoolPreset name ${JSON.stringify(preset.name)}`)
+    names.add(preset.name)
+  }
+  return validated
 }

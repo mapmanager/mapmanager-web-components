@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import nicePoolStateSchema from '../schemas/nicepool-state.schema.json'
-import plotPresetSchema from '../schemas/plot-preset.schema.json'
+import nicePoolPresetSchema from '../schemas/nicepool-preset.schema.json'
 import plotStateSchema from '../schemas/plot-state.schema.json'
 
 import {
   DatasetStore,
   NicePoolEngine,
   StateValidationError,
+  createNicePoolState,
   defaultNicePoolState,
+  validateNicePoolPreset,
+  validateNicePoolPresets,
   validateNicePoolState,
-  validatePlotPreset,
   visiblePlotCount,
 } from '../src/core'
 import { sampleDataset } from '../src/app/sampleData'
@@ -68,25 +70,36 @@ describe('versioned state contracts', () => {
     expect(engine.state).toEqual(before)
   })
 
-  it('applies a preset only to the requested plot', () => {
+  it('builds and applies a complete workspace preset', () => {
     const engine = new NicePoolEngine()
     engine.setData(edgeDataset)
-    engine.setLayout('1x2')
-    const preset = validatePlotPreset(engine.dataset, {
-      schemaVersion: 1,
-      name: 'large points',
-      plotState: { ...engine.plotState, pointSize: 14 },
+    const state = createNicePoolState(edgeDataset, {
+      layout: '1x2',
+      plots: [{ pointSize: 14 }, { pointSize: 11 }],
     })
-    engine.applyPlotPreset(preset, 1)
-    expect(engine.state.plots[0].pointSize).toBe(7)
-    expect(engine.state.plots[1].pointSize).toBe(14)
+    const preset = validateNicePoolPreset(engine.dataset, {
+      schemaVersion: 1,
+      name: 'large workspaces',
+      state,
+    })
+    engine.applyNicePoolPreset(preset)
+    expect(engine.state.layout).toBe('1x2')
+    expect(engine.state.plots[0].pointSize).toBe(14)
+    expect(engine.state.plots[1].pointSize).toBe(11)
   })
 
   it('ships readable version-one JSON schemas', () => {
-    for (const schema of [plotStateSchema, plotPresetSchema, nicePoolStateSchema]) {
+    for (const schema of [plotStateSchema, nicePoolPresetSchema, nicePoolStateSchema]) {
       expect(schema.$schema).toBe('https://json-schema.org/draft/2020-12/schema')
       expect(schema.additionalProperties).toBe(false)
     }
+  })
+
+  it('rejects duplicate preset names atomically', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const state = defaultNicePoolState(dataset)
+    const preset = { schemaVersion: 1 as const, name: 'duplicate', state }
+    expect(() => validateNicePoolPresets(dataset, [preset, preset])).toThrow(StateValidationError)
   })
 
   it('generates negative values, outliers, and explicit missing values', () => {

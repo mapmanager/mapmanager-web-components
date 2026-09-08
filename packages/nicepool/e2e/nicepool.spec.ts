@@ -33,3 +33,17 @@ test('changing X and Y updates the rendered Plotly specification', async ({ page
   expect(after.x).not.toEqual(before.x)
   expect(after.y).not.toEqual(before.y)
 })
+
+test('keeps preset selection visible while preset editing is toggled', async ({ page }) => {
+  await page.goto('/element-demo.html')
+  const pool = page.locator('nice-pool')
+  await expect(pool.getByLabel('Preset')).toBeVisible()
+  await expect(pool.getByRole('group', { name: 'Saved workspace' })).toBeVisible()
+
+  await pool.evaluate((element) => {
+    (element as HTMLElement & { setShowPresetEditing(visible: boolean): void }).setShowPresetEditing(false)
+  })
+
+  await expect(pool.getByLabel('Preset')).toBeVisible()
+  await expect(pool.getByRole('group', { name: 'Saved workspace' })).toHaveCount(0)
+})

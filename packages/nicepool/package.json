@@ -13,6 +13,7 @@
   "files": [
     "dist-lib",
     "dist-element",
+    "schemas",
     "README.md"
   ],
   "types": "./dist-lib/types/public-api.d.ts",
@@ -23,7 +24,8 @@
       "import": "./dist-lib/nicepool-web.js"
     },
     "./register": "./dist-element/nicepool-element.js",
-    "./style.css": "./dist-lib/nicepool-web.css"
+    "./style.css": "./dist-lib/nicepool-web.css",
+    "./schemas/*.json": "./schemas/*.json"
   },
   "scripts": {
     "dev": "vite",

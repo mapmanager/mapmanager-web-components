@@ -72,11 +72,18 @@ export interface NicePoolState {
   plots: readonly [PlotState, PlotState, PlotState, PlotState]
 }
 
-/** Named single-plot state applied only to the active plot. */
-export interface PlotPreset {
+/** Named complete plotting workspace. */
+export interface NicePoolPreset {
   schemaVersion: 1
   name: string
-  plotState: PlotState
+  state: NicePoolState
+}
+
+/** Dataset-aware overrides accepted by {@link createNicePoolState}. */
+export interface NicePoolStateOverrides {
+  layout?: PlotLayout
+  activePlotIndex?: number
+  plots?: readonly Partial<PlotState>[]
 }
 
 /** Error raised when a complete dataset cannot satisfy the public contract. */

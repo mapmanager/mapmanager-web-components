@@ -2,12 +2,12 @@ import { DatasetStore } from './dataset'
 import { SelectionModel } from './selection'
 import {
   defaultNicePoolState,
+  validateNicePoolPreset,
   validateNicePoolState,
-  validatePlotPreset,
   validatePlotState,
   visiblePlotCount,
 } from './state'
-import type { DatasetInput, NicePoolSelection, NicePoolState, PlotLayout, PlotPreset, PlotState, RowId } from './types'
+import type { DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, PlotLayout, PlotState, RowId } from './types'
 import { preparePlotData } from '../plots/prepare'
 import { summarizePlot } from '../plots/summary'
 import type { PreparedPlot } from '../plots/types'
@@ -102,7 +102,7 @@ export class NicePoolEngine {
     return Array.from({ length: visiblePlotCount(this.state.layout) }, (_, index) => this.preparePlot(index))
   }
 
-  applyPlotPreset(preset: PlotPreset, plotIndex = this.state.activePlotIndex): void {
-    this.setPlotState(validatePlotPreset(this.dataset, preset).plotState, plotIndex)
+  applyNicePoolPreset(preset: NicePoolPreset): void {
+    this.setState(validateNicePoolPreset(this.dataset, preset).state)
   }
 }

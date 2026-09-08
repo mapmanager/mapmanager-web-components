@@ -18,7 +18,7 @@ const theme = ref<NicePoolTheme>('dark')
       </div>
       <p>{{ dataset.rows.length }} rows · primary {{ lastSelection.primaryRowId ?? 'none' }}</p>
     </header>
-    <NicePoolWidget :dataset="dataset" :theme="theme" preset-storage-key="nicepool-web-demo-presets-v3" @selection-change="lastSelection = $event" @theme-change="theme = $event" />
+    <NicePoolWidget :dataset="dataset" :theme="theme" preset-storage-key="nicepool-web-demo-presets-v4" @selection-change="lastSelection = $event" @theme-change="theme = $event" />
   </div>
 </template>
 

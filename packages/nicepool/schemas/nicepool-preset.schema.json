@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://nicewidgets.dev/nicepool/schemas/v1/plot-preset.schema.json",
-  "title": "NicePool PlotPreset v1",
+  "$id": "https://nicewidgets.dev/nicepool/schemas/v1/nicepool-preset.schema.json",
+  "title": "NicePoolPreset v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "name", "plotState"],
+  "required": ["schemaVersion", "name", "state"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "name": { "type": "string", "minLength": 1 },
-    "plotState": { "$ref": "plot-state.schema.json" }
+    "state": { "$ref": "nicepool-state.schema.json" }
   }
 }

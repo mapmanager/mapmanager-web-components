@@ -49,10 +49,12 @@ are ignored; only genuine Plotly user events update the authoritative model.
 
 The Custom Element also emits `nicepool-state-change`,
 `nicepool-presets-change`, `nicepool-theme-change`, and `nicepool-data-reset`.
-Host-facing methods include
-`setState`, `getState`, `setPlotPresets`, and `getPlotPresets` in addition to the
-data and selection methods. `setTheme('dark' | 'light')` and `getTheme()` expose
-the presentation theme without changing serialized workspace state.
+Host-facing methods include `setState`, `getState`, `setNicePoolPresets`,
+`getNicePoolPresets`, and `applyNicePoolPreset` in addition to the data and
+selection methods. `setShowPresetEditing` toggles the optional Name, Save, and
+Delete controls without hiding preset selection. `setTheme('dark' | 'light')`
+and `getTheme()` expose the presentation theme without changing serialized
+workspace state.
 
 ## NiceGUI boundary
 
