@@ -12,12 +12,17 @@ export interface ColumnSchemaGroup {
 
 /** Group selectable columns without discarding caller-owned schema order. */
 export function groupColumnSchemas(columns: readonly ColumnSchema[]): readonly ColumnSchemaGroup[] {
-  const groups = new Map<string, IndexedColumnSchema[]>()
-  columns.forEach((column, offset) => {
+  const groupedColumns = new Map<string, ColumnSchema[]>()
+  columns.forEach((column) => {
     const category = column.category ?? 'Uncategorized'
-    const entries = groups.get(category) ?? []
-    entries.push({ index: offset + 1, column })
-    groups.set(category, entries)
+    const entries = groupedColumns.get(category) ?? []
+    entries.push(column)
+    groupedColumns.set(category, entries)
   })
-  return [...groups].map(([category, entries]) => ({ category, columns: entries }))
+
+  let index = 0
+  return [...groupedColumns].map(([category, columns]) => ({
+    category,
+    columns: columns.map((column) => ({ index: ++index, column })),
+  }))
 }
