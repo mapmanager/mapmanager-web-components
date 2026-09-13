@@ -17,6 +17,7 @@ A hosted package demo is at
 - [Plot and summary semantics](plot-and-summary-semantics.md)
 - [State and presets](state-and-presets.md)
 - [Saved preset persistence](preset-persistence.md)
+- [PyQt5 integration](pyqt5-integration.md)
 
 NicePool is actively developed and currently pre-1.0. Its explicit state and
 schema contracts are intended to make necessary API evolution reviewable.

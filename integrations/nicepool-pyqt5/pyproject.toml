@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nicepool-pyqt5"
+version = "0.1.0"
+description = "PyQt5 adapter for the MapManager NicePool web component"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = [
+  "numpy>=2.1,<3",
+  "pandas>=2.3,<3",
+  "PyQt5==5.15.11",
+  "PyQtWebEngine==5.15.7",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<10",
+  "pytest-qt>=4,<5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nicepool_pyqt5"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/nicepool_pyqt5/static/index.html" = "nicepool_pyqt5/static/index.html"
+"src/nicepool_pyqt5/static/nicepool-pyqt5.js" = "nicepool_pyqt5/static/nicepool-pyqt5.js"
+"src/nicepool_pyqt5/static/nicepool-pyqt5.css" = "nicepool_pyqt5/static/nicepool-pyqt5.css"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

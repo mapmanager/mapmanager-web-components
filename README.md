@@ -18,6 +18,8 @@ that improves the design; user-visible changes belong in the changelog.
 
 - [`nicepool-anywidget`](integrations/nicepool-anywidget/) is a thin Python and
   Jupyter adapter around the existing NicePool custom element.
+- [`nicepool-pyqt5`](integrations/nicepool-pyqt5/) embeds the existing NicePool
+  custom element in a reusable PyQt5 widget.
 - [`examples/jupyter/nicepool-anywidget.ipynb`](examples/jupyter/nicepool-anywidget.ipynb)
   demonstrates that adapter from Python.
 - [`packages/nicepool/notebooks/01-nicepool-engine.ipynb`](packages/nicepool/notebooks/01-nicepool-engine.ipynb)
