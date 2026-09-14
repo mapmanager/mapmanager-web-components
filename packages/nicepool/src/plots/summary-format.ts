@@ -19,6 +19,16 @@ export function formatPlotSummaryToTsv(
 ): string {
   const includeParameters = options.includeParameters ?? true
   const includeRepresentedRows = options.includeRepresentedRows ?? true
+  const groupColumn = summary.parameters.groupColumn
+  const colorColumn = summary.parameters.colorColumn
+  const dimensionHeaders = [
+    ...(groupColumn ? [groupColumn] : []),
+    ...(colorColumn ? [colorColumn] : []),
+  ]
+  const dimensions = (groupValue: string | null, colorValue: string | null): unknown[] => [
+    ...(groupColumn ? [groupValue] : []),
+    ...(colorColumn ? [colorValue] : []),
+  ]
   const lines: string[] = []
   if (includeParameters) {
     lines.push('=== Plot state ===')
@@ -31,28 +41,28 @@ export function formatPlotSummaryToTsv(
     ? ['count', 'min', 'q1', 'median', 'q3', 'max', 'iqr', 'mean', 'std', 'sem', 'cv'] as const
     : AGGREGATE_COLUMNS
   if (lines.length) lines.push('')
-  lines.push('=== Summary table ===', row(['group', 'color', ...aggregateColumns]))
+  lines.push('=== Summary table ===', row([...dimensionHeaders, ...aggregateColumns]))
   for (const aggregate of summary.aggregateRows) {
     lines.push(row([
-      aggregate.groupValue ?? 'Overall', aggregate.colorValue,
+      ...dimensions(aggregate.groupValue, aggregate.colorValue),
       ...aggregateColumns.map((column) => aggregate.statistics[column]),
     ]))
   }
 
   if (summary.bins) {
-    lines.push('', '=== Bins ===', row(['group', 'color', 'lower', 'upper', 'center', 'count', 'cumulative_count', 'cumulative_proportion']))
+    lines.push('', '=== Bins ===', row([...dimensionHeaders, 'lower', 'upper', 'center', 'count', 'cumulative_count', 'cumulative_proportion']))
     for (const bin of summary.bins) lines.push(row([
-      bin.groupValue, bin.colorValue, bin.lower, bin.upper, bin.center,
+      ...dimensions(bin.groupValue, bin.colorValue), bin.lower, bin.upper, bin.center,
       bin.count, bin.cumulativeCount, bin.cumulativeProportion,
     ]))
   }
 
   if (includeRepresentedRows) {
-    lines.push('', '=== Raw data ===', row(['row_id', 'x', 'y', 'group', 'color']))
+    lines.push('', '=== Raw data ===', row(['row_id', 'x', 'y', ...dimensionHeaders]))
     for (const represented of summary.representedRows) {
       lines.push(row([
         represented.rowId, represented.x, represented.y,
-        represented.groupValue, represented.colorValue,
+        ...dimensions(represented.groupValue, represented.colorValue),
       ]))
     }
   }

@@ -104,3 +104,60 @@ test('emits one selection for point clicks, drag selections, and clears', async 
     { primaryRowId: null, selectedRowIds: [] },
   ])
 })
+
+test('organizes controls and labels summary dimensions from plot state', async ({ page }) => {
+  await page.goto('/element-demo.html')
+  const pool = page.locator('nice-pool')
+
+  const filtersBeforePlotType = await pool.evaluate((element) => {
+    const root = element.shadowRoot!
+    const filters = [...root.querySelectorAll('fieldset')]
+      .find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Filters')!
+    const plotType = [...root.querySelectorAll('.nicepool-controls > label')]
+      .find((label) => label.firstChild?.textContent?.trim() === 'Plot type')!
+    return Boolean(filters.compareDocumentPosition(plotType) & Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+  expect(filtersBeforePlotType).toBe(true)
+  const displayControls = await pool.evaluate((element) => {
+    const details = element.shadowRoot!.querySelector('.nicepool-display-options') as HTMLDetailsElement
+    details.open = true
+    return [...details.querySelectorAll('label')].map((label) => label.textContent?.trim())
+  })
+  expect(displayControls).toContain('Point size')
+  expect(displayControls).toContain('Histogram bins')
+
+  const categoryAlignment = await pool.evaluate((element) => {
+    const root = element.shadowRoot!
+    const columnHeader = root.querySelector('.nicepool-column-selector thead th:nth-child(2)')!.getBoundingClientRect()
+    const category = root.querySelector('.nicepool-category-row th:nth-child(2)')!.getBoundingClientRect()
+    return { columnX: columnHeader.x, categoryX: category.x }
+  })
+  expect(categoryAlignment.categoryX).toBe(categoryAlignment.columnX)
+
+  await pool.evaluate((element) => {
+    const nicePool = element as HTMLElement & {
+      getState(): { layout: string; plots: Array<Record<string, unknown>> }
+      setState(state: unknown): void
+    }
+    const state = nicePool.getState()
+    state.plots[0] = {
+      ...state.plots[0],
+      plotType: 'swarm',
+      groupColumn: 'condition',
+      colorColumn: null,
+      yColumn: 'amplitude',
+    }
+    nicePool.setState(state)
+    const details = element.shadowRoot!.querySelector('.nicepool-summary-panel') as HTMLDetailsElement
+    details.open = true
+    const summaryTab = [...element.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+      .find((button) => button.textContent?.includes('summary'))!
+    summaryTab.click()
+  })
+
+  const summaryPanel = pool.locator('.nicepool-summary-panel')
+  await expect(summaryPanel.getByRole('columnheader', { name: 'condition', exact: true }).first()).toBeVisible()
+  await expect(summaryPanel.getByRole('columnheader', { name: 'Color', exact: true })).toHaveCount(0)
+  await summaryPanel.getByLabel('Raw Data', { exact: true }).check()
+  await expect(summaryPanel.getByRole('columnheader', { name: 'condition', exact: true })).toHaveCount(2)
+})

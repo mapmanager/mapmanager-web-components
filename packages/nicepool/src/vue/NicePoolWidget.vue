@@ -118,6 +118,8 @@ function resizeWithKeyboard(axis: 'horizontal' | 'vertical', event: KeyboardEven
 const state = computed(() => { revision.value; return preparedPlots.value.length ? engine.state : null })
 const plotState = computed(() => state.value?.plots[state.value.activePlotIndex] ?? null)
 const activeSummary = computed(() => state.value ? preparedPlots.value[state.value.activePlotIndex]?.summary ?? null : null)
+const summaryGroupColumn = computed(() => activeSummary.value?.parameters.groupColumn ?? null)
+const summaryColorColumn = computed(() => activeSummary.value?.parameters.colorColumn ?? null)
 const visibleIndexes = computed(() => state.value ? Array.from({ length: visiblePlotCount(state.value.layout) }, (_, index) => index) : [])
 function columnSchemas(names: readonly string[]): readonly ColumnSchema[] {
   return names.map((name) => engine.dataset.columnSchema(name))
@@ -324,6 +326,11 @@ onBeforeUnmount(() => {
           <option v-for="index in visibleIndexes" :key="index" :value="index">Plot {{ index + 1 }}</option>
         </select></label>
       </div>
+      <fieldset v-if="filterColumns.length"><legend>Filters</legend>
+        <label v-for="column in filterColumns" :key="column">{{ column }}<select :value="String(plotState.preFilters[column] ?? '')" @change="updateFilter(column, ($event.target as HTMLSelectElement).value)">
+          <option value="">All</option><option v-for="value in engine.dataset.uniqueValues(column)" :key="String(value)" :value="String(value)">{{ value }}</option>
+        </select></label>
+      </fieldset>
       <label>Plot type<select :value="plotState.plotType" @change="changePlotType(($event.target as HTMLSelectElement).value as PlotState['plotType'])">
         <option value="scatter">Scatter</option><option value="swarm">Swarm</option><option value="box">Box</option><option value="violin">Violin</option><option value="histogram">Histogram</option><option value="cumulativeHistogram">Cumulative histogram</option>
       </select></label>
@@ -335,15 +342,8 @@ onBeforeUnmount(() => {
         <ColumnSelectionTable title="Group" :columns="categoricalColumns" :selected-name="plotState.groupColumn" :disabled="plotState.plotType === 'scatter'" :allow-none="true" @select="updatePlotState({ groupColumn: $event })" />
         <ColumnSelectionTable title="Color by" :columns="categoricalColumns" :selected-name="plotState.colorColumn" :disabled="false" :allow-none="true" @select="updatePlotState({ colorColumn: $event })" />
       </div>
-      <fieldset v-if="filterColumns.length"><legend>Filters</legend>
-        <label v-for="column in filterColumns" :key="column">{{ column }}<select :value="String(plotState.preFilters[column] ?? '')" @change="updateFilter(column, ($event.target as HTMLSelectElement).value)">
-          <option value="">All</option><option v-for="value in engine.dataset.uniqueValues(column)" :key="String(value)" :value="String(value)">{{ value }}</option>
-        </select></label>
-      </fieldset>
       <label><span>Absolute values</span><input type="checkbox" :checked="plotState.useAbsoluteValue" @change="updatePlotState({ useAbsoluteValue: ($event.target as HTMLInputElement).checked })" /></label>
       <label>Keep within ±<span class="nicepool-inline-option"><input type="checkbox" aria-label="Exclude extreme values" :checked="plotState.removeValuesThreshold !== null" @change="updatePlotState({ removeValuesThreshold: ($event.target as HTMLInputElement).checked ? 10 : null })" /><input type="number" min="0" step="0.5" aria-label="Extreme-value threshold" :disabled="plotState.removeValuesThreshold === null" :value="plotState.removeValuesThreshold ?? 10" @change="updatePlotState({ removeValuesThreshold: Number(($event.target as HTMLInputElement).value) })" /></span></label>
-      <label :class="{ 'nicepool-control-disabled': !supportsPointSize }">Point size<input type="number" min="1" max="30" step="1" :disabled="!supportsPointSize" :value="plotState.pointSize" @change="updatePlotState({ pointSize: Number(($event.target as HTMLInputElement).value) })" /></label>
-      <label :class="{ 'nicepool-control-disabled': !isHistogram }">Histogram bins<input type="number" min="1" max="200" step="1" :disabled="!isHistogram" :value="plotState.histogramBins" @change="updatePlotState({ histogramBins: Number(($event.target as HTMLInputElement).value) })" /></label>
       <div class="nicepool-control-group">
         <label :class="{ 'nicepool-control-disabled': !isDistribution }"><span>Raw points</span><input type="checkbox" :disabled="!isDistribution" :checked="plotState.showRaw" @change="updatePlotState({ showRaw: ($event.target as HTMLInputElement).checked })" /></label>
         <label :class="{ 'nicepool-control-disabled': plotState.plotType !== 'swarm' }"><span>Show mean</span><input type="checkbox" :disabled="plotState.plotType !== 'swarm'" :checked="plotState.showMean" @change="updatePlotState({ showMean: ($event.target as HTMLInputElement).checked })" /></label>
@@ -354,6 +354,8 @@ onBeforeUnmount(() => {
       <details class="nicepool-display-options">
         <summary><span aria-hidden="true">☰</span> Display options</summary>
         <div class="nicepool-display-options-panel">
+          <label :class="{ 'nicepool-control-disabled': !supportsPointSize }">Point size<input type="number" min="1" max="30" step="1" :disabled="!supportsPointSize" :value="plotState.pointSize" @change="updatePlotState({ pointSize: Number(($event.target as HTMLInputElement).value) })" /></label>
+          <label :class="{ 'nicepool-control-disabled': !isHistogram }">Histogram bins<input type="number" min="1" max="200" step="1" :disabled="!isHistogram" :value="plotState.histogramBins" @change="updatePlotState({ histogramBins: Number(($event.target as HTMLInputElement).value) })" /></label>
           <label>Legend position<span class="nicepool-inline-option"><input type="checkbox" aria-label="Show legend" :checked="plotState.showLegend" @change="updatePlotState({ showLegend: ($event.target as HTMLInputElement).checked })" /><select aria-label="Legend position" :disabled="!plotState.showLegend" :value="plotState.legendPosition" @change="updatePlotState({ legendPosition: ($event.target as HTMLSelectElement).value as PlotState['legendPosition'] })">
             <option value="bottom">Bottom</option><option value="right">Right</option><option value="top">Top</option><option value="left">Left</option>
           </select></span></label>
@@ -415,23 +417,23 @@ onBeforeUnmount(() => {
             </template>
             <h3>Summary</h3>
             <table>
-              <thead><tr><th>Group</th><th>Color</th><th>Count</th><th>Min</th><th v-if="showsQuartiles">Q1</th><th>Median</th><th v-if="showsQuartiles">Q3</th><th>Max</th><th v-if="showsQuartiles">IQR</th><th>Mean</th><th>SD</th><th>SE</th><th>CV</th></tr></thead>
+              <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupColumn }}</th><th v-if="summaryColorColumn">{{ summaryColorColumn }}</th><th>Count</th><th>Min</th><th v-if="showsQuartiles">Q1</th><th>Median</th><th v-if="showsQuartiles">Q3</th><th>Max</th><th v-if="showsQuartiles">IQR</th><th>Mean</th><th>SD</th><th>SE</th><th>CV</th></tr></thead>
               <tbody><tr v-for="(row, index) in activeSummary.aggregateRows" :key="index">
-                <td>{{ row.groupValue ?? 'Overall' }}</td><td>{{ row.colorValue ?? '' }}</td><td>{{ row.statistics.count }}</td><td>{{ displayStatistic(row.statistics.min) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q1 ?? null) }}</td><td>{{ displayStatistic(row.statistics.median) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q3 ?? null) }}</td><td>{{ displayStatistic(row.statistics.max) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.iqr ?? null) }}</td><td>{{ displayStatistic(row.statistics.mean) }}</td><td>{{ displayStatistic(row.statistics.std) }}</td><td>{{ displayStatistic(row.statistics.sem) }}</td><td>{{ displayStatistic(row.statistics.cv) }}</td>
+                <td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td><td>{{ row.statistics.count }}</td><td>{{ displayStatistic(row.statistics.min) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q1 ?? null) }}</td><td>{{ displayStatistic(row.statistics.median) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q3 ?? null) }}</td><td>{{ displayStatistic(row.statistics.max) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.iqr ?? null) }}</td><td>{{ displayStatistic(row.statistics.mean) }}</td><td>{{ displayStatistic(row.statistics.std) }}</td><td>{{ displayStatistic(row.statistics.sem) }}</td><td>{{ displayStatistic(row.statistics.cv) }}</td>
               </tr></tbody>
             </table>
             <template v-if="activeSummary.bins">
               <h3>Bins</h3>
               <table>
-                <thead><tr><th>Group</th><th>Color</th><th>Lower</th><th>Upper</th><th>Center</th><th>Count</th><th>Cumulative count</th><th>Cumulative proportion</th></tr></thead>
-                <tbody><tr v-for="(bin, index) in activeSummary.bins" :key="index"><td>{{ bin.groupValue ?? 'Overall' }}</td><td>{{ bin.colorValue ?? '' }}</td><td>{{ displayStatistic(bin.lower) }}</td><td>{{ displayStatistic(bin.upper) }}</td><td>{{ displayStatistic(bin.center) }}</td><td>{{ bin.count }}</td><td>{{ bin.cumulativeCount }}</td><td>{{ displayStatistic(bin.cumulativeProportion) }}</td></tr></tbody>
+                <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupColumn }}</th><th v-if="summaryColorColumn">{{ summaryColorColumn }}</th><th>Lower</th><th>Upper</th><th>Center</th><th>Count</th><th>Cumulative count</th><th>Cumulative proportion</th></tr></thead>
+                <tbody><tr v-for="(bin, index) in activeSummary.bins" :key="index"><td v-if="summaryGroupColumn">{{ bin.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ bin.colorValue ?? '' }}</td><td>{{ displayStatistic(bin.lower) }}</td><td>{{ displayStatistic(bin.upper) }}</td><td>{{ displayStatistic(bin.center) }}</td><td>{{ bin.count }}</td><td>{{ bin.cumulativeCount }}</td><td>{{ displayStatistic(bin.cumulativeProportion) }}</td></tr></tbody>
               </table>
             </template>
             <template v-if="showSummaryRawData">
               <h3>Raw Data</h3>
               <table>
-                <thead><tr><th>Row ID</th><th>X</th><th>Y</th><th>Group</th><th>Color</th></tr></thead>
-                <tbody><tr v-for="row in activeSummary.representedRows" :key="row.rowId"><td>{{ row.rowId }}</td><td>{{ displaySummaryValue(row.x) }}</td><td>{{ displayStatistic(row.y) }}</td><td>{{ row.groupValue ?? '' }}</td><td>{{ row.colorValue ?? '' }}</td></tr></tbody>
+                <thead><tr><th>Row ID</th><th>X</th><th>Y</th><th v-if="summaryGroupColumn">{{ summaryGroupColumn }}</th><th v-if="summaryColorColumn">{{ summaryColorColumn }}</th></tr></thead>
+                <tbody><tr v-for="row in activeSummary.representedRows" :key="row.rowId"><td>{{ row.rowId }}</td><td>{{ displaySummaryValue(row.x) }}</td><td>{{ displayStatistic(row.y) }}</td><td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td></tr></tbody>
               </table>
             </template>
           </div>

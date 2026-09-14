@@ -3,7 +3,10 @@ from __future__ import annotations
 import os
 
 import pytest
+from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtTest import QSignalSpy
+from PyQt5.QtWebEngineWidgets import QWebEngineSettings
+from PyQt5.QtWidgets import QApplication
 
 from nicepool_pyqt5 import NicePoolWidget
 
@@ -15,6 +18,9 @@ from nicepool_pyqt5 import NicePoolWidget
 def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
     widget = NicePoolWidget()
     qtbot.addWidget(widget)
+    assert widget.web_view.settings().testAttribute(
+        QWebEngineSettings.JavascriptCanAccessClipboard
+    )
     errors = QSignalSpy(widget.error_occurred)
     selections = QSignalSpy(widget.selection_changed)
     states = QSignalSpy(widget.state_changed)
@@ -93,3 +99,53 @@ def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
     assert selections[0][0] == {"primaryRowId": "b", "selectedRowIds": ["b"]}
     assert received == [{"primaryRowId": "b", "selectedRowIds": ["b"]}]
     assert len(errors) == 0
+
+    widget.web_view.page().runJavaScript(
+        """
+        (() => {
+          const root = document.querySelector('nice-pool')?.shadowRoot;
+          const panel = root?.querySelector('.nicepool-summary-panel');
+          if (!panel) return false;
+          panel.open = true;
+          const tab = [...root.querySelectorAll('[role="tab"]')]
+            .find((button) => button.textContent.includes('summary'));
+          tab?.click();
+          return Boolean(tab);
+        })();
+        """
+    )
+    qtbot.wait(100)
+    button_positions: list[object] = []
+    widget.web_view.page().runJavaScript(
+        """
+        (() => {
+          const root = document.querySelector('nice-pool')?.shadowRoot;
+          const button = [...(root?.querySelectorAll('button') ?? [])]
+            .find((candidate) => candidate.textContent === 'Copy Summary');
+          if (!button) return null;
+          button.scrollIntoView({block: 'center'});
+          const rect = button.getBoundingClientRect();
+          return {x: rect.x + rect.width / 2, y: rect.y + rect.height / 2};
+        })();
+        """,
+        button_positions.append,
+    )
+    qtbot.waitUntil(lambda: len(button_positions) == 1, timeout=5_000)
+    position = button_positions[0]
+    assert isinstance(position, dict)
+    clipboard = QApplication.clipboard()
+    previous_clipboard_text = clipboard.text()
+    try:
+        clipboard.clear()
+        click_target = widget.web_view.focusProxy() or widget.web_view
+        qtbot.mouseClick(
+            click_target,
+            Qt.LeftButton,
+            pos=QPoint(round(position["x"]), round(position["y"])),
+        )
+        qtbot.waitUntil(
+            lambda: "=== Summary table ===" in clipboard.text(), timeout=5_000
+        )
+        assert "row_id\tx\ty" in clipboard.text()
+    finally:
+        clipboard.setText(previous_clipboard_text)

@@ -18,6 +18,7 @@ describe('plot summary export', () => {
 
     expect(report).toContain('=== Plot state ===')
     expect(report).toContain('=== Summary table ===')
+    expect(report).toContain('condition\tcohort\tcount')
     expect(report).toContain('count\tmin\tmax\tmean\tmedian\tstd\tsem\tcv')
     expect(report).toContain('=== Raw data ===')
     for (const represented of summary.representedRows) expect(report).toContain(String(represented.rowId))
@@ -26,5 +27,15 @@ describe('plot summary export', () => {
     expect(aggregateOnly).not.toContain('=== Plot state ===')
     expect(aggregateOnly).toContain('=== Summary table ===')
     expect(aggregateOnly).not.toContain('=== Raw data ===')
+  })
+
+  it('omits inactive grouping dimensions from copied tables', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const state = { ...defaultPlotState(dataset), plotType: 'swarm' as const, yColumn: 'y', groupColumn: 'condition' }
+    const report = formatPlotSummaryToTsv(summarizePlot(prepareSwarm(dataset, state)))
+
+    expect(report).toContain('condition\tcount')
+    expect(report).not.toContain('\tcolor\t')
+    expect(report).toContain('row_id\tx\ty\tcondition')
   })
 })

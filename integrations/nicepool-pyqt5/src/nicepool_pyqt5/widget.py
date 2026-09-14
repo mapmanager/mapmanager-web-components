@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 from PyQt5.QtCore import QUrl, pyqtSignal
 from PyQt5.QtWebChannel import QWebChannel
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import QWebEngineSettings, QWebEngineView
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from .bridge import WebChannelBridge
@@ -49,6 +49,10 @@ class NicePoolWidget(QWidget):
         self._pending: dict[int, tuple[str, ResultCallback | None]] = {}
 
         self.web_view = QWebEngineView(self)
+        self.web_view.settings().setAttribute(
+            QWebEngineSettings.JavascriptCanAccessClipboard,
+            True,
+        )
         self._bridge = WebChannelBridge(self)
         self._channel = QWebChannel(self.web_view.page())
         self._channel.registerObject("nicePoolBridge", self._bridge)

@@ -44,7 +44,7 @@ function select(name: string | null): void {
           </tr>
         </tbody>
         <tbody v-for="group in groups" :key="group.category">
-          <tr class="nicepool-category-row"><th colspan="2" scope="rowgroup">{{ group.category }}</th></tr>
+          <tr class="nicepool-category-row"><th aria-hidden="true"></th><th scope="rowgroup">{{ group.category }}</th></tr>
           <tr v-for="entry in group.columns" :key="entry.column.name" class="nicepool-column-row" :class="{ selected: selectedName === entry.column.name }" @click="select(entry.column.name)">
             <td><input class="nicepool-visually-hidden" type="radio" :name="radioName" :checked="selectedName === entry.column.name" :disabled="disabled" :aria-label="`${title}: ${entry.column.name}`" @change="select(entry.column.name)"><span aria-hidden="true">{{ entry.index }}</span></td>
             <td :title="entry.column.axis_label">{{ entry.column.name }}</td>
