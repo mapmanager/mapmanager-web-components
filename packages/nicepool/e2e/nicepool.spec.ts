@@ -72,3 +72,35 @@ test('collapses and restores controls through the public element API', async ({ 
   })
   await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(520)
 })
+
+test('emits one selection for point clicks, drag selections, and clears', async ({ page }) => {
+  await page.goto('/element-demo.html')
+  const pool = page.locator('nice-pool')
+  await expect(pool.locator('.nicepool-plot .plot-container')).toBeVisible()
+
+  const selections = await pool.evaluate(async (element) => {
+    const received: unknown[] = []
+    element.addEventListener('nicepool-selection-change', (event) => {
+      received.push((event as CustomEvent).detail)
+    })
+    const plot = element.shadowRoot!.querySelector('.nicepool-plot') as HTMLElement & {
+      emit(name: string, event: unknown): void
+    }
+    plot.emit('plotly_selected', { points: [] })
+    plot.emit('plotly_click', { points: [{ customdata: ['row-0001'] }] })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    plot.emit('plotly_selected', {
+      points: [{ customdata: ['row-0002'] }, { customdata: ['row-0003'] }],
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    plot.emit('plotly_selected', { points: [] })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    return received
+  })
+
+  expect(selections).toEqual([
+    { primaryRowId: 'row-0001', selectedRowIds: ['row-0001'] },
+    { primaryRowId: 'row-0002', selectedRowIds: ['row-0002', 'row-0003'] },
+    { primaryRowId: null, selectedRowIds: [] },
+  ])
+})

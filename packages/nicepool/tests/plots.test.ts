@@ -124,7 +124,7 @@ describe('plot preparation and summaries', () => {
     }
   })
 
-  it('orders numeric categorical groups numerically', () => {
+  it('orders numeric categorical groups and plot-summary rows numerically', () => {
     const dataset = new DatasetStore({
       rowIdColumn: 'id',
       rows: [{ id: 'a', epochLevel: 10, y: 1 }, { id: 'b', epochLevel: 2, y: 2 }],
@@ -134,10 +134,19 @@ describe('plot preparation and summaries', () => {
         { name: 'y', type: 'number', axis_label: 'Response' },
       ],
     })
-    const state = { ...defaultPlotState(dataset), plotType: 'swarm' as const, groupColumn: 'epochLevel', yColumn: 'y' }
-    const data = prepareSwarm(dataset, state)
-    expect(data.categories).toEqual(['2', '10'])
-    const specification = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl')
+    const baseState = { ...defaultPlotState(dataset), groupColumn: 'epochLevel', yColumn: 'y' }
+    const prepared = [
+      prepareSwarm(dataset, { ...baseState, plotType: 'swarm' }),
+      prepareDistribution(dataset, { ...baseState, plotType: 'box' }),
+      prepareDistribution(dataset, { ...baseState, plotType: 'violin' }),
+    ]
+    for (const data of prepared) {
+      expect(data.categories).toEqual(['2', '10'])
+      const summary = summarizePlot(data)
+      expect(summary.aggregateRows.map(({ groupValue }) => groupValue)).toEqual(['2', '10'])
+      expect(summary.representedRows.map(({ rowId }) => rowId)).toEqual(['b', 'a'])
+    }
+    const specification = buildPlotlySpecification(prepared[0]!, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl')
     expect(specification.layout.xaxis).toMatchObject({ title: { text: 'Epoch level' } })
     expect(specification.layout.yaxis).toMatchObject({ title: { text: 'Response' } })
   })

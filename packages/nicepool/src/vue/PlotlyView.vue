@@ -12,6 +12,7 @@ let plotly: typeof import('plotly.js') | null = null
 let resizeObserver: ResizeObserver | null = null
 let specificationUpdates = 0
 let shiftPressed = false
+let pendingClear: ReturnType<typeof setTimeout> | null = null
 let boundHost: (HTMLDivElement & {
   on: (name: string, callback: (event: unknown) => void) => void
   removeAllListeners: (name: string) => void
@@ -46,10 +47,27 @@ function installPlotlyShadowStyles(): void {
 function selectionHandler(event: unknown): void {
   if (specificationUpdates > 0) return
   const rowIds = rowIdsFromPlotlyEvent(event as never)
+  if (!rowIds.length) {
+    if (pendingClear !== null) clearTimeout(pendingClear)
+    const additive = shiftPressed
+    pendingClear = setTimeout(() => {
+      pendingClear = null
+      emit('selection', [], null, additive)
+    }, 0)
+    return
+  }
+  if (pendingClear !== null) {
+    clearTimeout(pendingClear)
+    pendingClear = null
+  }
   emit('selection', rowIds, rowIds[0] ?? null, shiftPressed)
 }
 
 function clickHandler(event: unknown): void {
+  if (pendingClear !== null) {
+    clearTimeout(pendingClear)
+    pendingClear = null
+  }
   const rowIds = rowIdsFromPlotlyEvent(event as never)
   const primary = rowIds[0] ?? null
   emit('selection', primary ? [primary] : [], primary, shiftPressed)
@@ -102,6 +120,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keyup', keyChanged)
   window.removeEventListener('blur', resetModifiers)
   resizeObserver?.disconnect()
+  if (pendingClear !== null) clearTimeout(pendingClear)
   boundHost?.removeAllListeners('plotly_selected')
   boundHost?.removeAllListeners('plotly_click')
   if (host.value) plotly?.purge(host.value)
