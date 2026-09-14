@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 
 import pytest
@@ -27,7 +26,10 @@ def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
 
     with qtbot.waitSignal(widget.data_reset, timeout=20_000):
         widget.set_records(
-            [{"id": "a", "value": 1.0}, {"id": "b", "value": 2.0}],
+            [
+                {"id": "a", "x": 1.0, "y": 2.0},
+                {"id": "b", "x": 2.0, "y": 3.0},
+            ],
             row_id_column="id",
         )
 
@@ -46,19 +48,48 @@ def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
     assert len(presets) == 0
     assert len(themes) == 0
 
-    selection = {"primaryRowId": "b", "selectedRowIds": ["b"]}
-    script = f"""
-      document.querySelector('nice-pool').dispatchEvent(
-        new CustomEvent('nicepool-selection-change', {{detail: {json.dumps(selection)}}})
-      );
+    rendered: list[object] = []
+    inspect_script = """
+      (() => {
+        const plot = document.querySelector('nice-pool')?.shadowRoot?.querySelector('.nicepool-plot');
+        const traceType = plot?.data?.[0]?.type ?? null;
+        if (!traceType) return null;
+        return {
+          traceType,
+          hasPlotDom: Boolean(plot.querySelector('.plot-container')),
+          hasWebGlWarning: plot.innerText.includes('WebGL is not supported'),
+        };
+      })();
     """
-    widget.web_view.page().runJavaScript(script)
+    for _ in range(50):
+        widget.web_view.page().runJavaScript(inspect_script, rendered.append)
+        qtbot.wait(100)
+        if any(result is not None for result in rendered):
+            break
+    render_result = next(result for result in rendered if result is not None)
+    assert render_result == {
+        "traceType": "scatter",
+        "hasPlotDom": True,
+        "hasWebGlWarning": False,
+    }
+
+    click_results: list[object] = []
+    click_script = """
+      (() => {
+        const plot = document.querySelector('nice-pool')?.shadowRoot?.querySelector('.nicepool-plot');
+        if (!plot?.emit) return false;
+        plot.emit('plotly_click', {points: [{customdata: ['b']}]});
+        return true;
+      })();
+    """
+    widget.web_view.page().runJavaScript(click_script, click_results.append)
+    qtbot.waitUntil(lambda: click_results == [True], timeout=5_000)
     qtbot.waitUntil(lambda: len(selections) == 1, timeout=5_000)
 
     received: list[object] = []
     widget.get_selection(received.append)
     qtbot.waitUntil(lambda: len(received) == 1, timeout=5_000)
 
-    assert selections[0][0] == selection
-    assert received == [{"primaryRowId": "a", "selectedRowIds": ["a"]}]
+    assert selections[0][0] == {"primaryRowId": "b", "selectedRowIds": ["b"]}
+    assert received == [{"primaryRowId": "b", "selectedRowIds": ["b"]}]
     assert len(errors) == 0

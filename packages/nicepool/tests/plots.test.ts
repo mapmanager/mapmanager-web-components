@@ -76,6 +76,54 @@ describe('plot preparation and summaries', () => {
     expect(summarizePlot(first).representedRows).toHaveLength(4)
   })
 
+  it.each(['scatter', 'swarm'] as const)('changes only raw %s traces for the SVG fallback', (plotType) => {
+    const dataset = new DatasetStore(edgeDataset)
+    const state = {
+      ...defaultPlotState(dataset),
+      plotType,
+      xColumn: 'x',
+      yColumn: 'y',
+      groupColumn: 'condition',
+      showMean: true,
+      showErrorBars: true,
+    }
+    const data = plotType === 'scatter' ? prepareScatter(dataset, state) : prepareSwarm(dataset, state)
+    const selection = { primaryRowId: 'a', selectedRowIds: ['a', 'b'] }
+    const webgl = buildPlotlySpecification(data, selection, 'dark', 'scattergl')
+    const svg = buildPlotlySpecification(data, selection, 'dark', 'scatter')
+
+    expect(svg.layout).toEqual(webgl.layout)
+    expect(svg.config).toEqual(webgl.config)
+    expect(svg.traces).toHaveLength(webgl.traces.length)
+    webgl.traces.forEach((trace, index) => {
+      const fallbackTrace = svg.traces[index]
+      if (trace.type === 'scattergl') {
+        expect(fallbackTrace?.type).toBe('scatter')
+        expect({ ...fallbackTrace, type: 'scattergl' }).toEqual(trace)
+      } else {
+        expect(fallbackTrace).toEqual(trace)
+      }
+    })
+  })
+
+  it('does not change non-point plot specifications for the SVG fallback', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const base = { ...defaultPlotState(dataset), xColumn: 'x', yColumn: 'y', groupColumn: 'condition' }
+    const selection = { primaryRowId: null, selectedRowIds: [] }
+    const prepared = [
+      prepareHistogram(dataset, { ...base, plotType: 'histogram' }),
+      prepareHistogram(dataset, { ...base, plotType: 'cumulativeHistogram' }),
+      prepareDistribution(dataset, { ...base, plotType: 'box' }),
+      prepareDistribution(dataset, { ...base, plotType: 'violin' }),
+    ]
+
+    for (const data of prepared) {
+      expect(buildPlotlySpecification(data, selection, 'dark', 'scatter')).toEqual(
+        buildPlotlySpecification(data, selection, 'dark', 'scattergl'),
+      )
+    }
+  })
+
   it('orders numeric categorical groups numerically', () => {
     const dataset = new DatasetStore({
       rowIdColumn: 'id',
@@ -89,7 +137,7 @@ describe('plot preparation and summaries', () => {
     const state = { ...defaultPlotState(dataset), plotType: 'swarm' as const, groupColumn: 'epochLevel', yColumn: 'y' }
     const data = prepareSwarm(dataset, state)
     expect(data.categories).toEqual(['2', '10'])
-    const specification = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] })
+    const specification = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl')
     expect(specification.layout.xaxis).toMatchObject({ title: { text: 'Epoch level' } })
     expect(specification.layout.yaxis).toMatchObject({ title: { text: 'Response' } })
   })
@@ -106,14 +154,14 @@ describe('plot preparation and summaries', () => {
     })
     const selection = { primaryRowId: null, selectedRowIds: [] }
     const scatterState = { ...defaultPlotState(dataset), xColumn: 'x', yColumn: 'y' }
-    const scatter = buildPlotlySpecification(prepareScatter(dataset, scatterState), selection)
+    const scatter = buildPlotlySpecification(prepareScatter(dataset, scatterState), selection, 'dark', 'scattergl')
     expect(scatter.layout.xaxis).toMatchObject({ title: { text: 'Elapsed time' } })
     expect(scatter.layout.yaxis).toMatchObject({ title: { text: 'Voltage' } })
     const histogramState = { ...scatterState, plotType: 'histogram' as const }
-    const histogram = buildPlotlySpecification(prepareHistogram(dataset, histogramState), selection)
+    const histogram = buildPlotlySpecification(prepareHistogram(dataset, histogramState), selection, 'dark', 'scattergl')
     expect(histogram.layout.xaxis).toMatchObject({ title: { text: 'Elapsed time' } })
     expect(histogram.layout.yaxis).toMatchObject({ title: { text: 'Count' } })
-    const cumulative = buildPlotlySpecification(prepareHistogram(dataset, { ...histogramState, plotType: 'cumulativeHistogram' }), selection)
+    const cumulative = buildPlotlySpecification(prepareHistogram(dataset, { ...histogramState, plotType: 'cumulativeHistogram' }), selection, 'dark', 'scattergl')
     expect(cumulative.layout.yaxis).toMatchObject({ title: { text: 'Cumulative proportion' } })
   })
 
@@ -127,9 +175,9 @@ describe('plot preparation and summaries', () => {
     const summary = summarizePlot(data)
     expect(data.categories).toEqual(['control', 'treated'])
     expect(summary.aggregateRows[0]?.statistics).toMatchObject({ q1: 1.5, q3: 2.5, iqr: 1 })
-    expect(buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }).traces[0]).toMatchObject({ type: 'box', pointpos: 0 })
+    expect(buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl').traces[0]).toMatchObject({ type: 'box', pointpos: 0 })
     const violin = prepareDistribution(dataset, { ...state, plotType: 'violin' })
-    expect(buildPlotlySpecification(violin, { primaryRowId: null, selectedRowIds: [] }).traces[0]).toMatchObject({ type: 'violin', pointpos: 0 })
+    expect(buildPlotlySpecification(violin, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl').traces[0]).toMatchObject({ type: 'violin', pointpos: 0 })
   })
 
   it('uses shared histogram edges and deterministic cumulative proportions', () => {
@@ -147,7 +195,7 @@ describe('plot preparation and summaries', () => {
 
     const cumulative = prepareHistogram(dataset, { ...histogramState, plotType: 'cumulativeHistogram' })
     expect(cumulative.bins.filter((bin) => bin.groupValue === 'control').at(-1)?.cumulativeProportion).toBe(1)
-    expect(buildPlotlySpecification(cumulative, { primaryRowId: null, selectedRowIds: [] }).traces[0]).toMatchObject({ type: 'scatter', mode: 'lines' })
+    expect(buildPlotlySpecification(cumulative, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl').traces[0]).toMatchObject({ type: 'scatter', mode: 'lines' })
   })
 
   it('decodes stable row identity from Plotly selection events', () => {
@@ -159,9 +207,9 @@ describe('plot preparation and summaries', () => {
   it('changes Plotly selection revision when shared selection changes', () => {
     const dataset = new DatasetStore(edgeDataset)
     const data = prepareScatter(dataset, { ...defaultPlotState(dataset), xColumn: 'x', yColumn: 'y' })
-    const multiple = buildPlotlySpecification(data, { primaryRowId: 'a', selectedRowIds: ['a', 'b'] })
-    const single = buildPlotlySpecification(data, { primaryRowId: 'c', selectedRowIds: ['c'] })
-    const cleared = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] })
+    const multiple = buildPlotlySpecification(data, { primaryRowId: 'a', selectedRowIds: ['a', 'b'] }, 'dark', 'scattergl')
+    const single = buildPlotlySpecification(data, { primaryRowId: 'c', selectedRowIds: ['c'] }, 'dark', 'scattergl')
+    const cleared = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl')
     expect(multiple.layout.selectionrevision).toBe('["a","b"]')
     expect(single.layout.selectionrevision).toBe('["c"]')
     expect(cleared.layout.selectionrevision).toBe('[]')
@@ -181,7 +229,7 @@ describe('plot preparation and summaries', () => {
       showVerticalGrid: true,
     }
     const data = prepareScatter(dataset, state)
-    const specification = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }, 'dark')
+    const specification = buildPlotlySpecification(data, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl')
     expect(specification.config.displayModeBar).toBe(false)
     expect(specification.layout.paper_bgcolor).toBe('#111827')
     expect(specification.layout.hovermode).toBe('closest')
@@ -201,6 +249,8 @@ describe('plot preparation and summaries', () => {
     const specification = buildPlotlySpecification(
       data,
       { primaryRowId: null, selectedRowIds: [] },
+      'dark',
+      'scattergl',
     )
     expect(specification.layout.hovermode).toBe('closest')
     expect(specification.traces[0]).toMatchObject({ hoverinfo: 'none' })

@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import type { NicePoolSelection, NicePoolTheme, RowId } from '../core/types'
-import { buildPlotlySpecification, rowIdsFromPlotlyEvent } from '../plots/plotly'
+import { buildPlotlySpecification, rowIdsFromPlotlyEvent, type PointTraceType } from '../plots/plotly'
 import type { PreparedPlotData } from '../plots/types'
 
 const props = defineProps<{ data: PreparedPlotData; selection: NicePoolSelection; theme: NicePoolTheme }>()
@@ -16,6 +16,20 @@ let boundHost: (HTMLDivElement & {
   on: (name: string, callback: (event: unknown) => void) => void
   removeAllListeners: (name: string) => void
 }) | null = null
+
+function detectPointTraceType(): PointTraceType {
+  try {
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('webgl2')
+      ?? canvas.getContext('webgl')
+      ?? canvas.getContext('experimental-webgl')
+    return context ? 'scattergl' : 'scatter'
+  } catch {
+    return 'scatter'
+  }
+}
+
+const pointTraceType = detectPointTraceType()
 
 /** Make Plotly's document-level runtime CSS available inside a Custom Element shadow root. */
 function installPlotlyShadowStyles(): void {
@@ -53,7 +67,7 @@ async function render(): Promise<void> {
   if (!host.value) return
   plotly ??= (await import('plotly.js-dist-min')).default
   installPlotlyShadowStyles()
-  const specification = buildPlotlySpecification(props.data, props.selection, props.theme)
+  const specification = buildPlotlySpecification(props.data, props.selection, props.theme, pointTraceType)
   specificationUpdates += 1
   try {
     await plotly.react(host.value, specification.traces, specification.layout, specification.config)

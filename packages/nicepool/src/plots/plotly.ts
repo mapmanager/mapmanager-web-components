@@ -9,6 +9,9 @@ export interface PlotlySpecification {
   config: Partial<Plotly.Config>
 }
 
+/** Plotly renderer used for raw scatter and swarm point traces. */
+export type PointTraceType = 'scatter' | 'scattergl'
+
 function groupedPoints(points: readonly PreparedPoint[]): readonly [string, readonly PreparedPoint[]][] {
   const groups = new Map<string, PreparedPoint[]>()
   for (const point of points) {
@@ -31,9 +34,10 @@ function pointTrace(
   selection: NicePoolSelection,
   pointSize: number,
   showHover: boolean,
+  pointTraceType: PointTraceType,
 ): Plotly.Data {
   return {
-    type: 'scattergl',
+    type: pointTraceType,
     mode: 'markers',
     name,
     x: points.map(({ x }) => x),
@@ -141,7 +145,8 @@ function legendLayout(position: LegendPosition): Partial<Plotly.Legend> {
 export function buildPlotlySpecification(
   data: PreparedPlotData,
   selection: NicePoolSelection,
-  theme: NicePoolTheme = 'dark',
+  theme: NicePoolTheme,
+  pointTraceType: PointTraceType,
 ): PlotlySpecification {
   let traces: Plotly.Data[]
   if (data.type === 'box' || data.type === 'violin') traces = distributionTraces(data)
@@ -150,6 +155,7 @@ export function buildPlotlySpecification(
     traces = data.state.showRaw
       ? groupedPoints(data.points).map(([name, points]) => pointTrace(
           name, points, selection, data.state.pointSize, data.state.showHover,
+          pointTraceType,
         ))
       : []
     if (data.type === 'swarm') traces.push(...swarmOverlays(data, theme))
