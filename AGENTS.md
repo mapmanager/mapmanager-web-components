@@ -35,9 +35,15 @@ Run one package with npm's `--workspace` option.
 
 ## Verification
 
-Run focused tests while developing, followed by the root `npm run check`.
-Browser behavior must also be inspected in the relevant standalone and embedded
-client when GUI integration changes.
+During implementation, run focused unit tests and type checks for the affected
+workspace. Provide the user with exact commands for broader repository checks,
+Playwright tests, and embedded-client smoke tests. Do not repeatedly run the
+complete repository check unless the user explicitly requests it or the scope
+and risk of the change justify it.
+
+The user normally performs interactive browser, PyQt5 WebEngine, and host-
+application smoke tests on the local macOS development machine. Clearly report
+which checks were run and which remain for the user.
 
 ## Git discipline
 

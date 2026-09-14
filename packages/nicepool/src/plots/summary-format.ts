@@ -15,15 +15,22 @@ function row(values: readonly unknown[]): string {
 /** Format the full Python-compatible plot report for clipboard export. */
 export function formatPlotSummaryToTsv(
   summary: PlotSummary,
-  options: { includeParameters?: boolean; includeRepresentedRows?: boolean } = {},
+  options: {
+    includeParameters?: boolean
+    includeRepresentedRows?: boolean
+    xLabel?: string
+    yLabel?: string
+    groupLabel?: string | null
+    colorLabel?: string | null
+  } = {},
 ): string {
   const includeParameters = options.includeParameters ?? true
   const includeRepresentedRows = options.includeRepresentedRows ?? true
   const groupColumn = summary.parameters.groupColumn
   const colorColumn = summary.parameters.colorColumn
   const dimensionHeaders = [
-    ...(groupColumn ? [groupColumn] : []),
-    ...(colorColumn ? [colorColumn] : []),
+    ...(groupColumn ? [options.groupLabel ?? groupColumn] : []),
+    ...(colorColumn ? [options.colorLabel ?? colorColumn] : []),
   ]
   const dimensions = (groupValue: string | null, colorValue: string | null): unknown[] => [
     ...(groupColumn ? [groupValue] : []),
@@ -58,7 +65,7 @@ export function formatPlotSummaryToTsv(
   }
 
   if (includeRepresentedRows) {
-    lines.push('', '=== Raw data ===', row(['row_id', 'x', 'y', ...dimensionHeaders]))
+    lines.push('', '=== Raw data ===', row(['row_id', options.xLabel ?? 'x', options.yLabel ?? 'y', ...dimensionHeaders]))
     for (const represented of summary.representedRows) {
       lines.push(row([
         represented.rowId, represented.x, represented.y,

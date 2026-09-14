@@ -27,6 +27,12 @@ describe('plot summary export', () => {
     expect(aggregateOnly).not.toContain('=== Plot state ===')
     expect(aggregateOnly).toContain('=== Summary table ===')
     expect(aggregateOnly).not.toContain('=== Raw data ===')
+
+    const labeled = formatPlotSummaryToTsv(summary, {
+      xLabel: 'Condition', yLabel: 'Response', groupLabel: 'Condition', colorLabel: 'Cohort',
+    })
+    expect(labeled).toContain('Condition\tCohort\tcount')
+    expect(labeled).toContain('row_id\tCondition\tResponse\tCondition\tCohort')
   })
 
   it('omits inactive grouping dimensions from copied tables', () => {

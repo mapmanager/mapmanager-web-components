@@ -118,8 +118,20 @@ function resizeWithKeyboard(axis: 'horizontal' | 'vertical', event: KeyboardEven
 const state = computed(() => { revision.value; return preparedPlots.value.length ? engine.state : null })
 const plotState = computed(() => state.value?.plots[state.value.activePlotIndex] ?? null)
 const activeSummary = computed(() => state.value ? preparedPlots.value[state.value.activePlotIndex]?.summary ?? null : null)
+function columnLabel(name: string | null | undefined): string | null {
+  return name ? engine.dataset.axisLabel(name) : null
+}
 const summaryGroupColumn = computed(() => activeSummary.value?.parameters.groupColumn ?? null)
 const summaryColorColumn = computed(() => activeSummary.value?.parameters.colorColumn ?? null)
+const summaryGroupLabel = computed(() => columnLabel(summaryGroupColumn.value))
+const summaryColorLabel = computed(() => columnLabel(summaryColorColumn.value))
+const summaryXLabel = computed(() => {
+  if (!activeSummary.value) return 'X'
+  return columnLabel(['swarm', 'box', 'violin'].includes(activeSummary.value.plotType)
+    ? summaryGroupColumn.value
+    : activeSummary.value.parameters.xColumn) ?? 'X'
+})
+const summaryYLabel = computed(() => columnLabel(activeSummary.value?.parameters.yColumn) ?? 'Y')
 const visibleIndexes = computed(() => state.value ? Array.from({ length: visiblePlotCount(state.value.layout) }, (_, index) => index) : [])
 function columnSchemas(names: readonly string[]): readonly ColumnSchema[] {
   return names.map((name) => engine.dataset.columnSchema(name))
@@ -136,7 +148,7 @@ const isDistribution = computed(() => plotState.value?.plotType === 'swarm' || p
 const supportsPointSize = computed(() => plotState.value?.plotType === 'scatter' || plotState.value?.plotType === 'swarm')
 const showsQuartiles = computed(() => activeSummary.value?.plotType === 'box' || activeSummary.value?.plotType === 'violin')
 const availableXColumns = computed(() => isHistogram.value ? numericColumns.value : scatterXColumns.value)
-const rawTableColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.schema.map(({ name }) => name) : [] })
+const rawTableColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.schema : [] })
 const rawTablePageCount = computed(() => { revision.value; return preparedPlots.value.length ? Math.max(1, Math.ceil(engine.dataset.rows.length / rawTablePageSize)) : 1 })
 const visibleRawRows = computed(() => {
   revision.value
@@ -285,6 +297,10 @@ async function copySummary(): Promise<void> {
     await navigator.clipboard.writeText(formatPlotSummaryToTsv(activeSummary.value, {
       includeParameters: showSummaryPlotState.value,
       includeRepresentedRows: showSummaryRawData.value,
+      xLabel: summaryXLabel.value,
+      yLabel: summaryYLabel.value,
+      groupLabel: summaryGroupLabel.value,
+      colorLabel: summaryColorLabel.value,
     }))
     summaryCopyStatus.value = 'Copied'
   } catch (reason) {
@@ -398,8 +414,8 @@ onBeforeUnmount(() => {
             </div>
             <div class="nicepool-summary-table-scroll">
               <table>
-                <thead><tr><th>#</th><th v-for="column in rawTableColumns" :key="column">{{ column }}</th></tr></thead>
-                <tbody><tr v-for="(row, rowIndex) in visibleRawRows" :key="String(row[engine.dataset.rowIdColumn] ?? rowIndex)"><td>{{ rawTablePage * rawTablePageSize + rowIndex + 1 }}</td><td v-for="column in rawTableColumns" :key="column">{{ displaySummaryValue(row[column]) }}</td></tr></tbody>
+                <thead><tr><th>#</th><th v-for="column in rawTableColumns" :key="column.name">{{ column.axis_label }}</th></tr></thead>
+                <tbody><tr v-for="(row, rowIndex) in visibleRawRows" :key="String(row[engine.dataset.rowIdColumn] ?? rowIndex)"><td>{{ rawTablePage * rawTablePageSize + rowIndex + 1 }}</td><td v-for="column in rawTableColumns" :key="column.name">{{ displaySummaryValue(row[column.name]) }}</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -417,7 +433,7 @@ onBeforeUnmount(() => {
             </template>
             <h3>Summary</h3>
             <table>
-              <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupColumn }}</th><th v-if="summaryColorColumn">{{ summaryColorColumn }}</th><th>Count</th><th>Min</th><th v-if="showsQuartiles">Q1</th><th>Median</th><th v-if="showsQuartiles">Q3</th><th>Max</th><th v-if="showsQuartiles">IQR</th><th>Mean</th><th>SD</th><th>SE</th><th>CV</th></tr></thead>
+              <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th><th>Count</th><th>Min</th><th v-if="showsQuartiles">Q1</th><th>Median</th><th v-if="showsQuartiles">Q3</th><th>Max</th><th v-if="showsQuartiles">IQR</th><th>Mean</th><th>SD</th><th>SE</th><th>CV</th></tr></thead>
               <tbody><tr v-for="(row, index) in activeSummary.aggregateRows" :key="index">
                 <td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td><td>{{ row.statistics.count }}</td><td>{{ displayStatistic(row.statistics.min) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q1 ?? null) }}</td><td>{{ displayStatistic(row.statistics.median) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q3 ?? null) }}</td><td>{{ displayStatistic(row.statistics.max) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.iqr ?? null) }}</td><td>{{ displayStatistic(row.statistics.mean) }}</td><td>{{ displayStatistic(row.statistics.std) }}</td><td>{{ displayStatistic(row.statistics.sem) }}</td><td>{{ displayStatistic(row.statistics.cv) }}</td>
               </tr></tbody>
@@ -425,14 +441,14 @@ onBeforeUnmount(() => {
             <template v-if="activeSummary.bins">
               <h3>Bins</h3>
               <table>
-                <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupColumn }}</th><th v-if="summaryColorColumn">{{ summaryColorColumn }}</th><th>Lower</th><th>Upper</th><th>Center</th><th>Count</th><th>Cumulative count</th><th>Cumulative proportion</th></tr></thead>
+                <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th><th>Lower</th><th>Upper</th><th>Center</th><th>Count</th><th>Cumulative count</th><th>Cumulative proportion</th></tr></thead>
                 <tbody><tr v-for="(bin, index) in activeSummary.bins" :key="index"><td v-if="summaryGroupColumn">{{ bin.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ bin.colorValue ?? '' }}</td><td>{{ displayStatistic(bin.lower) }}</td><td>{{ displayStatistic(bin.upper) }}</td><td>{{ displayStatistic(bin.center) }}</td><td>{{ bin.count }}</td><td>{{ bin.cumulativeCount }}</td><td>{{ displayStatistic(bin.cumulativeProportion) }}</td></tr></tbody>
               </table>
             </template>
             <template v-if="showSummaryRawData">
               <h3>Raw Data</h3>
               <table>
-                <thead><tr><th>Row ID</th><th>X</th><th>Y</th><th v-if="summaryGroupColumn">{{ summaryGroupColumn }}</th><th v-if="summaryColorColumn">{{ summaryColorColumn }}</th></tr></thead>
+                <thead><tr><th>Row ID</th><th>{{ summaryXLabel }}</th><th>{{ summaryYLabel }}</th><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th></tr></thead>
                 <tbody><tr v-for="row in activeSummary.representedRows" :key="row.rowId"><td>{{ row.rowId }}</td><td>{{ displaySummaryValue(row.x) }}</td><td>{{ displayStatistic(row.y) }}</td><td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td></tr></tbody>
               </table>
             </template>

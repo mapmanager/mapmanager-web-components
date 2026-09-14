@@ -15,5 +15,6 @@ describe('column selector grouping', () => {
     expect(groups[0]?.columns.map(({ index, column }) => [index, column.name])).toEqual([[1, 'epoch'], [2, 'epochLevel']])
     expect(groups[1]?.columns.map(({ index, column }) => [index, column.name])).toEqual([[3, 'thresholdSec']])
     expect(groups[2]?.columns.map(({ index, column }) => [index, column.name])).toEqual([[4, 'custom']])
+    expect(groups[0]?.columns.map(({ column }) => column.axis_label)).toEqual(['Epoch', 'Epoch level'])
   })
 })
