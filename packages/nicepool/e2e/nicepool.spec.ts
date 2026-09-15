@@ -156,8 +156,10 @@ test('organizes controls and labels summary dimensions from plot state', async (
   })
 
   const summaryPanel = pool.locator('.nicepool-summary-panel')
-  await expect(summaryPanel.getByRole('columnheader', { name: 'condition', exact: true }).first()).toBeVisible()
+  const summaryTable = summaryPanel.getByRole('table', { name: 'Summary', exact: true })
+  const rawDataTable = summaryPanel.getByRole('table', { name: 'Raw Data', exact: true })
+  await expect(summaryTable.getByRole('columnheader', { name: 'condition', exact: true })).toHaveCount(1)
   await expect(summaryPanel.getByRole('columnheader', { name: 'Color', exact: true })).toHaveCount(0)
   await summaryPanel.getByLabel('Raw Data', { exact: true }).check()
-  await expect(summaryPanel.getByRole('columnheader', { name: 'condition', exact: true })).toHaveCount(2)
+  await expect(rawDataTable.getByRole('columnheader', { name: 'condition', exact: true })).toHaveCount(2)
 })

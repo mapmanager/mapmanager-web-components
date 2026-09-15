@@ -432,7 +432,7 @@ onBeforeUnmount(() => {
               <table><tbody><tr v-for="(value, key) in activeSummary.parameters" :key="key"><th>{{ key }}</th><td>{{ displaySummaryValue(value) }}</td></tr></tbody></table>
             </template>
             <h3>Summary</h3>
-            <table>
+            <table aria-label="Summary">
               <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th><th>Count</th><th>Min</th><th v-if="showsQuartiles">Q1</th><th>Median</th><th v-if="showsQuartiles">Q3</th><th>Max</th><th v-if="showsQuartiles">IQR</th><th>Mean</th><th>SD</th><th>SE</th><th>CV</th></tr></thead>
               <tbody><tr v-for="(row, index) in activeSummary.aggregateRows" :key="index">
                 <td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td><td>{{ row.statistics.count }}</td><td>{{ displayStatistic(row.statistics.min) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q1 ?? null) }}</td><td>{{ displayStatistic(row.statistics.median) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.q3 ?? null) }}</td><td>{{ displayStatistic(row.statistics.max) }}</td><td v-if="showsQuartiles">{{ displayStatistic(row.statistics.iqr ?? null) }}</td><td>{{ displayStatistic(row.statistics.mean) }}</td><td>{{ displayStatistic(row.statistics.std) }}</td><td>{{ displayStatistic(row.statistics.sem) }}</td><td>{{ displayStatistic(row.statistics.cv) }}</td>
@@ -447,7 +447,7 @@ onBeforeUnmount(() => {
             </template>
             <template v-if="showSummaryRawData">
               <h3>Raw Data</h3>
-              <table>
+              <table aria-label="Raw Data">
                 <thead><tr><th>Row ID</th><th>{{ summaryXLabel }}</th><th>{{ summaryYLabel }}</th><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th></tr></thead>
                 <tbody><tr v-for="row in activeSummary.representedRows" :key="row.rowId"><td>{{ row.rowId }}</td><td>{{ displaySummaryValue(row.x) }}</td><td>{{ displayStatistic(row.y) }}</td><td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td></tr></tbody>
               </table>

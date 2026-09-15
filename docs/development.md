@@ -19,6 +19,33 @@ npm run build --workspace @mapmanager/image-viewer
 
 Replace the workspace name with `@mapmanager/nicepool` for NicePool.
 
+## NicePool browser tests
+
+Install Chromium for Playwright once after cloning the repository:
+
+```bash
+npx playwright install chromium
+```
+
+Run one NicePool browser test while developing:
+
+```bash
+npx playwright test packages/nicepool/e2e/nicepool.spec.ts -g "organizes controls"
+```
+
+Run all repository browser tests with:
+
+```bash
+npm run test:e2e
+```
+
+Playwright starts the NicePool Vite server at <http://127.0.0.1:4173/>
+automatically. Before pushing, run the same complete gate used by CI:
+
+```bash
+npm run check
+```
+
 ## Documentation
 
 The public documentation source is the repository-level `docs/` tree.
