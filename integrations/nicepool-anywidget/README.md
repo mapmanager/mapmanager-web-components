@@ -5,6 +5,11 @@ NicePool custom element. Python synchronizes data and state; the existing
 TypeScript component continues to own analysis, plotting, controls, and
 selection behavior.
 
+`set_data()` performs NicePool's full dataset reset. `replace_data()` sends a
+distinct state-preserving replacement request; a browser-side validation error
+is synchronized to `replace_data_error` while the previous table remains
+active.
+
 From the repository root, install JavaScript dependencies and generate the
 self-contained anywidget frontend:
 

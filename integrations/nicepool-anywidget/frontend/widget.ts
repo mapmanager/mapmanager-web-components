@@ -17,6 +17,7 @@ interface AnyWidgetModel {
 
 interface NicePoolDomElement extends HTMLElement {
   setData(input: DatasetInput): void
+  replaceData(input: DatasetInput): void
   setState(state: NicePoolState): void
   setSelection(selection: NicePoolSelection): void
   setNicePoolPresets(presets: readonly NicePoolPreset[]): void
@@ -47,6 +48,16 @@ function render({ model, el }: RenderContext): () => void {
   el.replaceChildren(pool)
 
   const updateData = (): void => pool.setData(model.get('data') as DatasetInput)
+  const replaceData = (): void => {
+    const request = model.get('_replace_data_request') as { data?: DatasetInput }
+    if (!request?.data) return
+    try {
+      pool.replaceData(request.data)
+      updateModel(model, 'replace_data_error', '')
+    } catch (reason) {
+      updateModel(model, 'replace_data_error', reason instanceof Error ? reason.message : String(reason))
+    }
+  }
   const updateState = (): void => {
     const state = model.get('state') as Partial<NicePoolState>
     if (state?.schemaVersion === 1) pool.setState(state as NicePoolState)
@@ -60,6 +71,7 @@ function render({ model, el }: RenderContext): () => void {
 
   const subscriptions: Array<[string, () => void]> = [
     ['change:data', updateData],
+    ['change:_replace_data_request', replaceData],
     ['change:state', updateState],
     ['change:selection', updateSelection],
     ['change:nicepool_presets', updatePresets],

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function plotSnapshot(page: Page) {
-  return page.locator('.nicepool-plot').evaluate((element) => {
+  return page.locator('.nicepool-plot').first().evaluate((element) => {
     const plot = element as HTMLElement & {
       _fullData: Array<{ x: unknown[]; y: unknown[] }>
       _fullLayout: { xaxis: { title: { text: string } }; yaxis: { title: { text: string } } }
@@ -71,6 +71,53 @@ test('collapses and restores controls through the public element API', async ({ 
     (element as HTMLElement & { setControlsCollapsed(collapsed: boolean): void }).setControlsCollapsed(false)
   })
   await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(520)
+})
+
+test('replaceData keeps plot state and emits only the replacement lifecycle event', async ({ page }) => {
+  await page.goto('/element-demo.html')
+  const pool = page.locator('nice-pool')
+  await expect(pool.locator('.nicepool-plot .plot-container')).toBeVisible()
+
+  const result = await pool.evaluate(async (element) => {
+    const nicePool = element as HTMLElement & {
+      getState(): { layout: string; plots: Array<Record<string, unknown>> }
+      setState(state: unknown): void
+      replaceData(input: unknown): void
+      getSelection(): { primaryRowId: string | null; selectedRowIds: string[] }
+      setSelection(selection: unknown): void
+      setNicePoolPresets(presets: unknown[]): void
+      getNicePoolPresets(): unknown[]
+      applyNicePoolPreset(name: string): void
+    }
+    const events: string[] = []
+    for (const name of ['nicepool-data-replaced', 'nicepool-data-reset', 'nicepool-selection-change']) {
+      element.addEventListener(name, () => events.push(name))
+    }
+    const state = nicePool.getState()
+    state.layout = '1x2'
+    state.plots[0] = { ...state.plots[0], xColumn: 'velocity', yColumn: 'duration', pointSize: 13 }
+    nicePool.setState(state)
+    nicePool.setNicePoolPresets([{ schemaVersion: 1, name: 'Current', state }])
+    nicePool.applyNicePoolPreset('Current')
+    nicePool.setSelection({ primaryRowId: 'row-0001', selectedRowIds: ['row-0001', 'row-0002'] })
+    nicePool.replaceData({
+      rowIdColumn: 'pool_row_id',
+      rows: [
+        { pool_row_id: 'row-0002', accept: 'yes', channel: 'green', roi_id: 'roi-1', condition: 'control', time: 1, amplitude: 2, velocity: 3, duration: 4 },
+        { pool_row_id: 'new-row', accept: 'yes', channel: 'red', roi_id: 'roi-2', condition: 'treated', time: 5, amplitude: 6, velocity: 7, duration: 8 },
+      ],
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    return { state: nicePool.getState(), selection: nicePool.getSelection(), presets: nicePool.getNicePoolPresets(), events }
+  })
+
+  expect(result.state.layout).toBe('1x2')
+  expect(result.state.plots[0]).toMatchObject({ xColumn: 'velocity', yColumn: 'duration', pointSize: 13 })
+  expect(result.selection).toEqual({ primaryRowId: null, selectedRowIds: ['row-0002'] })
+  expect(result.presets).toHaveLength(1)
+  expect(result.events).toEqual(['nicepool-data-replaced'])
+  await expect(pool.getByLabel('Preset')).toHaveValue('Current')
+  await expect.poll(async () => (await plotSnapshot(page)).x).toEqual([3, 7])
 })
 
 test('emits one selection for point clicks, drag selections, and clears', async ({ page }) => {
@@ -160,6 +207,40 @@ test('organizes controls and labels summary dimensions from plot state', async (
   const rawDataTable = summaryPanel.getByRole('table', { name: 'Raw Data', exact: true })
   await expect(summaryTable.getByRole('columnheader', { name: 'condition', exact: true })).toHaveCount(1)
   await expect(summaryPanel.getByRole('columnheader', { name: 'Color', exact: true })).toHaveCount(0)
-  await summaryPanel.getByLabel('Raw Data', { exact: true }).check()
+  await summaryPanel.getByRole('checkbox', { name: 'Raw Data', exact: true }).check()
   await expect(rawDataTable.getByRole('columnheader', { name: 'condition', exact: true })).toHaveCount(2)
+})
+
+test('publishes complete preset collections for user saves, overwrites, and deletes', async ({ page }) => {
+  await page.goto('/element-demo.html')
+  const pool = page.locator('nice-pool')
+  await expect(pool.getByRole('group', { name: 'Saved workspace' })).toBeVisible()
+
+  await pool.evaluate((element) => {
+    const received: unknown[] = []
+    element.addEventListener('nicepool-presets-change', (event) => {
+      received.push((event as CustomEvent).detail)
+    })
+    ;(element as HTMLElement & { __presetEvents?: unknown[] }).__presetEvents = received
+  })
+
+  const savedWorkspace = pool.getByRole('group', { name: 'Saved workspace' })
+  await savedWorkspace.getByLabel('Name').fill('Host preset')
+  await savedWorkspace.getByRole('button', { name: 'Save' }).click()
+  await expect(pool.getByLabel('Preset')).toHaveValue('Host preset')
+
+  await pool.getByLabel('Layout').selectOption('1x2')
+  await savedWorkspace.getByRole('button', { name: 'Save' }).click()
+  await savedWorkspace.getByRole('button', { name: 'Delete' }).click()
+
+  const events = await pool.evaluate((element) =>
+    (element as HTMLElement & { __presetEvents?: Array<Array<{ name: string; state: { layout: string } }>> }).__presetEvents,
+  )
+  expect(events).toHaveLength(3)
+  expect(events?.[0]).toHaveLength(1)
+  expect(events?.[0]?.[0]?.name).toBe('Host preset')
+  expect(events?.[0]?.[0]?.state.layout).toBe('1x1')
+  expect(events?.[1]).toHaveLength(1)
+  expect(events?.[1]?.[0]?.state.layout).toBe('1x2')
+  expect(events?.[2]).toEqual([])
 })

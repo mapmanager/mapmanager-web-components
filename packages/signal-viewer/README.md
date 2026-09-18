@@ -5,6 +5,9 @@ regularly sampled scientific signals. It knows nothing about SanPy, Zarr,
 Parquet, or HTTP. Applications either provide complete arrays or implement the
 small asynchronous `SignalSource` range-loading interface.
 
+The canonical guide and hosted demo are available at
+[mapmanager.github.io/mapmanager-web-components/signal-viewer/](https://mapmanager.github.io/mapmanager-web-components/signal-viewer/).
+
 ## Run the demo on macOS
 
 From the `mapmanager-web-components` repository root:

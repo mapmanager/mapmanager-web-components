@@ -52,6 +52,9 @@ jobs:
       - name: Build NicePool demo
         run: npm run build:app --workspace @mapmanager/nicepool
 
+      - name: Build Signal Viewer demo
+        run: npm run build:app --workspace @mapmanager/signal-viewer
+
       - name: Install documentation dependencies
         run: pip install -r requirements-docs.txt
 
@@ -63,6 +66,7 @@ jobs:
           mkdir -p site/demos
           cp -R packages/image-viewer/dist site/demos/image-viewer
           cp -R packages/nicepool/dist site/demos/nicepool
+          cp -R packages/signal-viewer/dist site/demos/signal-viewer
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4

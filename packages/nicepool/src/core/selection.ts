@@ -14,6 +14,16 @@ export class SelectionModel {
     this.#selection = EMPTY_SELECTION
   }
 
+  /** Return the current selection with unknown row IDs removed. */
+  pruned(validIds: ReadonlySet<RowId>): NicePoolSelection {
+    return {
+      primaryRowId: this.#selection.primaryRowId !== null && validIds.has(this.#selection.primaryRowId)
+        ? this.#selection.primaryRowId
+        : null,
+      selectedRowIds: this.#selection.selectedRowIds.filter((rowId) => validIds.has(rowId)),
+    }
+  }
+
   set(selection: NicePoolSelection, validIds: ReadonlySet<RowId>): void {
     const unique = [...new Set(selection.selectedRowIds)]
     for (const rowId of unique) {

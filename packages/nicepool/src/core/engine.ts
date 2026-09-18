@@ -44,6 +44,22 @@ export class NicePoolEngine {
     this.#state = defaultNicePoolState(dataset)
   }
 
+  /** Replace rows while preserving the complete workspace when it remains valid. */
+  replaceData(input: DatasetInput): void {
+    if (!this.#dataset || !this.#state) throw new Error('NicePool has no dataset; call setData first')
+    const dataset = new DatasetStore(input)
+    const state = validateNicePoolState(dataset, this.#state)
+    for (let index = 0; index < visiblePlotCount(state.layout); index += 1) {
+      preparePlotData(dataset, state.plots[index]!)
+    }
+    const validIds = new Set(dataset.rowIndexById.keys())
+    const selection = this.#selection.pruned(validIds)
+
+    this.#dataset = dataset
+    this.#state = state
+    this.#selection.set(selection, validIds)
+  }
+
   setState(state: NicePoolState): void {
     const validated = validateNicePoolState(this.dataset, state)
     for (let index = 0; index < visiblePlotCount(validated.layout); index += 1) {

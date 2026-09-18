@@ -12,6 +12,18 @@ Rows are rectangular JSON-compatible records containing only `string`, finite
 and contain unique, non-empty string or finite-number values. IDs are normalized
 to strings. Invalid input rejects the complete replacement.
 
+`replaceData(input)` is the state-preserving replacement boundary. It requires
+an existing dataset, validates the new table against the complete current
+workspace, and commits only when the workspace and visible plots remain valid.
+Failure leaves the previous dataset, workspace, and selection unchanged; it
+does not partially repair incompatible columns or plot configuration.
+
+On success, `replaceData` preserves layout, active plot, all four plot states,
+filters, presets, and the selected preset name. Selection IDs absent from the
+new table are removed in their existing order. If the primary ID is absent it
+becomes `null`, even when other selected IDs survive. This host operation does
+not emit a user selection event.
+
 Callers may provide a complete column `schema` and an ordered
 `preFilterColumns` list. When `preFilterColumns` is omitted, NicePool retains
 its conventional `accept`, `channel`, and `roi_id` filters when those columns
@@ -55,7 +67,7 @@ interface NicePoolSelection {
 Host calls do not emit user-selection events. Plot interactions emit
 `selection-change` from the Vue component and `nicepool-selection-change` from
 the Custom Element. Ordinary filtering preserves hidden selections; `setData`
-clears all selection.
+clears all selection, while `replaceData` prunes it.
 
 An area selection replaces the shared selected-row set. A point click replaces
 it with exactly one primary row. Clearing selection publishes an empty set to
@@ -65,7 +77,8 @@ Selection events emitted by `Plotly.react` during programmatic synchronization
 are ignored; only genuine Plotly user events update the authoritative model.
 
 The Custom Element also emits `nicepool-state-change`,
-`nicepool-presets-change`, `nicepool-theme-change`, and `nicepool-data-reset`.
+`nicepool-presets-change`, `nicepool-theme-change`, `nicepool-data-reset`, and
+`nicepool-data-replaced`. Reset and replacement events are mutually exclusive.
 Host-facing methods include `setState`, `getState`, `setNicePoolPresets`,
 `getNicePoolPresets`, and `applyNicePoolPreset` in addition to the data and
 selection methods. `setShowPresetEditing` toggles the optional Name, Save, and

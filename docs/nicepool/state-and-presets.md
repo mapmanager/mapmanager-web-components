@@ -17,6 +17,11 @@ and Color-by choices depend on the table schema. `setData` therefore creates a
 fresh default workspace and clears selection; it never attempts to carry plot
 state across datasets.
 
+`replaceData` is the explicit alternative when a host wants to retain the
+workspace. It validates the complete state against the candidate dataset and
+prepares all visible plots before committing. An incompatible replacement
+fails atomically and leaves the previous table and workspace active.
+
 Plot-type-specific fields remain present while inactive. This keeps the state
 simple, stable, and easy for Python or TypeScript clients to construct.
 

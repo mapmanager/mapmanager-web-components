@@ -36,6 +36,8 @@ class NicePoolAnyWidget(anywidget.AnyWidget):
     nicepool_presets = traitlets.List().tag(sync=True)
     theme = traitlets.Enum(["dark", "light"], default_value="dark").tag(sync=True)
     height = traitlets.Int(default_value=720, min=240).tag(sync=True)
+    _replace_data_request = traitlets.Dict().tag(sync=True)
+    replace_data_error = traitlets.Unicode(default_value="").tag(sync=True)
 
     @traitlets.default("state")
     def _default_state(self) -> dict[str, Any]:
@@ -80,3 +82,21 @@ class NicePoolAnyWidget(anywidget.AnyWidget):
         if schema is not None:
             payload["schema"] = [dict(column) for column in schema]
         self.data = payload
+
+    def replace_data(
+        self,
+        rows: Sequence[Mapping[str, Any]] | Any,
+        *,
+        row_id_column: str | None = None,
+        schema: Sequence[Mapping[str, Any]] | None = None,
+    ) -> None:
+        """Replace rows while preserving valid NicePool workspace state."""
+        payload: dict[str, Any] = {
+            "rows": _records(rows),
+            "rowIdColumn": row_id_column or self.data["rowIdColumn"],
+        }
+        if schema is not None:
+            payload["schema"] = [dict(column) for column in schema]
+        revision = int(self._replace_data_request.get("revision", 0)) + 1
+        self.replace_data_error = ""
+        self._replace_data_request = {"revision": revision, "data": payload}

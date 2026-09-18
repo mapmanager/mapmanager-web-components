@@ -17,6 +17,7 @@ from .bridge import WebChannelBridge
 from .data import dataframe_to_dataset, records_to_dataset
 
 ResultCallback = Callable[[Any], None]
+ErrorCallback = Callable[[str], None]
 
 
 class NicePoolWidget(QWidget):
@@ -28,6 +29,7 @@ class NicePoolWidget(QWidget):
     presets_changed = pyqtSignal(object)
     theme_changed = pyqtSignal(str)
     data_reset = pyqtSignal()
+    data_replaced = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -46,7 +48,7 @@ class NicePoolWidget(QWidget):
         self._next_request_id = 1
         self._queued_messages: list[dict[str, Any]] = []
         self._in_flight_request_id: int | None = None
-        self._pending: dict[int, tuple[str, ResultCallback | None]] = {}
+        self._pending: dict[int, tuple[str, ResultCallback | None, ErrorCallback | None]] = {}
 
         self.web_view = QWebEngineView(self)
         self.web_view.settings().setAttribute(
@@ -76,12 +78,18 @@ class NicePoolWidget(QWidget):
         if not success:
             self.error_occurred.emit("NicePool host page failed to load")
 
-    def _send(self, name: str, payload: Any = None, callback: ResultCallback | None = None) -> None:
+    def _send(
+        self,
+        name: str,
+        payload: Any = None,
+        callback: ResultCallback | None = None,
+        error_callback: ErrorCallback | None = None,
+    ) -> None:
         request_id = self._next_request_id
         self._next_request_id += 1
         message = {"id": request_id, "name": name, "payload": payload}
         json.dumps(message, allow_nan=False)
-        self._pending[request_id] = (name, callback)
+        self._pending[request_id] = (name, callback, error_callback)
         self._queued_messages.append(message)
         self._dispatch_next()
 
@@ -118,10 +126,13 @@ class NicePoolWidget(QWidget):
         if request_id != self._in_flight_request_id:
             self.error_occurred.emit(f"Out-of-order NicePool response ID: {request_id!r}")
             return
-        name, callback = self._pending.pop(request_id)
+        name, callback, error_callback = self._pending.pop(request_id)
         self._in_flight_request_id = None
         if message.get("ok") is not True:
-            self.error_occurred.emit(f"NicePool command {name!r} failed: {message.get('error', 'unknown error')}")
+            error = f"NicePool command {name!r} failed: {message.get('error', 'unknown error')}"
+            self.error_occurred.emit(error)
+            if error_callback is not None:
+                error_callback(error)
             self._dispatch_next()
             return
         if callback is not None:
@@ -141,6 +152,8 @@ class NicePoolWidget(QWidget):
             self.theme_changed.emit(str(detail))
         elif name == "dataReset":
             self.data_reset.emit()
+        elif name == "dataReplaced":
+            self.data_replaced.emit()
         else:
             self.error_occurred.emit(f"Unknown NicePool browser event: {name!r}")
 
@@ -180,6 +193,52 @@ class NicePoolWidget(QWidget):
                 schema=schema,
                 pre_filter_columns=pre_filter_columns,
             ),
+        )
+
+    def replace_dataframe(
+        self,
+        dataframe: pd.DataFrame,
+        *,
+        row_id_column: str,
+        schema: Sequence[Mapping[str, Any]] | None = None,
+        pre_filter_columns: Sequence[str] | None = None,
+        callback: ResultCallback | None = None,
+        error_callback: ErrorCallback | None = None,
+    ) -> None:
+        """Atomically replace rows while preserving valid NicePool workspace state."""
+        self._send(
+            "replaceData",
+            dataframe_to_dataset(
+                dataframe,
+                row_id_column=row_id_column,
+                schema=schema,
+                pre_filter_columns=pre_filter_columns,
+            ),
+            callback,
+            error_callback,
+        )
+
+    def replace_records(
+        self,
+        records: Sequence[Mapping[str, Any]],
+        *,
+        row_id_column: str,
+        schema: Sequence[Mapping[str, Any]] | None = None,
+        pre_filter_columns: Sequence[str] | None = None,
+        callback: ResultCallback | None = None,
+        error_callback: ErrorCallback | None = None,
+    ) -> None:
+        """Atomically replace rows while preserving valid NicePool workspace state."""
+        self._send(
+            "replaceData",
+            records_to_dataset(
+                records,
+                row_id_column=row_id_column,
+                schema=schema,
+                pre_filter_columns=pre_filter_columns,
+            ),
+            callback,
+            error_callback,
         )
 
     def set_selection(self, primary_row_id: str | None, selected_row_ids: Sequence[str]) -> None:

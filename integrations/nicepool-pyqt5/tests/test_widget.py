@@ -54,6 +54,55 @@ def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
     assert len(presets) == 0
     assert len(themes) == 0
 
+    widget.web_view.page().runJavaScript(
+        """
+        (() => {
+          const root = document.querySelector('nice-pool')?.shadowRoot;
+          const name = root?.querySelector('fieldset input[placeholder="Preset name"]');
+          const save = [...(root?.querySelectorAll('fieldset button') ?? [])]
+            .find((button) => button.textContent === 'Save');
+          if (!name || !save) return false;
+          name.value = 'Host saved';
+          name.dispatchEvent(new Event('input', {bubbles: true}));
+          save.click();
+          return true;
+        })();
+        """
+    )
+    qtbot.waitUntil(lambda: len(presets) == 1, timeout=5_000)
+    assert [preset["name"] for preset in presets[0][0]] == ["Current", "Host saved"]
+
+    widget.web_view.page().runJavaScript(
+        """
+        (() => {
+          const root = document.querySelector('nice-pool')?.shadowRoot;
+          const remove = [...(root?.querySelectorAll('fieldset button') ?? [])]
+            .find((button) => button.textContent === 'Delete');
+          remove?.click();
+          return Boolean(remove);
+        })();
+        """
+    )
+    qtbot.waitUntil(lambda: len(presets) == 2, timeout=5_000)
+    assert [preset["name"] for preset in presets[1][0]] == ["Current"]
+
+    replacement_state = dict(state[0])
+    replacement_state["plots"] = [dict(plot) for plot in state[0]["plots"]]
+    replacement_state["plots"][0]["pointSize"] = 12
+    widget.set_state(replacement_state)
+    with qtbot.waitSignal(widget.data_replaced, timeout=20_000):
+        widget.replace_records(
+            [
+                {"id": "a", "x": 10.0, "y": 20.0},
+                {"id": "b", "x": 11.0, "y": 21.0},
+            ],
+            row_id_column="id",
+        )
+    replaced_state: list[object] = []
+    widget.get_state(replaced_state.append)
+    qtbot.waitUntil(lambda: len(replaced_state) == 1 or len(errors) > 0, timeout=5_000)
+    assert replaced_state[0]["plots"][0]["pointSize"] == 12
+
     rendered: list[object] = []
     inspect_script = """
       (() => {

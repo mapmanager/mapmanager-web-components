@@ -74,6 +74,26 @@ There is no incremental update, chunking, dataframe comparison, row patching,
 or automatic restoration of state from the previous dataset. The adapter does
 not impose a row or column limit.
 
+After an initial `set_dataframe()` or `set_records()`, callers may use
+`replace_dataframe()` or `replace_records()` to preserve the current valid
+plot workspace and presets. Missing selection IDs are pruned and the distinct
+`data_replaced` signal is emitted after success; `data_reset` is not emitted.
+If the current workspace is incompatible, the old table remains active.
+
+Replacement commands accept optional per-call callbacks so a host can choose
+its own fallback without parsing the shared error signal:
+
+```python
+self.pool.replace_dataframe(
+    next_frame,
+    row_id_column="pool_row_id",
+    callback=lambda _result: self._replacement_finished(),
+    error_callback=lambda message: self._reset_after_failed_replacement(message),
+)
+```
+
+Failures also continue to emit `error_occurred(str)`.
+
 The row-ID column must be explicit, unique, and nonempty. The adapter never uses
 the pandas index or generates IDs. Table cells must resolve to strings, finite
 numbers, booleans, or missing values. pandas and NumPy missing values become
@@ -106,6 +126,7 @@ Browser/user changes emit Qt signals:
 - `state_changed(object)`
 - `presets_changed(object)`
 - `theme_changed(str)`
+- `data_replaced()`
 
 Python setters do not echo through their corresponding change signal. This is
 the adapter's feedback-loop boundary:
@@ -117,6 +138,11 @@ self.pool.set_selection("row-2", ["row-2"])
 
 `data_reset` is a lifecycle notification emitted after NicePool accepts a new
 dataset; it is not a user-change signal.
+
+`presets_changed` carries the complete preset collection after a user saves,
+overwrites, or deletes a workspace. Connect it to host-owned persistence and
+restore that collection with `set_presets()` after `data_reset`. See
+[Saved workspace persistence](preset-persistence.md#host-owned-persistence).
 
 ## Setters
 

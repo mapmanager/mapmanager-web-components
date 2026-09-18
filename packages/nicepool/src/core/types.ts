@@ -15,7 +15,7 @@ export interface ColumnSchema {
   categorical?: boolean
 }
 
-/** Complete replacement payload accepted by {@link NicePoolEngine.setData}. */
+/** Complete table payload accepted by dataset reset and state-preserving replacement APIs. */
 export interface DatasetInput {
   rows: readonly NicePoolRow[]
   rowIdColumn: string

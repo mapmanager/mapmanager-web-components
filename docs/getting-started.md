@@ -1,6 +1,7 @@
 # Getting started
 
-The repository is an npm workspace containing two independent packages.
+The repository is an npm workspace containing independent component and
+integration packages.
 
 ## Install and verify
 
@@ -20,6 +21,7 @@ GitHub Pages publishes the same standalone demo applications:
 
 - [Image Viewer](https://mapmanager.github.io/mapmanager-web-components/demos/image-viewer/)
 - [NicePool](https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/)
+- [Signal Viewer](https://mapmanager.github.io/mapmanager-web-components/demos/signal-viewer/)
 
 ## Run a component locally
 
@@ -31,6 +33,12 @@ or:
 
 ```bash
 npm run dev --workspace @mapmanager/nicepool
+```
+
+or:
+
+```bash
+npm run dev --workspace @mapmanager/signal-viewer
 ```
 
 Each command starts that package's standalone Vite development application.

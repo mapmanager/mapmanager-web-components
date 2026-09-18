@@ -24,3 +24,15 @@ def test_replace_data_preserves_row_id_column():
         "rowIdColumn": "id",
         "rows": [{"id": "b", "value": 2}],
     }
+
+
+def test_state_preserving_replace_uses_a_distinct_request():
+    widget = NicePoolAnyWidget([{"id": "a", "value": 1}], row_id_column="id")
+
+    widget.replace_data([{"id": "b", "value": 2}])
+
+    assert widget.data["rows"] == [{"id": "a", "value": 1}]
+    assert widget._replace_data_request == {
+        "revision": 1,
+        "data": {"rowIdColumn": "id", "rows": [{"id": "b", "value": 2}]},
+    }

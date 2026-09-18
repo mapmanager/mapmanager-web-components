@@ -26,6 +26,7 @@ interface QtNamespace {
 
 interface NicePoolDomElement extends HTMLElement {
   setData(input: DatasetInput): void
+  replaceData(input: DatasetInput): void
   setState(state: NicePoolState): void
   getState(): NicePoolState
   setNicePoolPresets(presets: readonly NicePoolPreset[]): void
@@ -100,10 +101,14 @@ new window.QWebChannel(window.qt.webChannelTransport, (channel) => {
   pool.addEventListener('nicepool-data-reset', () => {
     send({ kind: 'event', name: 'dataReset', detail: null })
   })
+  pool.addEventListener('nicepool-data-replaced', () => {
+    send({ kind: 'event', name: 'dataReplaced', detail: null })
+  })
 
   const execute = (command: CommandEnvelope): unknown => {
     switch (command.name) {
       case 'setData': return pool.setData(command.payload as DatasetInput)
+      case 'replaceData': return pool.replaceData(command.payload as DatasetInput)
       case 'setState': return pool.setState(command.payload as NicePoolState)
       case 'getState': return pool.getState()
       case 'setPresets': return pool.setNicePoolPresets(command.payload as NicePoolPreset[])

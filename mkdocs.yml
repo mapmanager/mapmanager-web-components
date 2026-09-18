@@ -37,9 +37,19 @@ nav:
       - State and presets: nicepool/state-and-presets.md
       - Preset persistence: nicepool/preset-persistence.md
       - PyQt5 integration: nicepool/pyqt5-integration.md
+      - Changelog: nicepool/CHANGELOG.md
+  - Signal Viewer:
+      - Overview: signal-viewer/index.md
+      - Data sources: signal-viewer/data-sources.md
+      - Vue integration: signal-viewer/vue-integration.md
+      - Custom Element: signal-viewer/custom-element.md
+      - Overlays and cursors: signal-viewer/overlays-and-cursors.md
+      - Interaction and display: signal-viewer/interaction-and-display.md
+      - Architecture: signal-viewer/architecture.md
   - Live demos:
       - Image Viewer: https://mapmanager.github.io/mapmanager-web-components/demos/image-viewer/
       - NicePool: https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/
+      - Signal Viewer: https://mapmanager.github.io/mapmanager-web-components/demos/signal-viewer/
   - Example clients: clients.md
   - Development: development.md
 

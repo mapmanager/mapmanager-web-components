@@ -24,8 +24,18 @@ points.
 [Read the NicePool guide](nicepool/index.md).
 [Open the hosted NicePool demo](https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/).
 
+### Signal Viewer
+
+`@mapmanager/signal-viewer` displays aligned scientific signals from complete
+arrays or asynchronous range sources. It provides zooming and panning,
+left/right axes, overlays, measurement cursors, display controls, and Vue and
+Custom Element entry points.
+
+[Read the Signal Viewer guide](signal-viewer/index.md).
+[Open the hosted Signal Viewer demo](https://mapmanager.github.io/mapmanager-web-components/demos/signal-viewer/).
+
 ## Project status
 
-Both components are implemented and used by MapManager applications. They are
+The components are implemented for MapManager applications. They are
 actively developed and pre-1.0: breaking API changes are allowed when they
 improve the design and should include changelog and migration notes.

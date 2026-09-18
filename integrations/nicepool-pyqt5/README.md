@@ -22,6 +22,16 @@ The generated `nicepool-pyqt5.js` and `nicepool-pyqt5.css` are intentionally
 not tracked. Build them before running the example, testing the WebEngine
 integration, or building a wheel.
 
+Use `set_dataframe()` / `set_records()` for initialization or a full reset.
+Use `replace_dataframe()` / `replace_records()` after initialization to retain
+valid plot state and presets. Replacement offers per-call `callback` and
+`error_callback` hooks for host-controlled fallback behavior.
+
+The adapter is storage-agnostic. To persist UI-created workspaces, connect
+`presets_changed` to the application's settings layer and restore the complete
+list with `set_presets()` after the initial `data_reset`. See
+`examples/preset_persistence.py`.
+
 ## Run tests and the example
 
 ```bash

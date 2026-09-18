@@ -22,6 +22,7 @@ const emit = defineEmits<{
   'presets-change': [presets: readonly NicePoolPreset[]]
   'theme-change': [theme: NicePoolTheme]
   'data-reset': []
+  'data-replaced': []
 }>()
 const engine = new NicePoolEngine()
 const preparedPlots = shallowRef<readonly PreparedPlot[]>([])
@@ -197,6 +198,14 @@ function setData(input: DatasetInput): void {
   emit('data-reset')
 }
 
+/** Replace rows while preserving valid workspace and preset state. */
+function replaceData(input: DatasetInput): void {
+  engine.replaceData(input)
+  rawTablePage.value = 0
+  refresh()
+  emit('data-replaced')
+}
+
 function updatePlotState(patch: Partial<PlotState>): void {
   if (!plotState.value) return
   engine.setPlotState({ ...plotState.value, ...patch })
@@ -318,7 +327,7 @@ function displaySummaryValue(value: unknown): string {
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
-defineExpose({ setData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setControlsCollapsed, getControlsCollapsed, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
+defineExpose({ setData, replaceData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setControlsCollapsed, getControlsCollapsed, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
 watch(() => props.dataset, (dataset) => { if (dataset) setData(dataset) }, { immediate: true })
 watch(() => props.theme, (theme) => setTheme(theme))
 watch(() => props.showPresetEditing, (visible) => setShowPresetEditing(visible))

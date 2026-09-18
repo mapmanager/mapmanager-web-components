@@ -7,6 +7,7 @@ import widgetStyles from '../vue/widget.css?inline'
 
 interface WidgetApi {
   setData(input: DatasetInput): void
+  replaceData(input: DatasetInput): void
   setState(state: NicePoolState): void
   getState(): NicePoolState
   setNicePoolPresets(presets: readonly NicePoolPreset[]): void
@@ -56,6 +57,9 @@ export class NicePoolElement extends HTMLElement {
         },
         onDataReset: () => {
           this.dispatchEvent(new CustomEvent('nicepool-data-reset', { bubbles: true, composed: true }))
+        },
+        onDataReplaced: () => {
+          this.dispatchEvent(new CustomEvent('nicepool-data-replaced', { bubbles: true, composed: true }))
         },
         onStateChange: (state: NicePoolState) => {
           this.dispatchEvent(new CustomEvent('nicepool-state-change', {
@@ -114,6 +118,12 @@ export class NicePoolElement extends HTMLElement {
       return
     }
     this.#widget.value.setData(input)
+  }
+
+  /** Replace rows while preserving valid workspace and preset state. */
+  replaceData(input: DatasetInput): void {
+    if (!this.#widget.value) throw new Error('NicePool element is not connected; call setData after connecting first')
+    this.#widget.value.replaceData(input)
   }
 
   setSelection(selection: NicePoolSelection): void {
