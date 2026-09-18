@@ -6,7 +6,8 @@ Signal Viewer separates data coordination, rendering, and host integration.
 
 `SignalViewerEngine` owns source descriptions, visible-series state,
 calibrated viewport normalization, request cancellation, generation guards,
-and range-result validation. It has no Vue or uPlot dependency.
+and range-result validation. It has no Vue or
+[uPlot](https://github.com/leeoniya/uPlot) dependency.
 
 `InMemorySignalSource` adapts complete aligned arrays to the same
 `SignalSource` contract used by lazy storage adapters. This keeps validation

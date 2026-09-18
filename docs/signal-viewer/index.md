@@ -1,9 +1,13 @@
 # Signal Viewer
 
 `@mapmanager/signal-viewer` is a reusable viewer for aligned, regularly
-sampled scientific signals. It supports complete in-memory arrays and lazy
+sampled 2D signals. It supports complete in-memory arrays and lazy
 range sources without knowing about an application's storage, transport, or
 analysis model.
+Plotting is provided by [uPlot](https://github.com/leeoniya/uPlot).
+
+[SanPy Web](https://mapmanager.github.io/sanpy-web/) uses Signal Viewer to plot
+recorded signals against time.
 
 [Open the hosted Signal Viewer demo](https://mapmanager.github.io/mapmanager-web-components/demos/signal-viewer/).
 

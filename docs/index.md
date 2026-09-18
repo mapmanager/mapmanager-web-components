@@ -7,7 +7,7 @@ MapManager web and Python/NiceGUI applications.
 
 ### Image Viewer
 
-`@mapmanager/image-viewer` is a Deck.gl/Viv scientific image viewer. It loads
+`@mapmanager/image-viewer` is a [Viv](https://github.com/hms-dbmi/viv)/Deck.gl image viewer. It loads
 in-memory and lazy image planes as well as remote or browser-selected local
 OME-Zarr data. It provides channel layouts, composites, contrast and color-map
 controls, calibrated axes, ROIs, XY overlays, and copying of the current view.
@@ -26,7 +26,7 @@ points.
 
 ### Signal Viewer
 
-`@mapmanager/signal-viewer` displays aligned scientific signals from complete
+`@mapmanager/signal-viewer` displays 2D plots of 1D signals (line plots) from complete
 arrays or asynchronous range sources. It provides zooming and panning,
 left/right axes, overlays, measurement cursors, display controls, and Vue and
 Custom Element entry points.

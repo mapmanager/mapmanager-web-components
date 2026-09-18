@@ -1,7 +1,7 @@
 # Interaction and display
 
-Signal Viewer uses uPlot at the rendering boundary while its public controls
-remain renderer-independent.
+Signal Viewer uses [uPlot](https://github.com/leeoniya/uPlot) at the rendering
+boundary while its public controls remain renderer-independent.
 
 ## Navigation
 

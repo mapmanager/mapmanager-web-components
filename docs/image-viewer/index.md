@@ -1,7 +1,8 @@
 # Image Viewer
 
-`@mapmanager/image-viewer` is the reusable MapManager scientific image viewer.
-It combines Viv image layers with Deck.gl interaction and a Vue user interface.
+`@mapmanager/image-viewer` is a reusable image viewer.
+It combines [Viv](https://github.com/hms-dbmi/viv) image layers with Deck.gl
+interaction and a Vue user interface.
 It is used in production by [AcqView](https://mapmanager.github.io/acqview/).
 A hosted package demo is at
 [mapmanager.github.io/mapmanager-web-components/demos/image-viewer](https://mapmanager.github.io/mapmanager-web-components/demos/image-viewer/).

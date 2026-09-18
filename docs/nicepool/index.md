@@ -3,10 +3,12 @@
 `@mapmanager/nicepool` is a browser-native statistical exploration component.
 It owns dataset validation, filtering, linked selection, plot preparation,
 summaries, four persistent plot slots, and saved workspace presets.
+Plotting is provided by [Plotly JavaScript](https://plotly.com/javascript/).
 
 It provides a Vue component and a framework-neutral `<nice-pool>` Custom
-Element. [CloudScope Web](https://mapmanager.github.io/cloudscope-web/) is the
-primary client example.
+Element. It is used by
+[CloudScope Web](https://mapmanager.github.io/cloudscope-web/) and
+[SanPy Web](https://mapmanager.github.io/sanpy-web/).
 A hosted package demo is at
 [mapmanager.github.io/mapmanager-web-components/demos/nicepool](https://mapmanager.github.io/mapmanager-web-components/demos/nicepool/).
 
