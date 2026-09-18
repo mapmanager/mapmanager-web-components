@@ -32,6 +32,19 @@ The adapter is storage-agnostic. To persist UI-created workspaces, connect
 list with `set_presets()` after the initial `data_reset`. See
 `examples/preset_persistence.py`.
 
+Apply display-only startup options in the constructor so the first browser
+render already has the intended appearance:
+
+```python
+pool = NicePoolWidget(
+    theme="dark",
+    controls_collapsed=True,
+    preset_editing_visible=True,
+)
+```
+
+The corresponding setters remain available for runtime changes.
+
 ## Run tests and the example
 
 ```bash

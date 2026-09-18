@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NicePoolEngine } from '../core/engine'
-import { validateNicePoolPreset, validateNicePoolPresets, visiblePlotCount } from '../core/state'
-import type { ColumnSchema, DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
+import { createNicePoolPresets, validateNicePoolPreset, validateNicePoolPresets, visiblePlotCount } from '../core/state'
+import type { ColumnSchema, DatasetInput, NicePoolPreset, NicePoolPresetDefinition, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
 import type { PreparedPlot, PlotSummary } from '../plots/types'
 import { describeEmptyPlot } from '../plots/diagnostics'
 import { formatPlotSummaryToTsv } from '../plots/summary-format'
@@ -198,6 +198,28 @@ function setData(input: DatasetInput): void {
   emit('data-reset')
 }
 
+/** Atomically initialize data, dataset-aware presets, and the active preset. */
+function initializeData(
+  input: DatasetInput,
+  definitions: readonly NicePoolPresetDefinition[],
+  defaultPresetName: string | null = null,
+): void {
+  const nextPresets = createNicePoolPresets(input, definitions)
+  if (defaultPresetName !== null && !nextPresets.some(({ name }) => name === defaultPresetName)) {
+    throw new Error(`Unknown default NicePool preset ${JSON.stringify(defaultPresetName)}`)
+  }
+  engine.setData(input)
+  rawTablePage.value = 0
+  presets.value = nextPresets
+  selectedPresetName.value = ''
+  if (defaultPresetName !== null) {
+    engine.applyNicePoolPreset(nextPresets.find(({ name }) => name === defaultPresetName)!)
+    selectedPresetName.value = defaultPresetName
+  }
+  refresh()
+  emit('data-reset')
+}
+
 /** Replace rows while preserving valid workspace and preset state. */
 function replaceData(input: DatasetInput): void {
   engine.replaceData(input)
@@ -327,7 +349,7 @@ function displaySummaryValue(value: unknown): string {
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
-defineExpose({ setData, replaceData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setControlsCollapsed, getControlsCollapsed, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
+defineExpose({ setData, initializeData, replaceData, setState, getState, setNicePoolPresets, getNicePoolPresets, applyNicePoolPreset, setShowPresetEditing, getShowPresetEditing, setControlsCollapsed, getControlsCollapsed, setSelection, setPrimarySelection, clearSelection, getSelection, getPlotSummary, setTheme, getTheme })
 watch(() => props.dataset, (dataset) => { if (dataset) setData(dataset) }, { immediate: true })
 watch(() => props.theme, (theme) => setTheme(theme))
 watch(() => props.showPresetEditing, (visible) => setShowPresetEditing(visible))
@@ -342,7 +364,6 @@ onBeforeUnmount(() => {
 <template>
   <section class="nicepool-shell" :class="`nicepool-theme-${activeTheme}`" :style="{ '--nicepool-controls-width': `${controlsWidth}px`, '--nicepool-plot-height': `${plotHeight}px` }">
     <aside v-if="state && plotState" class="nicepool-controls" :class="{ 'nicepool-controls-collapsed': controlsWidth === 0 }">
-      <label>Preset<select :value="selectedPresetName" @change="applyPreset(($event.target as HTMLSelectElement).value)"><option value="">None</option><option v-for="preset in presets" :key="preset.name" :value="preset.name">{{ preset.name }}</option></select></label>
       <div class="nicepool-control-row">
         <label>Layout<select :value="state.layout" @change="setLayout(($event.target as HTMLSelectElement).value as PlotLayout)">
           <option value="1x1">1×1</option><option value="1x2">1×2</option><option value="2x1">2×1</option><option value="2x2">2×2</option>
@@ -399,6 +420,9 @@ onBeforeUnmount(() => {
     </aside>
     <div class="nicepool-splitter nicepool-splitter-vertical" role="separator" aria-label="Resize controls" aria-orientation="vertical" tabindex="0" @pointerdown="startResize('vertical', $event)" @keydown="resizeWithKeyboard('vertical', $event)" />
     <section class="nicepool-plot-region">
+      <header v-if="state" class="nicepool-preset-bar">
+        <label>Preset<select :value="selectedPresetName" @change="applyPreset(($event.target as HTMLSelectElement).value)"><option value="">None</option><option v-for="preset in presets" :key="preset.name" :value="preset.name">{{ preset.name }}</option></select></label>
+      </header>
       <main v-if="state" class="nicepool-main nicepool-grid" :class="`nicepool-layout-${state.layout}`">
         <section v-for="(prepared, index) in preparedPlots" :key="index" class="nicepool-plot-cell" :class="{ 'nicepool-plot-active': index === state.activePlotIndex }" @click="activatePlotFromCell(index)">
           <span class="nicepool-plot-number">Plot {{ index + 1 }}</span><PlotlyView :data="prepared.data" :selection="selection" :theme="activeTheme" @selection="selectRows" />

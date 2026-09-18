@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from PyQt5.QtCore import QUrl, pyqtSignal
+from PyQt5.QtCore import QUrl, QUrlQuery, pyqtSignal
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import QWebEngineSettings, QWebEngineView
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
@@ -32,8 +32,29 @@ class NicePoolWidget(QWidget):
     data_replaced = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        theme: str = "dark",
+        controls_collapsed: bool = False,
+        preset_editing_visible: bool = True,
+    ) -> None:
+        """Create a NicePool host with display options applied before first render.
+
+        Args:
+            parent: Optional parent widget.
+            theme: Initial ``dark`` or ``light`` theme.
+            controls_collapsed: Whether the controls panel starts collapsed.
+            preset_editing_visible: Whether preset editing starts visible.
+
+        Raises:
+            ValueError: If ``theme`` is not supported.
+            RuntimeError: If the packaged browser assets are unavailable.
+        """
         super().__init__(parent)
+        if theme not in {"dark", "light"}:
+            raise ValueError("theme must be 'dark' or 'light'")
         static_directory = Path(__file__).resolve().parent / "static"
         html_path = static_directory / "index.html"
         script_path = static_directory / "nicepool-pyqt5.js"
@@ -51,6 +72,7 @@ class NicePoolWidget(QWidget):
         self._pending: dict[int, tuple[str, ResultCallback | None, ErrorCallback | None]] = {}
 
         self.web_view = QWebEngineView(self)
+        self.web_view.hide()
         self.web_view.settings().setAttribute(
             QWebEngineSettings.JavascriptCanAccessClipboard,
             True,
@@ -67,7 +89,18 @@ class NicePoolWidget(QWidget):
         self._bridge.message_received.connect(self._receive_browser_message)
         self._bridge.invalid_message.connect(self.error_occurred)
         self.web_view.loadFinished.connect(self._load_finished)
-        self.web_view.load(QUrl.fromLocalFile(str(html_path)))
+        page_url = QUrl.fromLocalFile(str(html_path))
+        query = QUrlQuery()
+        query.addQueryItem("theme", theme)
+        query.addQueryItem(
+            "controlsCollapsed", "true" if controls_collapsed else "false"
+        )
+        query.addQueryItem(
+            "presetEditingVisible",
+            "true" if preset_editing_visible else "false",
+        )
+        page_url.setQuery(query)
+        self.web_view.load(page_url)
 
     @property
     def is_ready(self) -> bool:
@@ -108,6 +141,11 @@ class NicePoolWidget(QWidget):
                 return
             self._ready = True
             self.ready_changed.emit(True)
+            if not any(
+                message["name"] in {"setData", "initializeData"}
+                for message in self._queued_messages
+            ):
+                self.web_view.show()
             self._dispatch_next()
             return
         if kind == "response":
@@ -151,6 +189,7 @@ class NicePoolWidget(QWidget):
         elif name == "themeChanged":
             self.theme_changed.emit(str(detail))
         elif name == "dataReset":
+            self.web_view.show()
             self.data_reset.emit()
         elif name == "dataReplaced":
             self.data_replaced.emit()
@@ -164,16 +203,28 @@ class NicePoolWidget(QWidget):
         row_id_column: str,
         schema: Sequence[Mapping[str, Any]] | None = None,
         pre_filter_columns: Sequence[str] | None = None,
+        preset_definitions: Sequence[Mapping[str, Any]] | None = None,
+        default_preset: str | None = None,
     ) -> None:
         """Atomically replace NicePool data from a pandas DataFrame."""
+        dataset = dataframe_to_dataset(
+            dataframe,
+            row_id_column=row_id_column,
+            schema=schema,
+            pre_filter_columns=pre_filter_columns,
+        )
+        if preset_definitions is None:
+            if default_preset is not None:
+                raise ValueError("default_preset requires preset_definitions")
+            self._send("setData", dataset)
+            return
         self._send(
-            "setData",
-            dataframe_to_dataset(
-                dataframe,
-                row_id_column=row_id_column,
-                schema=schema,
-                pre_filter_columns=pre_filter_columns,
-            ),
+            "initializeData",
+            {
+                "dataset": dataset,
+                "presetDefinitions": [dict(item) for item in preset_definitions],
+                "defaultPresetName": default_preset,
+            },
         )
 
     def set_records(
@@ -183,16 +234,28 @@ class NicePoolWidget(QWidget):
         row_id_column: str,
         schema: Sequence[Mapping[str, Any]] | None = None,
         pre_filter_columns: Sequence[str] | None = None,
+        preset_definitions: Sequence[Mapping[str, Any]] | None = None,
+        default_preset: str | None = None,
     ) -> None:
         """Atomically replace NicePool data from rectangular records."""
+        dataset = records_to_dataset(
+            records,
+            row_id_column=row_id_column,
+            schema=schema,
+            pre_filter_columns=pre_filter_columns,
+        )
+        if preset_definitions is None:
+            if default_preset is not None:
+                raise ValueError("default_preset requires preset_definitions")
+            self._send("setData", dataset)
+            return
         self._send(
-            "setData",
-            records_to_dataset(
-                records,
-                row_id_column=row_id_column,
-                schema=schema,
-                pre_filter_columns=pre_filter_columns,
-            ),
+            "initializeData",
+            {
+                "dataset": dataset,
+                "presetDefinitions": [dict(item) for item in preset_definitions],
+                "defaultPresetName": default_preset,
+            },
         )
 
     def replace_dataframe(

@@ -1,12 +1,13 @@
 import { createApp, h, ref, type App, type ComponentPublicInstance } from 'vue'
 
-import type { DatasetInput, NicePoolPreset, NicePoolSelection, NicePoolState, NicePoolTheme, RowId } from '../core/types'
+import type { DatasetInput, NicePoolPreset, NicePoolPresetDefinition, NicePoolSelection, NicePoolState, NicePoolTheme, RowId } from '../core/types'
 import type { PlotSummary } from '../plots/types'
 import NicePoolWidget from '../vue/NicePoolWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
 
 interface WidgetApi {
   setData(input: DatasetInput): void
+  initializeData(input: DatasetInput, definitions: readonly NicePoolPresetDefinition[], defaultPresetName?: string | null): void
   replaceData(input: DatasetInput): void
   setState(state: NicePoolState): void
   getState(): NicePoolState
@@ -35,6 +36,7 @@ export class NicePoolElement extends HTMLElement {
   #pendingPresets: readonly NicePoolPreset[] | null = null
   #showPresetEditing = true
   #controlsCollapsed = false
+  #theme: NicePoolTheme = 'dark'
 
   connectedCallback(): void {
     if (this.#app) return
@@ -48,6 +50,7 @@ export class NicePoolElement extends HTMLElement {
         ref: this.#widget,
         showPresetEditing: this.#showPresetEditing,
         controlsCollapsed: this.#controlsCollapsed,
+        theme: this.#theme,
         onSelectionChange: (selection: NicePoolSelection) => {
           this.dispatchEvent(new CustomEvent('nicepool-selection-change', {
             detail: selection,
@@ -120,6 +123,19 @@ export class NicePoolElement extends HTMLElement {
     this.#widget.value.setData(input)
   }
 
+  /** Atomically initialize data, dataset-aware presets, and the active preset. */
+  initializeData(
+    input: DatasetInput,
+    definitions: readonly NicePoolPresetDefinition[],
+    defaultPresetName: string | null = null,
+  ): void {
+    if (!this.#widget.value) throw new Error('NicePool element is not connected')
+    this.#pendingDataset = null
+    this.#pendingState = null
+    this.#pendingPresets = null
+    this.#widget.value.initializeData(input, definitions, defaultPresetName)
+  }
+
   /** Replace rows while preserving valid workspace and preset state. */
   replaceData(input: DatasetInput): void {
     if (!this.#widget.value) throw new Error('NicePool element is not connected; call setData after connecting first')
@@ -157,8 +173,11 @@ export class NicePoolElement extends HTMLElement {
     this.#widget.value?.setControlsCollapsed(collapsed)
   }
   getControlsCollapsed(): boolean { return this.#widget.value?.getControlsCollapsed() ?? this.#controlsCollapsed }
-  setTheme(theme: NicePoolTheme): void { this.#widget.value?.setTheme(theme) }
-  getTheme(): NicePoolTheme { return this.#widget.value?.getTheme() ?? 'dark' }
+  setTheme(theme: NicePoolTheme): void {
+    this.#theme = theme
+    this.#widget.value?.setTheme(theme)
+  }
+  getTheme(): NicePoolTheme { return this.#widget.value?.getTheme() ?? this.#theme }
 
   setPrimarySelection(rowId: RowId | null): void {
     this.#widget.value?.setPrimarySelection(rowId)

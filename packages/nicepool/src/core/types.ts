@@ -89,6 +89,12 @@ export interface NicePoolStateOverrides {
   plots?: readonly Partial<PlotState>[]
 }
 
+/** Named dataset-aware overrides used to construct a complete preset. */
+export interface NicePoolPresetDefinition {
+  name: string
+  state: NicePoolStateOverrides
+}
+
 /** Error raised when a complete dataset cannot satisfy the public contract. */
 export class DatasetValidationError extends Error {
   constructor(message: string) {

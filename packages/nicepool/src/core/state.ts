@@ -3,6 +3,7 @@ import {
   StateValidationError,
   type DatasetInput,
   type NicePoolPreset,
+  type NicePoolPresetDefinition,
   type NicePoolState,
   type NicePoolStateOverrides,
   type PlotLayout,
@@ -95,6 +96,19 @@ export function createNicePoolState(input: DatasetInput, overrides: NicePoolStat
     activePlotIndex: overrides.activePlotIndex ?? defaults.activePlotIndex,
     plots,
   })
+}
+
+/** Build and atomically validate complete presets from dataset-aware overrides. */
+export function createNicePoolPresets(
+  input: DatasetInput,
+  definitions: readonly NicePoolPresetDefinition[],
+): NicePoolPreset[] {
+  const presets = definitions.map(({ name, state }) => ({
+    schemaVersion: 1 as const,
+    name,
+    state: createNicePoolState(input, state),
+  }))
+  return validateNicePoolPresets(new DatasetStore(input), presets)
 }
 
 function requiredColumn(dataset: DatasetStore, column: string, label: string): void {

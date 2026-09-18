@@ -63,6 +63,7 @@ test('collapses and restores controls through the public element API', async ({ 
     (element as HTMLElement & { setControlsCollapsed(collapsed: boolean): void }).setControlsCollapsed(true)
   })
   await expect.poll(() => controls.evaluate((element) => element.getBoundingClientRect().width)).toBe(0)
+  await expect(pool.getByLabel('Preset')).toBeVisible()
   await expect.poll(() => pool.evaluate((element) =>
     (element as HTMLElement & { getControlsCollapsed(): boolean }).getControlsCollapsed(),
   )).toBe(true)

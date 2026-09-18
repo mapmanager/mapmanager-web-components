@@ -11,12 +11,28 @@ from PyQt5.QtWidgets import QApplication
 from nicepool_pyqt5 import NicePoolWidget
 
 
+def test_default_preset_requires_definitions(qtbot) -> None:
+    """Reject a default preset when no definitions were supplied."""
+    widget = NicePoolWidget()
+    qtbot.addWidget(widget)
+    with pytest.raises(ValueError, match="requires preset_definitions"):
+        widget.set_records(
+            [{"id": "a", "x": 1.0}],
+            row_id_column="id",
+            default_preset="Missing",
+        )
+
+
 @pytest.mark.skipif(
     os.environ.get("NICEPOOL_RUN_WEBENGINE_TEST") != "1",
     reason="set NICEPOOL_RUN_WEBENGINE_TEST=1 on a host with a working display/OpenGL context",
 )
 def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
-    widget = NicePoolWidget()
+    widget = NicePoolWidget(
+        theme="light",
+        controls_collapsed=True,
+        preset_editing_visible=False,
+    )
     qtbot.addWidget(widget)
     assert widget.web_view.settings().testAttribute(
         QWebEngineSettings.JavascriptCanAccessClipboard
@@ -38,6 +54,32 @@ def test_webengine_bridge_round_trip_and_no_selection_echo(qtbot) -> None:
             ],
             row_id_column="id",
         )
+
+    initial_display: list[object] = []
+    widget.web_view.page().runJavaScript(
+        """
+        (() => {
+          const pool = document.querySelector('nice-pool');
+          const root = pool?.shadowRoot;
+          return {
+            theme: pool?.getTheme(),
+            controlsCollapsed: pool?.getControlsCollapsed(),
+            presetEditingVisible: pool?.getShowPresetEditing(),
+            presetVisible: Boolean(root?.querySelector('.nicepool-preset-bar select')),
+          };
+        })();
+        """,
+        initial_display.append,
+    )
+    qtbot.waitUntil(lambda: len(initial_display) == 1, timeout=5_000)
+    assert initial_display == [
+        {
+            "theme": "light",
+            "controlsCollapsed": True,
+            "presetEditingVisible": False,
+            "presetVisible": True,
+        }
+    ]
 
     qtbot.wait(250)
     widget.set_primary_selection("a")

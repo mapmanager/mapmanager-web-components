@@ -2,6 +2,7 @@ import {
   registerNicePoolElement,
   type DatasetInput,
   type NicePoolPreset,
+  type NicePoolPresetDefinition,
   type NicePoolSelection,
   type NicePoolState,
   type NicePoolTheme,
@@ -26,6 +27,7 @@ interface QtNamespace {
 
 interface NicePoolDomElement extends HTMLElement {
   setData(input: DatasetInput): void
+  initializeData(input: DatasetInput, definitions: readonly NicePoolPresetDefinition[], defaultPresetName?: string | null): void
   replaceData(input: DatasetInput): void
   setState(state: NicePoolState): void
   getState(): NicePoolState
@@ -51,6 +53,12 @@ interface CommandEnvelope {
   payload?: unknown
 }
 
+interface InitializeDataPayload {
+  dataset: DatasetInput
+  presetDefinitions: NicePoolPresetDefinition[]
+  defaultPresetName?: string | null
+}
+
 declare global {
   interface Window {
     qt: QtNamespace
@@ -68,8 +76,15 @@ if (typeof globalThis.structuredClone !== 'function') {
 
 registerNicePoolElement()
 
-const pool = document.querySelector<NicePoolDomElement>('nice-pool')
-if (!pool) throw new Error('The NicePool host page is missing its <nice-pool> element')
+const host = document.querySelector<HTMLElement>('#nicepool-host')
+if (!host) throw new Error('The NicePool host page is missing its mount element')
+const parameters = new URLSearchParams(window.location.search)
+const pool = document.createElement('nice-pool') as NicePoolDomElement
+const initialTheme = parameters.get('theme')
+if (initialTheme === 'dark' || initialTheme === 'light') pool.setTheme(initialTheme)
+pool.setControlsCollapsed(parameters.get('controlsCollapsed') === 'true')
+pool.setShowPresetEditing(parameters.get('presetEditingVisible') !== 'false')
+host.append(pool)
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
@@ -108,6 +123,10 @@ new window.QWebChannel(window.qt.webChannelTransport, (channel) => {
   const execute = (command: CommandEnvelope): unknown => {
     switch (command.name) {
       case 'setData': return pool.setData(command.payload as DatasetInput)
+      case 'initializeData': {
+        const payload = command.payload as InitializeDataPayload
+        return pool.initializeData(payload.dataset, payload.presetDefinitions, payload.defaultPresetName)
+      }
       case 'replaceData': return pool.replaceData(command.payload as DatasetInput)
       case 'setState': return pool.setState(command.payload as NicePoolState)
       case 'getState': return pool.getState()

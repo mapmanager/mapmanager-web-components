@@ -8,6 +8,7 @@ import {
   DatasetStore,
   NicePoolEngine,
   StateValidationError,
+  createNicePoolPresets,
   createNicePoolState,
   defaultNicePoolState,
   validateNicePoolPreset,
@@ -99,6 +100,18 @@ describe('versioned state contracts', () => {
     expect(engine.state.layout).toBe('1x2')
     expect(engine.state.plots[0].pointSize).toBe(14)
     expect(engine.state.plots[1].pointSize).toBe(11)
+  })
+
+  it('builds dataset-aware presets atomically from partial definitions', () => {
+    const presets = createNicePoolPresets(edgeDataset, [
+      { name: 'scatter', state: { plots: [{ xColumn: 'x', yColumn: 'y', pointSize: 13 }] } },
+      { name: 'histogram', state: { plots: [{ plotType: 'histogram', xColumn: 'x', yColumn: 'y' }] } },
+    ])
+    expect(presets.map(({ name }) => name)).toEqual(['scatter', 'histogram'])
+    expect(presets[0]?.state.plots[0]).toMatchObject({ xColumn: 'x', yColumn: 'y', pointSize: 13 })
+    expect(() => createNicePoolPresets(edgeDataset, [
+      { name: 'invalid', state: { plots: [{ xColumn: 'missing' }] } },
+    ])).toThrow(StateValidationError)
   })
 
   it('ships readable version-one JSON schemas', () => {

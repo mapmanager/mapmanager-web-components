@@ -5,6 +5,7 @@ export { descriptiveStatistics, quartileStatistics } from './statistics'
 export { defaultPlotState } from './state'
 export {
   createNicePoolState,
+  createNicePoolPresets,
   defaultNicePoolState,
   validateNicePoolState,
   validateNicePoolPreset,
