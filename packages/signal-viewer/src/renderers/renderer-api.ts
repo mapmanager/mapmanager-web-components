@@ -55,3 +55,16 @@ export interface SignalRenderer {
   resize(width: number, height: number): void
   destroy(): void
 }
+
+/** Measure a renderer host and resize using prior dimensions only when it is collapsed. */
+export function resizeRendererToHost(
+  renderer: Pick<SignalRenderer, 'resize'>,
+  host: Pick<HTMLElement, 'clientWidth' | 'clientHeight'>,
+  fallbackWidth: number,
+  fallbackHeight: number,
+): { width: number; height: number } {
+  const width = host.clientWidth || fallbackWidth
+  const height = host.clientHeight || fallbackHeight
+  renderer.resize(width, height)
+  return { width, height }
+}

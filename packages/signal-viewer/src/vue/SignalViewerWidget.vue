@@ -31,7 +31,7 @@ import {
   type SignalViewerTheme,
   type SignalYAxisId,
 } from '../core'
-import type { SignalRenderer } from '../renderers/renderer-api'
+import { resizeRendererToHost, type SignalRenderer } from '../renderers/renderer-api'
 import { UPlotSignalRenderer } from '../renderers/uplot/uplot-renderer'
 import './widget.css'
 
@@ -376,6 +376,15 @@ function replaceRenderedSession(frame: LoadedSignalFrame): void {
   renderer?.setCursors(cursors)
 }
 
+/** Refit the renderer after the application finishes changing its enclosure. */
+function resize(): void {
+  const element = host.value
+  if (!element || !renderer) return
+  const dimensions = resizeRendererToHost(renderer, element, width, height)
+  width = dimensions.width
+  height = dimensions.height
+}
+
 function requireInMemory(): InMemorySignalSource {
   if (!inMemorySource) throw new Error('addTrace and updateTrace require in-memory trace mode')
   return inMemorySource
@@ -505,9 +514,7 @@ onMounted(async () => {
   renderer.setCursors(cursors)
   resizeObserver = new ResizeObserver(([entry]) => {
     if (!entry) return
-    width = entry.contentRect.width
-    height = entry.contentRect.height
-    renderer?.resize(width, height)
+    resize()
   })
   resizeObserver.observe(element)
 })
@@ -523,6 +530,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
   setSource, setTraces, addTrace, updateTrace, setTraceVisible, getVisibleTraces,
+  resize,
   setViewport, getViewport, resetView, setOverlays,
   setScatterSeries, addScatterSeries, updateScatterSeries,
   setScatterSeriesVisible, getVisibleScatterSeries,
