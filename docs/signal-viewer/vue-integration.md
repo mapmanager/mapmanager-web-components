@@ -42,7 +42,8 @@ function cursorsChanged(change: SignalCursorChange) {
 ## Events
 
 - `source-change`: emitted after a source is successfully installed;
-- `view-change`: emitted after a completed user zoom, pan, or reset;
+- `view-change`: emitted after a completed user zoom, pan, or reset, but not
+  after source installation;
 - `overlay-select`: selected point ID, or `null` when selection clears;
 - `cursor-change`: the changed cursor, all cursor state, and A/B or C/D delta.
 
@@ -52,3 +53,11 @@ trace-visibility methods before issuing work that depends on the new frame.
 
 The public methods are shared with the Custom Element and documented in the
 [Custom Element guide](custom-element.md).
+
+## Migration from source-triggered view events
+
+Signal Viewer 0.1 originally emitted both `source-change` and `view-change`
+after `setSource()`. Source installation now emits only `source-change`.
+Call `getViewport()` after awaiting `setSource()` when the host needs the
+installed viewport immediately. This prevents linked viewers from treating a
+programmatic source replacement as user navigation.

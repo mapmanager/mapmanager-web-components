@@ -42,8 +42,20 @@ displayed array in place; replace it through `updateTrace()`.
 
 All traces must have identical `xStart`, positive `xStep`, and sample count.
 `setTraces()` and `setSource()` are full-session replacements: they reset the
-viewport, overlays, and cursors. `addTrace()` and `updateTrace()` are available
-only for an in-memory session and preserve the current viewport.
+viewport, overlays, and cursors by default. A source can install its initial
+overlays and viewport atomically:
+
+```ts
+await viewer.setSource(source, {
+  overlays,
+  initialViewport: { xMin: 2, xMax: 4 },
+})
+```
+
+The previous session remains displayed with a loading status until the new
+source is ready. A failed or superseded load does not partially replace the
+active session. `addTrace()` and `updateTrace()` are available only for an
+in-memory session and preserve the current viewport.
 
 ## Lazy range sources
 

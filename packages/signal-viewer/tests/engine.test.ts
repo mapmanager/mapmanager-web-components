@@ -41,6 +41,17 @@ describe('SignalViewerEngine', () => {
     expect(source.requests[1]?.stopSample).toBeGreaterThan(31)
   })
 
+  it('loads an initial viewport without first loading the full range', async () => {
+    const source = new Source()
+    const engine = new SignalViewerEngine()
+    const initial = await engine.setSource(source, 500, undefined, { xMin: 2, xMax: 3 })
+
+    expect(initial.requestedViewport).toEqual({ xMin: 2, xMax: 3 })
+    expect(source.requests).toHaveLength(1)
+    expect(source.requests[0]?.startSample).toBeLessThan(20)
+    expect(source.requests[0]?.stopSample).toBeGreaterThan(31)
+  })
+
   it('loads only visible series and supports hiding all traces', async () => {
     const source = new Source()
     const engine = new SignalViewerEngine()

@@ -17,6 +17,7 @@ export class SignalViewerEngine {
     source: SignalSource,
     targetPoints: number,
     initiallyVisible?: readonly string[],
+    initialViewport?: SignalViewport,
   ): Promise<LoadedSignalFrame> {
     this.abort()
     const generation = ++this.#generation
@@ -35,7 +36,7 @@ export class SignalViewerEngine {
       const requested = initiallyVisible ?? [...available]
       if (requested.some((id) => !available.has(id))) throw new Error('initial visibility contains an unknown series id')
       this.#visibleSeries = new Set(requested)
-      return await this.#load(fullViewport(description), targetPoints, generation, controller)
+      return await this.#load(initialViewport ?? fullViewport(description), targetPoints, generation, controller)
     } catch (reason) {
       if (generation === this.#generation && !isAbort(reason)) {
         this.error = reason instanceof Error ? reason.message : String(reason)

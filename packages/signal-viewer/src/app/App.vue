@@ -6,6 +6,7 @@ import {
   type SignalCursorChange,
   type SignalOverlays,
   type SignalSource,
+  type SignalSourceInstallOptions,
   type SignalViewerTheme,
   type SignalViewport,
 } from '../core'
@@ -19,8 +20,8 @@ import {
 } from './synthetic-source'
 
 interface WidgetApi {
-  setSource(source: SignalSource): Promise<void>
-  setOverlays(overlays: SignalOverlays): void
+  setSource(source: SignalSource, options?: SignalSourceInstallOptions): Promise<void>
+  getViewport(): SignalViewport | null
   setCursor(id: 'a' | 'b' | 'c' | 'd', value: number): void
   resetView(): Promise<void>
   setTheme(theme: SignalViewerTheme): void
@@ -62,10 +63,15 @@ async function loadDataset(): Promise<void> {
   selected.value = null
   cursorDelta.value = '—'
   renderInput.value = 'Loading…'
-  await widget.value?.setSource(instrumentSource(new SyntheticSignalSource(datasetId.value)))
-  widget.value?.setOverlays(datasetOverlays(datasetId.value))
-  widget.value?.setCursor('a', 60)
-  widget.value?.setCursor('b', 120)
+  const viewer = widget.value
+  if (!viewer) return
+  await viewer.setSource(
+    instrumentSource(new SyntheticSignalSource(datasetId.value)),
+    { overlays: datasetOverlays(datasetId.value) },
+  )
+  viewport.value = viewer.getViewport()
+  viewer.setCursor('a', 60)
+  viewer.setCursor('b', 120)
 }
 
 function instrumentSource(source: SignalSource): SignalSource {

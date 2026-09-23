@@ -11,6 +11,7 @@ import {
   isAbort,
   signalViewerThemeVariables,
   type InMemorySignalSourceOptions,
+  type LoadedSignalFrame,
   type SignalAxisRange,
   type SignalAxisRangeSetting,
   type SignalAxisId,
@@ -23,6 +24,7 @@ import {
   type SignalScatterSeriesUpdate,
   type SignalSeriesDescriptor,
   type SignalSource,
+  type SignalSourceInstallOptions,
   type SignalTrace,
   type SignalTraceUpdate,
   type SignalViewport,
@@ -55,6 +57,8 @@ const hoverControl = ref(true)
 const legendControl = ref(true)
 const activeTheme = ref<SignalViewerTheme>('dark')
 let engine = new SignalViewerEngine()
+let pendingEngine: SignalViewerEngine | null = null
+let sourceReplacement = 0
 let renderer: SignalRenderer | null = null
 let inMemorySource: InMemorySignalSource | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -72,9 +76,11 @@ function closeOptionsOutside(event: PointerEvent): void {
 }
 
 /** Replace the complete session with an asynchronous range source. */
-async function setSource(source: SignalSource): Promise<void> {
-  inMemorySource = null
-  await replaceSource(source)
+async function setSource(
+  source: SignalSource,
+  options: SignalSourceInstallOptions = {},
+): Promise<void> {
+  await replaceSource(source, undefined, options, null)
 }
 
 /** Replace the complete session with aligned in-memory traces. */
@@ -82,10 +88,9 @@ async function setTraces(
   traces: readonly SignalTrace[],
   options: InMemorySignalSourceOptions = {},
 ): Promise<void> {
-  inMemorySource = new InMemorySignalSource(traces, options)
+  const nextSource = new InMemorySignalSource(traces, options)
   const visible = traces.filter((trace) => trace.visible !== false).map(({ id }) => id)
-  visibleTraceIds = new Set(visible)
-  await replaceSource(inMemorySource, visible)
+  await replaceSource(nextSource, visible, {}, nextSource)
 }
 
 /** Add one aligned in-memory trace while preserving the current viewport. */
@@ -290,38 +295,55 @@ function getViewport(): SignalViewport | null {
   return currentViewport ? { ...currentViewport } : null
 }
 
-async function replaceSource(source: SignalSource, visible?: readonly string[]): Promise<void> {
-  engine.abort()
-  engine = new SignalViewerEngine()
+async function replaceSource(
+  source: SignalSource,
+  visible: readonly string[] | undefined,
+  options: SignalSourceInstallOptions,
+  nextInMemorySource: InMemorySignalSource | null,
+): Promise<void> {
+  validateScatterSeries(options.overlays?.scatterSeries ?? [])
+  const nextOverlays: SignalOverlays = options.overlays
+    ? cloneOverlays(options.overlays)
+    : { scatterSeries: [] }
+  const generation = ++sourceReplacement
+  pendingEngine?.abort()
+  const candidate = new SignalViewerEngine()
+  pendingEngine = candidate
   loading.value = true
   error.value = null
-  overlays = { scatterSeries: [] }
-  cursors = defaultCursorState()
-  hasSource.value = false
-  traceControls.value = []
-  visibleControlIds.value = []
-  scatterControls.value = []
-  cursorControls.value = cloneCursorState(cursors)
-  renderer?.setOverlays(overlays)
-  renderer?.setCursors(cursors)
   try {
-    const frame = await engine.setSource(source, targetPoints(), visible)
+    const frame = await candidate.setSource(
+      source,
+      targetPoints(),
+      visible,
+      options.initialViewport,
+    )
+    if (generation !== sourceReplacement) return
+    engine.abort()
+    engine = candidate
+    pendingEngine = null
+    inMemorySource = nextInMemorySource
+    overlays = nextOverlays
+    cursors = defaultCursorState()
     visibleTraceIds = new Set(engine.getVisibleSeries())
     traceControls.value = frame.description.series
     visibleControlIds.value = engine.getVisibleSeries()
-    renderer?.setDescription(frame.description)
-    renderer?.setFrame(frame)
+    scatterControls.value = overlays.scatterSeries
+    cursorControls.value = cloneCursorState(cursors)
+    replaceRenderedSession(frame)
     currentViewport = frame.requestedViewport
     hasSource.value = true
     emit('source-change', frame.description.id)
-    emit('view-change', frame.requestedViewport)
   } catch (reason) {
-    if (!isAbort(reason)) {
+    if (generation === sourceReplacement && !isAbort(reason)) {
       error.value = reason instanceof Error ? reason.message : String(reason)
       throw reason
     }
   } finally {
-    loading.value = false
+    if (generation === sourceReplacement) {
+      pendingEngine = null
+      loading.value = false
+    }
   }
 }
 
@@ -332,18 +354,24 @@ async function reloadInMemory(): Promise<void> {
   const visible = [...visibleTraceIds].filter((id) => available.has(id))
   const savedOverlays = overlays
   const savedCursors = cloneCursorState(cursors)
-  const frame = await engine.setSource(source, targetPoints(), visible)
+  const frame = await engine.setSource(source, targetPoints(), visible, viewport ?? undefined)
   traceControls.value = frame.description.series
   visibleControlIds.value = engine.getVisibleSeries()
-  renderer?.setDescription(frame.description)
-  renderer?.setFrame(frame)
-  if (viewport) {
-    const restored = await engine.setViewport(viewport, targetPoints())
-    renderer?.setFrame(restored)
-    currentViewport = restored.requestedViewport
-  }
   overlays = savedOverlays
   cursors = savedCursors
+  scatterControls.value = overlays.scatterSeries
+  cursorControls.value = cloneCursorState(cursors)
+  replaceRenderedSession(frame)
+  currentViewport = frame.requestedViewport
+}
+
+function replaceRenderedSession(frame: LoadedSignalFrame): void {
+  if (renderer?.replaceSession) {
+    renderer.replaceSession(frame, overlays, cursors)
+    return
+  }
+  renderer?.setDescription(frame.description)
+  renderer?.setFrame(frame)
   renderer?.setOverlays(overlays)
   renderer?.setCursors(cursors)
 }
@@ -487,6 +515,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', closeOptionsOutside)
   if (viewportTimer) clearTimeout(viewportTimer)
+  pendingEngine?.abort()
   engine.abort()
   resizeObserver?.disconnect()
   renderer?.destroy()

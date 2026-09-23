@@ -164,6 +164,12 @@ export interface SignalOverlays {
   selectedPointId?: string | null
 }
 
+/** Initial application-owned state installed atomically with a new source. */
+export interface SignalSourceInstallOptions {
+  overlays?: SignalOverlays
+  initialViewport?: SignalViewport
+}
+
 /** Built-in persistent measurement cursor identity. */
 export type SignalCursorId = 'a' | 'b' | 'c' | 'd'
 

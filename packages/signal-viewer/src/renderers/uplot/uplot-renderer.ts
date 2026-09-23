@@ -64,19 +64,30 @@ export class UPlotSignalRenderer implements SignalRenderer {
     this.#callbacks = callbacks
   }
 
+  replaceSession(
+    frame: LoadedSignalFrame,
+    overlays: SignalOverlays,
+    cursors: SignalCursorState,
+  ): void {
+    this.#setDescriptionState(frame.description)
+    this.#frame = frame
+    this.#overlays = cloneOverlays(overlays)
+    this.#cursors = cloneCursorState(cursors)
+    this.#rebuild(false)
+  }
+
   setDescription(description: SignalDescription): void {
-    this.#description = description
+    this.#setDescriptionState(description)
     this.#frame = null
-    this.#axisSettings = {
-      left: description.yAxes.left.range ?? 'auto',
-      right: description.yAxes.right?.range ?? 'auto',
-    }
-    this.#rebuild()
+    this.#rebuild(false)
   }
 
   setFrame(frame: LoadedSignalFrame, options: SignalFrameOptions = {}): void {
     if (!this.#description || this.#description.id !== frame.description.id) {
-      this.setDescription(frame.description)
+      this.#setDescriptionState(frame.description)
+      this.#frame = frame
+      this.#rebuild(false)
+      return
     }
     this.#frame = frame
     const plot = this.#plot
@@ -103,14 +114,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
   }
 
   setOverlays(overlays: SignalOverlays): void {
-    this.#overlays = {
-      scatterSeries: overlays.scatterSeries.map((series) => ({
-        ...series,
-        points: series.points.map((point) => ({ ...point })),
-      })),
-      ...(overlays.regions ? { regions: overlays.regions.map((region) => ({ ...region })) } : {}),
-      ...(overlays.selectedPointId !== undefined ? { selectedPointId: overlays.selectedPointId } : {}),
-    }
+    this.#overlays = cloneOverlays(overlays)
     this.#plot?.redraw(false, false)
   }
 
@@ -231,8 +235,16 @@ export class UPlotSignalRenderer implements SignalRenderer {
     this.#host.replaceChildren()
   }
 
-  #rebuild(): void {
-    const preservedRanges = this.#frame ? this.#currentAxisRanges() : null
+  #setDescriptionState(description: SignalDescription): void {
+    this.#description = description
+    this.#axisSettings = {
+      left: description.yAxes.left.range ?? 'auto',
+      right: description.yAxes.right?.range ?? 'auto',
+    }
+  }
+
+  #rebuild(preserveYAxisRange = true): void {
+    const preservedRanges = preserveYAxisRange && this.#frame ? this.#currentAxisRanges() : null
     this.#plot?.destroy()
     this.#host.replaceChildren()
     const description = this.#description
@@ -289,12 +301,28 @@ export class UPlotSignalRenderer implements SignalRenderer {
         }],
       },
     }
-    this.#plot = new uPlot(options, emptyData(description.series.length), this.#host)
+    this.#plot = new uPlot(
+      options,
+      this.#frame ? alignedData(this.#frame) : emptyData(description.series.length),
+      this.#host,
+    )
     this.#applyLegendVisibility()
     this.#fitPlotToHost()
-    if (this.#frame) {
-      this.setFrame(this.#frame)
-      if (preservedRanges) this.#restoreAxisRanges(preservedRanges)
+    const frame = this.#frame
+    if (frame) {
+      this.#internalUpdate = true
+      try {
+        this.#plot.batch(() => {
+          this.#plot?.setScale('x', {
+            min: frame.requestedViewport.xMin,
+            max: frame.requestedViewport.xMax,
+          })
+          this.#applyAxisRange('left', preservedRanges?.left ?? null)
+          if (description.yAxes.right) this.#applyAxisRange('right', preservedRanges?.right ?? null)
+        })
+      } finally {
+        this.#internalUpdate = false
+      }
     }
   }
 
@@ -338,19 +366,6 @@ export class UPlotSignalRenderer implements SignalRenderer {
 
   #currentAxisRanges(): Record<SignalYAxisId, SignalAxisRange | null> {
     return { left: this.getAxisRange('left'), right: this.getAxisRange('right') }
-  }
-
-  #restoreAxisRanges(ranges: Record<SignalYAxisId, SignalAxisRange | null>): void {
-    const plot = this.#plot
-    if (!plot) return
-    this.#internalUpdate = true
-    try {
-      if (ranges.left) plot.setScale('left', ranges.left)
-      if (ranges.right && this.#description?.yAxes.right) plot.setScale('right', ranges.right)
-    } finally {
-      this.#internalUpdate = false
-    }
-    plot.redraw(false, true)
   }
 
   #onScale(key: string): void {
@@ -665,6 +680,17 @@ function scaleRange(plot: uPlot | null, key: string): SignalAxisRange | null {
 
 function emptyData(seriesCount: number): uPlot.AlignedData {
   return Array.from({ length: seriesCount + 1 }, () => [] as number[]) as unknown as uPlot.AlignedData
+}
+
+function cloneOverlays(overlays: SignalOverlays): SignalOverlays {
+  return {
+    scatterSeries: overlays.scatterSeries.map((series) => ({
+      ...series,
+      points: series.points.map((point) => ({ ...point })),
+    })),
+    ...(overlays.regions ? { regions: overlays.regions.map((region) => ({ ...region })) } : {}),
+    ...(overlays.selectedPointId !== undefined ? { selectedPointId: overlays.selectedPointId } : {}),
+  }
 }
 
 function alignedData(frame: LoadedSignalFrame): uPlot.AlignedData {

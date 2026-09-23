@@ -37,6 +37,8 @@ overlays, and cursor interaction. The embedding application owns persistence,
 storage and transport adapters, analysis, sweep/channel choice, and linked
 selection with other components.
 
-Full-session replacement intentionally clears overlays and cursors. Hosts that
-want to restore application state do so explicitly after `setSource()` or
-`setTraces()` completes.
+Full-session replacement resets overlays and cursors by default. `setSource()`
+can receive initial overlays and a viewport so the candidate engine loads and
+validates a complete session before the widget commits it. Until that commit,
+the renderer keeps the previous session intact. This prepare-then-commit
+boundary prevents hosts from exposing partially updated traces and overlays.

@@ -28,6 +28,12 @@ export interface SignalFrameOptions {
 
 /** Replaceable visual boundary used by the signal-viewer widget. */
 export interface SignalRenderer {
+  /** Atomically replace the rendered frame and its application-owned decoration state. */
+  replaceSession?(
+    frame: LoadedSignalFrame,
+    overlays: SignalOverlays,
+    cursors: SignalCursorState,
+  ): void
   setDescription(description: SignalDescription): void
   setFrame(frame: LoadedSignalFrame, options?: SignalFrameOptions): void
   setOverlays(overlays: SignalOverlays): void

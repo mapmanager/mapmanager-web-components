@@ -3,6 +3,7 @@ import { createApp, h, ref, type App, type ComponentPublicInstance } from 'vue'
 import type {
   InMemorySignalSourceOptions, SignalAxisId, SignalAxisRange, SignalAxisRangeSetting, SignalCursor,
   SignalCursorChange, SignalCursorId, SignalCursorState, SignalOverlays, SignalSource,
+  SignalSourceInstallOptions,
   SignalScatterSeries, SignalScatterSeriesUpdate, SignalTrace, SignalTraceUpdate,
   SignalViewport, SignalYAxisId,
   SignalViewerTheme,
@@ -11,7 +12,7 @@ import SignalViewerWidget from '../vue/SignalViewerWidget.vue'
 import widgetStyles from '../vue/widget.css?inline'
 
 interface WidgetApi {
-  setSource(source: SignalSource): Promise<void>
+  setSource(source: SignalSource, options?: SignalSourceInstallOptions): Promise<void>
   setTraces(traces: readonly SignalTrace[], options?: InMemorySignalSourceOptions): Promise<void>
   addTrace(trace: SignalTrace): Promise<void>
   updateTrace(id: string, update: SignalTraceUpdate): Promise<void>
@@ -49,7 +50,7 @@ interface WidgetApi {
 export class SignalViewerElement extends HTMLElement {
   #app: App<Element> | null = null
   #widget = ref<(ComponentPublicInstance & WidgetApi) | null>(null)
-  #pendingSource: SignalSource | null = null
+  #pendingSource: { source: SignalSource; options: SignalSourceInstallOptions } | null = null
 
   connectedCallback(): void {
     if (this.#app) return
@@ -70,9 +71,9 @@ export class SignalViewerElement extends HTMLElement {
     })
     this.#app.mount(mount)
     if (this.#pendingSource) {
-      const source = this.#pendingSource
+      const { source, options } = this.#pendingSource
       this.#pendingSource = null
-      queueMicrotask(() => void this.#widget.value?.setSource(source))
+      queueMicrotask(() => void this.#widget.value?.setSource(source, options))
     }
   }
 
@@ -83,12 +84,12 @@ export class SignalViewerElement extends HTMLElement {
   }
 
   /** Replace the complete session with an asynchronous range source. */
-  setSource(source: SignalSource): Promise<void> {
+  setSource(source: SignalSource, options: SignalSourceInstallOptions = {}): Promise<void> {
     if (!this.#widget.value) {
-      this.#pendingSource = source
+      this.#pendingSource = { source, options }
       return Promise.resolve()
     }
-    return this.#widget.value.setSource(source)
+    return this.#widget.value.setSource(source, options)
   }
 
   /** Replace the complete session with aligned in-memory traces. */
