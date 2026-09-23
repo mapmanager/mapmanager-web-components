@@ -271,7 +271,7 @@ export class UPlotSignalRenderer implements SignalRenderer {
       },
       scales: { x: { time: false }, left: { auto: false }, right: { auto: false } },
       axes: [
-        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x, this.#gridVisibility.x, 55, theme),
+        axisOptions('x', axisLabel(description.xLabel, description.xUnit), this.#axisVisibility.x, this.#gridVisibility.x, 28, theme),
         axisOptions('left', axisLabel(description.yAxes.left.label, description.yAxes.left.unit), this.#axisVisibility.y, this.#gridVisibility.y, 65, theme),
         ...(description.yAxes.right
           ? [{
