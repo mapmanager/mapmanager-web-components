@@ -120,10 +120,12 @@ export class DatasetStore {
     return this.schema.filter(({ name, type }) => name !== this.rowIdColumn && type === 'number').map(({ name }) => name)
   }
 
-  /** Return nonnumeric columns suitable for group and color controls. */
+  /** Return columns suitable for group and color controls. */
   categoricalColumns(): readonly string[] {
     return this.schema
-      .filter(({ name, type, categorical }) => name !== this.rowIdColumn && (type !== 'number' || categorical === true))
+      .filter(({ name, type, categorical }) =>
+        name !== this.rowIdColumn
+        && (categorical === true || (categorical === undefined && type !== 'number')))
       .map(({ name }) => name)
   }
 

@@ -39,6 +39,21 @@ describe('DatasetStore', () => {
     expect(dataset.columnSchema('epochLevel').category).toBe('stimulus')
   })
 
+  it('honors explicit categorical exclusions for nonnumeric columns', () => {
+    const dataset = new DatasetStore({
+      rowIdColumn: 'id',
+      rows: [{ id: 1, included: 'yes', excluded: 'no', accepted: true }],
+      schema: [
+        { name: 'id', type: 'number', axis_label: 'ID' },
+        { name: 'included', type: 'string', axis_label: 'Included' },
+        { name: 'excluded', type: 'string', axis_label: 'Excluded', categorical: false },
+        { name: 'accepted', type: 'boolean', axis_label: 'Accepted', categorical: false },
+      ],
+    })
+
+    expect(dataset.categoricalColumns()).toEqual(['included'])
+  })
+
   it('rejects unknown or duplicate prefilter columns', () => {
     expect(() => new DatasetStore({ ...edgeDataset, preFilterColumns: ['missing'] })).toThrow(DatasetValidationError)
     expect(() => new DatasetStore({ ...edgeDataset, preFilterColumns: ['accept', 'accept'] })).toThrow(DatasetValidationError)
