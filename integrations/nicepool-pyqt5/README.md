@@ -45,6 +45,12 @@ pool = NicePoolWidget(
 
 The corresponding setters remain available for runtime changes.
 
+The standalone example keeps its native **Dataset** selector outside
+`NicePoolWidget`. Its synthetic and Luo et al. configurations supply separate
+schemas and presets, demonstrating that CSV parsing and dataset choice belong
+to the Python host rather than the reusable browser component. The tracked Luo
+CSV and schema live together under `examples/nicepool/data/`.
+
 ## Run tests and the example
 
 ```bash

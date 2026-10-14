@@ -1,0 +1,293 @@
+[
+  {
+    "name": "file",
+    "type": "string",
+    "axis_label": "File",
+    "category": "acquisition",
+    "categorical": true
+  },
+  {
+    "name": "include",
+    "type": "string",
+    "axis_label": "Include",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "animal_id",
+    "type": "string",
+    "axis_label": "Animal ID",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "species",
+    "type": "string",
+    "axis_label": "Species",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "region",
+    "type": "string",
+    "axis_label": "Region",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "cell_type",
+    "type": "string",
+    "axis_label": "Cell Type",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "age",
+    "type": "string",
+    "axis_label": "Age",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "sex",
+    "type": "string",
+    "axis_label": "Sex",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "genotype",
+    "type": "string",
+    "axis_label": "Genotype",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "condition",
+    "type": "string",
+    "axis_label": "Condition",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "experiment",
+    "type": "string",
+    "axis_label": "Experiment",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "note",
+    "type": "string",
+    "axis_label": "Note",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "sweep",
+    "type": "number",
+    "axis_label": "Sweep",
+    "category": "acquisition",
+    "categorical": true
+  },
+  {
+    "name": "epoch",
+    "type": "number",
+    "axis_label": "Epoch",
+    "category": "acquisition",
+    "categorical": true
+  },
+  {
+    "name": "epochLevel",
+    "type": "number",
+    "axis_label": "Epoch level",
+    "category": "acquisition",
+    "categorical": true
+  },
+  {
+    "name": "dacCommand",
+    "type": "number",
+    "axis_label": "DAC command (mV)",
+    "category": "acquisition",
+    "categorical": true
+  },
+  {
+    "name": "spike_include",
+    "type": "string",
+    "axis_label": "Spike included",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "file_number",
+    "type": "number",
+    "axis_label": "File Number",
+    "category": "metadata",
+    "categorical": true
+  },
+  {
+    "name": "sweepCondition",
+    "type": "string",
+    "axis_label": "Sweep condition",
+    "category": "identity",
+    "categorical": true
+  },
+  {
+    "name": "spikeNumber",
+    "type": "number",
+    "axis_label": "Spike number",
+    "category": "identity"
+  },
+  {
+    "name": "sweepSpikeNumber",
+    "type": "number",
+    "axis_label": "Sweep spike number",
+    "category": "identity"
+  },
+  {
+    "name": "userType",
+    "type": "number",
+    "axis_label": "User type",
+    "category": "identity",
+    "categorical": true
+  },
+  {
+    "name": "spike_condition",
+    "type": "string",
+    "axis_label": "Spike condition",
+    "category": "identity",
+    "categorical": true
+  },
+  {
+    "name": "thresholdSec",
+    "type": "number",
+    "axis_label": "Threshold time (s)",
+    "category": "peak detection"
+  },
+  {
+    "name": "thresholdVal",
+    "type": "number",
+    "axis_label": "Threshold voltage (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "peakVal",
+    "type": "number",
+    "axis_label": "Peak voltage (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "peakHeight",
+    "type": "number",
+    "axis_label": "Spike height (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "timeToPeak_ms",
+    "type": "number",
+    "axis_label": "Time to peak (ms)",
+    "category": "peak detection"
+  },
+  {
+    "name": "fastAhpValue",
+    "type": "number",
+    "axis_label": "Fast AHP voltage (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "preMinVal",
+    "type": "number",
+    "axis_label": "Pre-spike minimum voltage (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "earlyDiastolicDuration_ms",
+    "type": "number",
+    "axis_label": "Early diastolic duration (ms)",
+    "category": "peak detection"
+  },
+  {
+    "name": "earlyDiastolicDurationRate",
+    "type": "number",
+    "axis_label": "Early diastolic rate (mV/s)",
+    "category": "peak detection"
+  },
+  {
+    "name": "preSpike_dvdt_max_val",
+    "type": "number",
+    "axis_label": "Voltage at pre-spike maximum dV/dt (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "preSpike_dvdt_max_val2",
+    "type": "number",
+    "axis_label": "Pre-spike maximum dV/dt (mV/ms)",
+    "category": "peak detection"
+  },
+  {
+    "name": "postSpike_dvdt_min_val",
+    "type": "number",
+    "axis_label": "Voltage at post-spike minimum dV/dt (mV)",
+    "category": "peak detection"
+  },
+  {
+    "name": "isi_ms",
+    "type": "number",
+    "axis_label": "Interspike interval (ms)",
+    "category": "timing"
+  },
+  {
+    "name": "spikeFreq_hz",
+    "type": "number",
+    "axis_label": "Spike frequency (Hz)",
+    "category": "timing"
+  },
+  {
+    "name": "cycleLength_ms",
+    "type": "number",
+    "axis_label": "Cycle length (ms)",
+    "category": "timing"
+  },
+  {
+    "name": "diastolicDuration_ms",
+    "type": "number",
+    "axis_label": "Diastolic duration (ms)",
+    "category": "timing"
+  },
+  {
+    "name": "widths_10",
+    "type": "number",
+    "axis_label": "Spike width at 10% (ms)",
+    "category": "widths"
+  },
+  {
+    "name": "widths_20",
+    "type": "number",
+    "axis_label": "Spike width at 20% (ms)",
+    "category": "widths"
+  },
+  {
+    "name": "widths_50",
+    "type": "number",
+    "axis_label": "Spike width at 50% (ms)",
+    "category": "widths"
+  },
+  {
+    "name": "widths_80",
+    "type": "number",
+    "axis_label": "Spike width at 80% (ms)",
+    "category": "widths"
+  },
+  {
+    "name": "widths_90",
+    "type": "number",
+    "axis_label": "Spike width at 90% (ms)",
+    "category": "widths"
+  },
+  {
+    "name": "row_id",
+    "type": "string",
+    "axis_label": "Row",
+    "category": "identity"
+  }
+]

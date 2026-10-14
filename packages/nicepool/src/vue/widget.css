@@ -30,7 +30,7 @@
 .nicepool-preset-bar { display: flex; align-items: center; min-height: 40px; box-sizing: border-box; padding: 7px 10px; border-bottom: 1px solid var(--np-border); background: var(--np-controls); font-size: var(--nicepool-control-font-size); }
 .nicepool-preset-bar label { display: grid; grid-template-columns: auto minmax(160px, 280px); align-items: center; gap: 8px; }
 .nicepool-preset-bar select { min-width: 0; min-height: 24px; box-sizing: border-box; border: 1px solid var(--np-input-border); border-radius: 4px; background: var(--np-input); padding: 2px 4px; color: inherit; font: inherit; }
-.nicepool-main { flex: 1 1 var(--nicepool-plot-height); width: 100%; min-width: 0; min-height: 160px; position: relative; background: var(--np-plot); }
+.nicepool-main { flex: 1 1 var(--nicepool-plot-height); width: 100%; min-width: 0; min-height: 0; position: relative; background: var(--np-plot); }
 .nicepool-grid { display: grid; gap: 4px; background: var(--np-border); }
 .nicepool-layout-1x1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 .nicepool-layout-1x2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }

@@ -35,11 +35,14 @@ with Vue and Plotly externalized (`dist-lib/`), and a self-contained registered
 Custom Element module (`dist-element/`). `element-demo.html` is the plain-HTML
 development host. The ESM library includes generated TypeScript declarations.
 
-The standalone development host generates deterministic demonstration data.
-Its velocity column intentionally contains negative values, extreme values, and
-explicit missing values for exercising plot controls. `public/sample.csv` is a
-small human-readable integration fixture; CSV adapters must convert blank cells
-to JSON `null` before calling `setData`.
+The standalone development host offers generated **Synthetic** data and the
+tracked **Luo et al. 2024** CSV/schema pair under `examples/nicepool/data/`.
+Dataset selection, fetching, and CSV parsing remain demo-host responsibilities;
+the reusable component receives validated records through `initializeData()`.
+The synthetic velocity column intentionally contains negative values, extreme
+values, and explicit missing values for exercising plot controls.
+`public/sample.csv` remains a small human-readable integration fixture; CSV
+adapters must convert blank cells to JSON `null` before calling `setData`.
 
 ## Python and NiceGUI
 

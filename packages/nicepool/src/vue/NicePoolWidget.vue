@@ -106,7 +106,7 @@ function startResize(axis: 'horizontal' | 'vertical', event: PointerEvent): void
     const position = axis === 'vertical' ? moveEvent.clientX : moveEvent.clientY
     const next = startValue + position - startPosition
     if (axis === 'vertical') setControlsWidth(next)
-    else plotHeight.value = Math.min(1400, Math.max(320, next))
+    else plotHeight.value = Math.min(1400, Math.max(0, next))
   }
   const stop = (): void => {
     window.removeEventListener('pointermove', onMove)
@@ -130,7 +130,7 @@ function resizeWithKeyboard(axis: 'horizontal' | 'vertical', event: KeyboardEven
   }
   if (axis === 'horizontal' && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
     event.preventDefault()
-    plotHeight.value = Math.min(1400, Math.max(320, plotHeight.value + (event.key === 'ArrowDown' ? step : -step)))
+    plotHeight.value = Math.min(1400, Math.max(0, plotHeight.value + (event.key === 'ArrowDown' ? step : -step)))
   }
 }
 
