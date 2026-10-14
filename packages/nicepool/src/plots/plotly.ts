@@ -53,6 +53,30 @@ function pointTrace(
   } as unknown as Plotly.Data
 }
 
+function selectedPointOverlay(
+  points: readonly PreparedPoint[],
+  selection: NicePoolSelection,
+  pointSize: number,
+  showHover: boolean,
+): Plotly.Data | null {
+  const selected = new Set(selection.selectedRowIds)
+  const selectedPoints = points.filter(({ rowId }) => selected.has(rowId))
+  if (!selectedPoints.length) return null
+  return {
+    type: 'scatter',
+    mode: 'markers',
+    name: 'Selected',
+    x: selectedPoints.map(({ x }) => x),
+    y: selectedPoints.map(({ y }) => y),
+    customdata: selectedPoints.map(({ rowId }) => [rowId]),
+    marker: { size: pointSize + 4, color: '#f97316' },
+    showlegend: false,
+    ...(showHover
+      ? { hovertemplate: 'row=%{customdata[0]}<br>x=%{x}<br>y=%{y}<extra></extra>' }
+      : { hoverinfo: 'none' }),
+  } as unknown as Plotly.Data
+}
+
 function swarmOverlays(data: PreparedSwarmData, theme: NicePoolTheme): Plotly.Data[] {
   if (!data.state.showMean && !data.state.showErrorBars) return []
   const groups = new Map<string, { centerX: number; values: number[] }>()
@@ -159,6 +183,12 @@ export function buildPlotlySpecification(
         ))
       : []
     if (data.type === 'swarm') traces.push(...swarmOverlays(data, theme))
+    if (data.state.showRaw) {
+      const overlay = selectedPointOverlay(
+        data.points, selection, data.state.pointSize, data.state.showHover,
+      )
+      if (overlay) traces.push(overlay)
+    }
   }
   const dark = theme === 'dark'
   const axisStyle: Partial<Plotly.LayoutAxis> = {

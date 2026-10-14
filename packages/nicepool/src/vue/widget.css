@@ -61,6 +61,7 @@
 .nicepool-table-tabs .nicepool-table-tab-active { border-bottom-color: var(--np-active); box-shadow: inset 0 -2px var(--np-active); }
 .nicepool-table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 5px; color: var(--np-muted); }
 .nicepool-table-pagination span { margin-right: auto; }
+.nicepool-table-pagination .nicepool-copy-status { margin-right: 0; }
 .nicepool-table-pagination button { border-radius: 4px; }
 .nicepool-summary-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: var(--np-muted); }
 .nicepool-summary-actions button { min-height: 24px; border: 1px solid var(--np-input-border); border-radius: 4px; padding: 2px 6px; background: var(--np-input); color: inherit; font: inherit; }

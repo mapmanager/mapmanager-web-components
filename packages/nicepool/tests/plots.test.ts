@@ -224,6 +224,47 @@ describe('plot preparation and summaries', () => {
     expect(cleared.layout.selectionrevision).toBe('[]')
   })
 
+  it('renders selected points in one final overlay above raw and summary traces', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const data = prepareSwarm(dataset, {
+      ...defaultPlotState(dataset),
+      plotType: 'swarm',
+      yColumn: 'y',
+      groupColumn: 'condition',
+      colorColumn: 'cohort',
+      showMean: true,
+      showErrorBars: true,
+    })
+    const specification = buildPlotlySpecification(
+      data,
+      { primaryRowId: 'a', selectedRowIds: ['a', 'c'] },
+      'dark',
+      'scattergl',
+    )
+    const overlay = specification.traces.at(-1)
+
+    expect(overlay).toMatchObject({
+      type: 'scatter',
+      mode: 'markers',
+      name: 'Selected',
+      showlegend: false,
+      customdata: [['a'], ['c']],
+      marker: { color: '#f97316' },
+    })
+    expect(specification.traces.at(-2)).toMatchObject({ name: 'mean ± sem' })
+  })
+
+  it('omits the selected overlay when points are hidden or no plotted rows are selected', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const base = { ...defaultPlotState(dataset), xColumn: 'x', yColumn: 'y' }
+    const selection = { primaryRowId: 'a', selectedRowIds: ['a'] }
+    const hidden = buildPlotlySpecification(prepareScatter(dataset, { ...base, showRaw: false }), selection, 'dark', 'scatter')
+    const absent = buildPlotlySpecification(prepareScatter(dataset, base), { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scatter')
+
+    expect(hidden.traces).toHaveLength(0)
+    expect(absent.traces.some((trace) => trace.name === 'Selected')).toBe(false)
+  })
+
   it('maps display options and theme only at the Plotly boundary', () => {
     const dataset = new DatasetStore(edgeDataset)
     const state = {

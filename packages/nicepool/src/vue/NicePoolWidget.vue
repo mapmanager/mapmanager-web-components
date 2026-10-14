@@ -8,6 +8,7 @@ import { describeEmptyPlot } from '../plots/diagnostics'
 import { formatPlotSummaryToTsv } from '../plots/summary-format'
 import PlotlyView from './PlotlyView.vue'
 import ColumnSelectionTable from './ColumnSelectionTable.vue'
+import NicePoolTable from './NicePoolTable.vue'
 import './widget.css'
 
 const props = withDefaults(defineProps<{ dataset?: DatasetInput; presetStorageKey?: string; theme?: NicePoolTheme; showPresetEditing?: boolean; controlsCollapsed?: boolean }>(), {
@@ -42,9 +43,7 @@ const plotHeight = ref(620)
 const summaryCopyStatus = ref('')
 const showSummaryPlotState = ref(true)
 const showSummaryRawData = ref(true)
-const activeTableTab = ref<'data' | 'summary'>('data')
-const rawTablePage = ref(0)
-const rawTablePageSize = 100
+const activeTableTab = ref<'data' | 'selection' | 'summary'>('data')
 let stopPointerResize: (() => void) | null = null
 
 function jsonClone<T>(value: T): T {
@@ -150,12 +149,11 @@ const supportsPointSize = computed(() => plotState.value?.plotType === 'scatter'
 const showsQuartiles = computed(() => activeSummary.value?.plotType === 'box' || activeSummary.value?.plotType === 'violin')
 const availableXColumns = computed(() => isHistogram.value ? numericColumns.value : scatterXColumns.value)
 const rawTableColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.schema : [] })
-const rawTablePageCount = computed(() => { revision.value; return preparedPlots.value.length ? Math.max(1, Math.ceil(engine.dataset.rows.length / rawTablePageSize)) : 1 })
-const visibleRawRows = computed(() => {
+const selectedRows = computed(() => {
   revision.value
   if (!preparedPlots.value.length) return []
-  const start = rawTablePage.value * rawTablePageSize
-  return engine.dataset.rows.slice(start, start + rawTablePageSize)
+  const selected = new Set(selection.value.selectedRowIds)
+  return engine.dataset.rows.filter((row) => selected.has(String(row[engine.dataset.rowIdColumn])))
 })
 
 function emptyPlotMessage(prepared: PreparedPlot): string | null {
@@ -191,7 +189,6 @@ function persistPresets(): void {
 /** Fully replace the dataset and reset every dataset-dependent view state. */
 function setData(input: DatasetInput): void {
   engine.setData(input)
-  rawTablePage.value = 0
   presets.value = persistedPresets()
   selectedPresetName.value = ''
   refresh()
@@ -209,7 +206,6 @@ function initializeData(
     throw new Error(`Unknown default NicePool preset ${JSON.stringify(defaultPresetName)}`)
   }
   engine.setData(input)
-  rawTablePage.value = 0
   presets.value = nextPresets
   selectedPresetName.value = ''
   if (defaultPresetName !== null) {
@@ -223,7 +219,6 @@ function initializeData(
 /** Replace rows while preserving valid workspace and preset state. */
 function replaceData(input: DatasetInput): void {
   engine.replaceData(input)
-  rawTablePage.value = 0
   refresh()
   emit('data-replaced')
 }
@@ -437,21 +432,11 @@ onBeforeUnmount(() => {
         <div class="nicepool-summary-content">
           <div class="nicepool-table-tabs" role="tablist" aria-label="NicePool tables">
             <button type="button" role="tab" :aria-selected="activeTableTab === 'data'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'data' }" @click="activeTableTab = 'data'">Data</button>
+            <button type="button" role="tab" :aria-selected="activeTableTab === 'selection'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'selection' }" @click="activeTableTab = 'selection'">Selection</button>
             <button type="button" role="tab" :aria-selected="activeTableTab === 'summary'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'summary' }" @click="activeTableTab = 'summary'">Plot {{ state!.activePlotIndex + 1 }} summary</button>
           </div>
-          <div v-if="activeTableTab === 'data'" class="nicepool-raw-table-view" role="tabpanel">
-            <div class="nicepool-table-pagination">
-              <span>Rows {{ engine.dataset.rows.length ? rawTablePage * rawTablePageSize + 1 : 0 }}–{{ Math.min((rawTablePage + 1) * rawTablePageSize, engine.dataset.rows.length) }} of {{ engine.dataset.rows.length }}</span>
-              <button type="button" :disabled="rawTablePage === 0" @click="rawTablePage -= 1">Previous</button>
-              <button type="button" :disabled="rawTablePage + 1 >= rawTablePageCount" @click="rawTablePage += 1">Next</button>
-            </div>
-            <div class="nicepool-summary-table-scroll">
-              <table>
-                <thead><tr><th>#</th><th v-for="column in rawTableColumns" :key="column.name">{{ column.axis_label }}</th></tr></thead>
-                <tbody><tr v-for="(row, rowIndex) in visibleRawRows" :key="String(row[engine.dataset.rowIdColumn] ?? rowIndex)"><td>{{ rawTablePage * rawTablePageSize + rowIndex + 1 }}</td><td v-for="column in rawTableColumns" :key="column.name">{{ displaySummaryValue(row[column.name]) }}</td></tr></tbody>
-              </table>
-            </div>
-          </div>
+          <NicePoolTable v-if="activeTableTab === 'data'" role="tabpanel" label="Data" :rows="engine.dataset.rows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @error="error = $event" />
+          <NicePoolTable v-else-if="activeTableTab === 'selection'" role="tabpanel" label="Selection" :rows="selectedRows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @error="error = $event" />
           <div v-else role="tabpanel">
           <div class="nicepool-summary-actions">
             <button type="button" @click="copySummary">Copy Summary</button>
