@@ -1,4 +1,5 @@
 export { DatasetStore, categoryKey, filteredRowIndices, finiteNumber } from './dataset'
+export { aggregateForPlot, type AggregateTable } from './aggregation'
 export { NicePoolEngine } from './engine'
 export { SelectionModel } from './selection'
 export { descriptiveStatistics, quartileStatistics } from './statistics'

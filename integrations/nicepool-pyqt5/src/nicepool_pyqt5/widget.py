@@ -203,6 +203,7 @@ class NicePoolWidget(QWidget):
         row_id_column: str,
         schema: Sequence[Mapping[str, Any]] | None = None,
         pre_filter_columns: Sequence[str] | None = None,
+        aggregation: Mapping[str, Any] | None = None,
         preset_definitions: Sequence[Mapping[str, Any]] | None = None,
         default_preset: str | None = None,
     ) -> None:
@@ -212,6 +213,7 @@ class NicePoolWidget(QWidget):
             row_id_column=row_id_column,
             schema=schema,
             pre_filter_columns=pre_filter_columns,
+            aggregation=aggregation,
         )
         if preset_definitions is None:
             if default_preset is not None:
@@ -234,6 +236,7 @@ class NicePoolWidget(QWidget):
         row_id_column: str,
         schema: Sequence[Mapping[str, Any]] | None = None,
         pre_filter_columns: Sequence[str] | None = None,
+        aggregation: Mapping[str, Any] | None = None,
         preset_definitions: Sequence[Mapping[str, Any]] | None = None,
         default_preset: str | None = None,
     ) -> None:
@@ -243,6 +246,7 @@ class NicePoolWidget(QWidget):
             row_id_column=row_id_column,
             schema=schema,
             pre_filter_columns=pre_filter_columns,
+            aggregation=aggregation,
         )
         if preset_definitions is None:
             if default_preset is not None:
@@ -265,6 +269,7 @@ class NicePoolWidget(QWidget):
         row_id_column: str,
         schema: Sequence[Mapping[str, Any]] | None = None,
         pre_filter_columns: Sequence[str] | None = None,
+        aggregation: Mapping[str, Any] | None = None,
         callback: ResultCallback | None = None,
         error_callback: ErrorCallback | None = None,
     ) -> None:
@@ -276,6 +281,7 @@ class NicePoolWidget(QWidget):
                 row_id_column=row_id_column,
                 schema=schema,
                 pre_filter_columns=pre_filter_columns,
+                aggregation=aggregation,
             ),
             callback,
             error_callback,
@@ -288,6 +294,7 @@ class NicePoolWidget(QWidget):
         row_id_column: str,
         schema: Sequence[Mapping[str, Any]] | None = None,
         pre_filter_columns: Sequence[str] | None = None,
+        aggregation: Mapping[str, Any] | None = None,
         callback: ResultCallback | None = None,
         error_callback: ErrorCallback | None = None,
     ) -> None:
@@ -299,6 +306,7 @@ class NicePoolWidget(QWidget):
                 row_id_column=row_id_column,
                 schema=schema,
                 pre_filter_columns=pre_filter_columns,
+                aggregation=aggregation,
             ),
             callback,
             error_callback,

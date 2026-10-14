@@ -1,6 +1,7 @@
 import {
   DatasetValidationError,
   type ColumnSchema,
+  type AggregationConfig,
   type DatasetInput,
   type NicePoolRow,
   type NicePoolValue,
@@ -41,11 +42,13 @@ export class DatasetStore {
   readonly rowIdColumn: string
   readonly schema: readonly ColumnSchema[]
   readonly #preFilterColumns: readonly string[]
+  readonly aggregation: AggregationConfig | null
   readonly rowIndexById: ReadonlyMap<RowId, number>
 
   constructor(input: DatasetInput) {
     if (!input.rowIdColumn) throw new DatasetValidationError('rowIdColumn must not be empty')
     const columnNames = new Set<string>()
+    for (const column of input.schema ?? []) columnNames.add(column.name)
     for (const row of input.rows) Object.keys(row).forEach((name) => columnNames.add(name))
     if (!columnNames.has(input.rowIdColumn)) {
       throw new DatasetValidationError(`Dataset is missing row-ID column ${JSON.stringify(input.rowIdColumn)}`)
@@ -91,10 +94,31 @@ export class DatasetStore {
     if (new Set(preFilterColumns).size !== preFilterColumns.length) {
       throw new DatasetValidationError('Prefilter columns must be unique')
     }
+    const aggregation = input.aggregation
+    if (aggregation) {
+      if (!declaredNames.has(aggregation.groupByColumn)) {
+        throw new DatasetValidationError(`Aggregation references unknown group column ${JSON.stringify(aggregation.groupByColumn)}`)
+      }
+      if (aggregation.groupByColumn === input.rowIdColumn) {
+        throw new DatasetValidationError('Aggregation group column cannot be the row-ID column')
+      }
+      if (new Set(aggregation.preserveColumns).size !== aggregation.preserveColumns.length) {
+        throw new DatasetValidationError('Aggregation preserve columns must be unique')
+      }
+      for (const name of aggregation.preserveColumns) {
+        if (!declaredNames.has(name)) throw new DatasetValidationError(`Aggregation preserves unknown column ${JSON.stringify(name)}`)
+        if (name === input.rowIdColumn || name === aggregation.groupByColumn) {
+          throw new DatasetValidationError('Aggregation preserve columns must exclude row-ID and group columns')
+        }
+      }
+    }
     this.rows = Object.freeze(rows)
     this.rowIdColumn = input.rowIdColumn
     this.schema = Object.freeze(declared)
     this.#preFilterColumns = Object.freeze([...preFilterColumns])
+    this.aggregation = aggregation
+      ? Object.freeze({ groupByColumn: aggregation.groupByColumn, preserveColumns: Object.freeze([...aggregation.preserveColumns]) })
+      : null
     this.rowIndexById = rowIndexById
   }
 

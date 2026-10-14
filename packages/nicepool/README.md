@@ -15,6 +15,40 @@ Box and violin reuse the same grouped observations and add quartile summaries.
 Histogram variants use a user-controlled bin count (default 50) and
 NicePool-owned, globally aligned bin edges shared by rendering and summaries.
 
+## Plot-specific aggregation
+
+Datasets may opt into aggregation with an explicit, scientifically safe recipe:
+
+```ts
+const dataset = {
+  rows,
+  rowIdColumn: 'row_id',
+  schema,
+  aggregation: {
+    groupByColumn: 'file_number',
+    preserveColumns: ['condition', 'animal_id'],
+  },
+}
+```
+
+`groupByColumn` is required only when the host wants to offer the
+**Aggregated groups** data level; NicePool never parses a row ID to infer it.
+Each declared preserved column must be constant within every filtered group or
+aggregation fails with a contextual error. Source prefilters run before the
+table is derived. For the current plot's selected Y column, NicePool calculates
+count, min, max, mean, median, sample SD, SEM, and CV while ignoring missing
+numeric values. SD, SEM, and CV remain missing for groups with fewer than two
+valid observations.
+
+The initial UI supports aggregation for swarm plots and plots the generated
+`<y>_mean` column, labeled `<Y label> (mean)`. Aggregate rows have their own
+stable identities and retain separate source-row membership metadata; changing
+data level clears selection rather than implicitly linking identities. The
+Data table always remains the complete authoritative source table. The
+Aggregate and Selection tabs show the active plot's current derived identity
+space, and **Copy Table** copies every in-memory row and column, not only the
+visible pagination page.
+
 The widget defaults to a dark theme for both controls and Plotly. Its active
 plot has a collapsible Display options panel for legend visibility/position,
 Plotly toolbar visibility, combined axis chrome, and independent horizontal and

@@ -17,7 +17,7 @@ const LAYOUT_COUNTS: Readonly<Record<PlotLayout, number>> = {
   '2x2': 4,
 }
 const PLOT_STATE_KEYS = new Set([
-  'plotType', 'preFilters', 'xColumn', 'yColumn', 'groupColumn', 'colorColumn',
+  'plotType', 'dataLevel', 'preFilters', 'xColumn', 'yColumn', 'groupColumn', 'colorColumn',
   'useAbsoluteValue', 'removeValuesThreshold', 'swarmJitterAmount', 'swarmGroupOffset',
   'jitterSeed', 'histogramBins', 'showRaw', 'showMean', 'showErrorBars', 'errorBarType', 'pointSize',
   'showLegend', 'legendPosition', 'showPlotlyToolbar', 'showHover', 'showAxes',
@@ -38,6 +38,7 @@ export function defaultPlotState(dataset: DatasetStore): PlotState {
   const yColumn = numeric[1] ?? numeric[0] ?? ''
   return {
     plotType: 'scatter',
+    dataLevel: 'source',
     preFilters: {},
     xColumn,
     yColumn,
@@ -131,7 +132,9 @@ export function validatePlotState(dataset: DatasetStore, state: PlotState): Plot
   }
   const unknownKeys = Object.keys(state).filter((key) => !PLOT_STATE_KEYS.has(key))
   if (unknownKeys.length) throw new StateValidationError(`Unknown PlotState field ${JSON.stringify(unknownKeys[0])}`)
-  const candidate = structuredClone(state)
+  const candidate = structuredClone(state) as PlotState
+  // Version 1 states created before data levels existed remain source-level states.
+  candidate.dataLevel ??= 'source'
   for (const field of [
     'useAbsoluteValue', 'showRaw', 'showMean', 'showErrorBars', 'showLegend',
     'showPlotlyToolbar', 'showHover', 'showAxes', 'showHorizontalGrid', 'showVerticalGrid',
@@ -142,6 +145,11 @@ export function validatePlotState(dataset: DatasetStore, state: PlotState): Plot
     throw new StateValidationError('preFilters must be an object')
   }
   if (!['scatter', 'swarm', 'box', 'violin', 'histogram', 'cumulativeHistogram'].includes(candidate.plotType)) throw new StateValidationError(`Unsupported plot type ${JSON.stringify(candidate.plotType)}`)
+  if (!['source', 'aggregate'].includes(candidate.dataLevel)) throw new StateValidationError('dataLevel must be source or aggregate')
+  if (candidate.dataLevel === 'aggregate' && !dataset.aggregation) throw new StateValidationError('Dataset does not define aggregation')
+  if (candidate.dataLevel === 'aggregate' && candidate.plotType !== 'swarm') {
+    throw new StateValidationError('Aggregate data level currently supports swarm plots only')
+  }
   requiredColumn(dataset, candidate.xColumn, 'xColumn')
   requiredColumn(dataset, candidate.yColumn, 'yColumn')
   if (!dataset.numericColumns().includes(candidate.yColumn)) throw new StateValidationError('yColumn must be numeric')

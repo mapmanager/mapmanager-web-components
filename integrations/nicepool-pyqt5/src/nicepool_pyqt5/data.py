@@ -37,6 +37,7 @@ def records_to_dataset(
     row_id_column: str,
     schema: Sequence[Mapping[str, Any]] | None = None,
     pre_filter_columns: Sequence[str] | None = None,
+    aggregation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create one complete NicePool dataset from rectangular records."""
     if not row_id_column:
@@ -87,6 +88,8 @@ def records_to_dataset(
         dataset["schema"] = [dict(column) for column in schema]
     if pre_filter_columns is not None:
         dataset["preFilterColumns"] = list(pre_filter_columns)
+    if aggregation is not None:
+        dataset["aggregation"] = dict(aggregation)
     return dataset
 
 
@@ -96,6 +99,7 @@ def dataframe_to_dataset(
     row_id_column: str,
     schema: Sequence[Mapping[str, Any]] | None = None,
     pre_filter_columns: Sequence[str] | None = None,
+    aggregation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create one complete NicePool dataset without modifying the DataFrame."""
     if dataframe.columns.has_duplicates:
@@ -107,4 +111,5 @@ def dataframe_to_dataset(
         row_id_column=row_id_column,
         schema=schema,
         pre_filter_columns=pre_filter_columns,
+        aggregation=aggregation,
     )

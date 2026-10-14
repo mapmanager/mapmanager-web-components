@@ -61,6 +61,19 @@ def test_conversion_has_no_artificial_row_limit() -> None:
     assert len(dataset["rows"]) == 1_205
 
 
+def test_conversion_forwards_explicit_aggregation_recipe() -> None:
+    aggregation = {"groupByColumn": "unit", "preserveColumns": ["condition"]}
+
+    dataset = records_to_dataset(
+        [{"id": "a", "unit": 1, "condition": "control", "value": 2}],
+        row_id_column="id",
+        aggregation=aggregation,
+    )
+
+    assert dataset["aggregation"] == aggregation
+    assert dataset["aggregation"] is not aggregation
+
+
 def test_empty_dataframe_is_rejected() -> None:
     frame = pd.DataFrame(columns=["id", "value"])
 

@@ -1,4 +1,5 @@
 import type { DescriptiveStatistics, QuartileStatistics } from '../core/statistics'
+import type { AggregateTable } from '../core/aggregation'
 import type { NicePoolValue, PlotState, RowId } from '../core/types'
 
 export interface PreparedPoint {
@@ -92,4 +93,5 @@ export interface PlotSummary {
 export interface PreparedPlot {
   data: PreparedPlotData
   summary: PlotSummary
+  aggregate?: AggregateTable
 }

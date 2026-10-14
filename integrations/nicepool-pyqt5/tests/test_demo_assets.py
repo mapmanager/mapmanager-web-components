@@ -22,13 +22,25 @@ def test_luo_csv_and_schema_form_a_complete_nicepool_dataset() -> None:
     assert frame["row_id"].is_unique
     assert frame["row_id"].notna().all()
 
+    preserve_columns = [
+        "file", "include", "animal_id", "species", "region", "cell_type",
+        "age", "sex", "genotype", "condition", "experiment",
+    ]
     dataset = dataframe_to_dataset(
         frame,
         row_id_column="row_id",
         schema=schema,
         pre_filter_columns=["include", "condition", "sweep"],
+        aggregation={
+            "groupByColumn": "file_number",
+            "preserveColumns": preserve_columns,
+        },
     )
 
     assert dataset["rowIdColumn"] == "row_id"
     assert dataset["preFilterColumns"] == ["include", "condition", "sweep"]
+    assert dataset["aggregation"]["groupByColumn"] == "file_number"
     assert len(dataset["rows"]) == len(frame)
+    assert frame["file_number"].notna().all()
+    grouped = frame.groupby("file_number", dropna=False)
+    assert all(not grouped[column].nunique(dropna=False).gt(1).any() for column in preserve_columns)

@@ -23,6 +23,7 @@ class DemoDataset:
     row_id_column: str
     schema: Sequence[Mapping[str, Any]]
     pre_filter_columns: Sequence[str]
+    aggregation: Mapping[str, Any] | None
     preset_definitions: Sequence[Mapping[str, Any]]
     default_preset: str
 
@@ -66,6 +67,7 @@ def load_synthetic_dataset() -> DemoDataset:
             {"name": "amplitude", "type": "number", "axis_label": "Amplitude"},
         ],
         pre_filter_columns=["accept", "condition"],
+        aggregation=None,
         preset_definitions=[
             {
                 "name": "Amplitude over time",
@@ -118,6 +120,13 @@ def load_luo_dataset() -> DemoDataset:
         row_id_column="row_id",
         schema=schema,
         pre_filter_columns=["include", "condition", "sweep"],
+        aggregation={
+            "groupByColumn": "file_number",
+            "preserveColumns": [
+                "file", "include", "animal_id", "species", "region", "cell_type",
+                "age", "sex", "genotype", "condition", "experiment",
+            ],
+        },
         preset_definitions=[
             {
                 "name": "Peak height by condition",

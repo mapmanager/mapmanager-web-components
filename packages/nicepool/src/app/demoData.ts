@@ -106,6 +106,10 @@ export async function loadLuoDemoDataset(): Promise<DemoDataset> {
       rowIdColumn: 'row_id',
       schema,
       preFilterColumns: ['include', 'condition', 'sweep'],
+      aggregation: {
+        groupByColumn: 'file_number',
+        preserveColumns: ['file', 'include', 'animal_id', 'species', 'region', 'cell_type', 'age', 'sex', 'genotype', 'condition', 'experiment'],
+      },
     },
     presetDefinitions: LUO_PRESETS,
     defaultPreset: 'Peak height by condition',

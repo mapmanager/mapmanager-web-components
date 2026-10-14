@@ -1,5 +1,6 @@
 import { DatasetStore } from './dataset'
 import { SelectionModel } from './selection'
+import { aggregateForPlot } from './aggregation'
 import {
   defaultNicePoolState,
   validateNicePoolPreset,
@@ -50,7 +51,7 @@ export class NicePoolEngine {
     const dataset = new DatasetStore(input)
     const state = validateNicePoolState(dataset, this.#state)
     for (let index = 0; index < visiblePlotCount(state.layout); index += 1) {
-      preparePlotData(dataset, state.plots[index]!)
+      this.#prepareFromState(dataset, state.plots[index]!)
     }
     const validIds = new Set(dataset.rowIndexById.keys())
     const selection = this.#selection.pruned(validIds)
@@ -63,18 +64,22 @@ export class NicePoolEngine {
   setState(state: NicePoolState): void {
     const validated = validateNicePoolState(this.dataset, state)
     for (let index = 0; index < visiblePlotCount(validated.layout); index += 1) {
-      preparePlotData(this.dataset, validated.plots[index]!)
+      this.#prepareFromState(this.dataset, validated.plots[index]!)
     }
+    const dataLevelChanged = this.state.plots.some((plot, index) => plot.dataLevel !== validated.plots[index]!.dataLevel)
     this.#state = validated
+    if (dataLevelChanged) this.#selection.reset()
   }
 
   setPlotState(state: PlotState, plotIndex = this.state.activePlotIndex): void {
     if (!Number.isInteger(plotIndex) || plotIndex < 0 || plotIndex > 3) throw new RangeError('plotIndex must be 0 through 3')
     const validated = validatePlotState(this.dataset, state)
-    preparePlotData(this.dataset, validated)
+    this.#prepareFromState(this.dataset, validated)
+    const dataLevelChanged = validated.dataLevel !== this.state.plots[plotIndex]!.dataLevel
     const plots = [...this.state.plots] as unknown as [PlotState, PlotState, PlotState, PlotState]
     plots[plotIndex] = validated
     this.#state = { ...this.state, plots }
+    if (dataLevelChanged) this.#selection.reset()
   }
 
   setLayout(layout: PlotLayout): void {
@@ -90,7 +95,7 @@ export class NicePoolEngine {
   }
 
   setSelection(selection: NicePoolSelection): void {
-    this.#selection.set(selection, new Set(this.dataset.rowIndexById.keys()))
+    this.#selection.set(selection, this.#validSelectionIds())
   }
 
   /** Add rows to the existing selection without removing previously selected rows. */
@@ -110,7 +115,17 @@ export class NicePoolEngine {
   }
 
   preparePlot(plotIndex = this.state.activePlotIndex): PreparedPlot {
-    const data = preparePlotData(this.dataset, this.state.plots[plotIndex]!)
+    return this.#prepareFromState(this.dataset, this.state.plots[plotIndex]!)
+  }
+
+  #prepareFromState(dataset: DatasetStore, state: PlotState): PreparedPlot {
+    if (state.dataLevel === 'aggregate') {
+      const aggregate = aggregateForPlot(dataset, state)
+      const effectiveState: PlotState = { ...state, yColumn: aggregate.meanColumn, preFilters: {} }
+      const data = preparePlotData(aggregate.dataset, effectiveState)
+      return { data, summary: summarizePlot(data), aggregate }
+    }
+    const data = preparePlotData(dataset, state)
     return { data, summary: summarizePlot(data) }
   }
 
@@ -120,5 +135,15 @@ export class NicePoolEngine {
 
   applyNicePoolPreset(preset: NicePoolPreset): void {
     this.setState(validateNicePoolPreset(this.dataset, preset).state)
+  }
+
+  #validSelectionIds(): Set<RowId> {
+    const ids = new Set(this.dataset.rowIndexById.keys())
+    for (let index = 0; index < visiblePlotCount(this.state.layout); index += 1) {
+      const state = this.state.plots[index]!
+      if (state.dataLevel !== 'aggregate') continue
+      for (const id of aggregateForPlot(this.dataset, state).dataset.rowIndexById.keys()) ids.add(id)
+    }
+    return ids
   }
 }

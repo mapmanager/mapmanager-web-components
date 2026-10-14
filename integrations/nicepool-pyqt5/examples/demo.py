@@ -64,6 +64,7 @@ class DemoWindow(QMainWindow):
             row_id_column=dataset.row_id_column,
             schema=dataset.schema,
             pre_filter_columns=dataset.pre_filter_columns,
+            aggregation=dataset.aggregation,
             preset_definitions=dataset.preset_definitions,
             default_preset=dataset.default_preset,
         )

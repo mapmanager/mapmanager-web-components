@@ -27,6 +27,25 @@ Use `replace_dataframe()` / `replace_records()` after initialization to retain
 valid plot state and presets. Replacement offers per-call `callback` and
 `error_callback` hooks for host-controlled fallback behavior.
 
+To enable NicePool's plot-specific aggregate data level, pass the same generic
+recipe accepted by the browser API. The adapter forwards it; aggregation and
+validation remain owned by the TypeScript core:
+
+```python
+pool.set_dataframe(
+    dataframe,
+    row_id_column="row_id",
+    schema=schema,
+    aggregation={
+        "groupByColumn": "file_number",
+        "preserveColumns": ["condition", "animal_id"],
+    },
+)
+```
+
+`groupByColumn` is not otherwise required. NicePool does not infer it from row
+IDs. Every preserved column must be constant within each filtered group.
+
 The adapter is storage-agnostic. To persist UI-created workspaces, connect
 `presets_changed` to the application's settings layer and restore the complete
 list with `set_presets()` after the initial `data_reset`. See

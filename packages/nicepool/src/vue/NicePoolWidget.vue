@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NicePoolEngine } from '../core/engine'
 import { createNicePoolPresets, validateNicePoolPreset, validateNicePoolPresets, visiblePlotCount } from '../core/state'
-import type { ColumnSchema, DatasetInput, NicePoolPreset, NicePoolPresetDefinition, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
+import type { ColumnSchema, DataLevel, DatasetInput, NicePoolPreset, NicePoolPresetDefinition, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
 import type { PreparedPlot, PlotSummary } from '../plots/types'
 import { describeEmptyPlot } from '../plots/diagnostics'
 import { formatPlotSummaryToTsv } from '../plots/summary-format'
@@ -43,7 +43,7 @@ const plotHeight = ref(620)
 const widgetStatus = ref('')
 const showSummaryPlotState = ref(true)
 const showSummaryRawData = ref(true)
-const activeTableTab = ref<'data' | 'selection' | 'summary'>('data')
+const activeTableTab = ref<'data' | 'aggregate' | 'selection' | 'summary'>('data')
 let stopPointerResize: (() => void) | null = null
 let statusTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -137,6 +137,8 @@ function resizeWithKeyboard(axis: 'horizontal' | 'vertical', event: KeyboardEven
 const state = computed(() => { revision.value; return preparedPlots.value.length ? engine.state : null })
 const plotState = computed(() => state.value?.plots[state.value.activePlotIndex] ?? null)
 const activeSummary = computed(() => state.value ? preparedPlots.value[state.value.activePlotIndex]?.summary ?? null : null)
+const activePrepared = computed(() => state.value ? preparedPlots.value[state.value.activePlotIndex] ?? null : null)
+const activeAggregate = computed(() => activePrepared.value?.aggregate ?? null)
 function columnLabel(name: string | null | undefined): string | null {
   return name ? engine.dataset.axisLabel(name) : null
 }
@@ -145,12 +147,9 @@ const summaryColorColumn = computed(() => activeSummary.value?.parameters.colorC
 const summaryGroupLabel = computed(() => columnLabel(summaryGroupColumn.value))
 const summaryColorLabel = computed(() => columnLabel(summaryColorColumn.value))
 const summaryXLabel = computed(() => {
-  if (!activeSummary.value) return 'X'
-  return columnLabel(['swarm', 'box', 'violin'].includes(activeSummary.value.plotType)
-    ? summaryGroupColumn.value
-    : activeSummary.value.parameters.xColumn) ?? 'X'
+  return activePrepared.value?.data.axisLabels.x ?? 'X'
 })
-const summaryYLabel = computed(() => columnLabel(activeSummary.value?.parameters.yColumn) ?? 'Y')
+const summaryYLabel = computed(() => activePrepared.value?.data.axisLabels.y ?? 'Y')
 const visibleIndexes = computed(() => state.value ? Array.from({ length: visiblePlotCount(state.value.layout) }, (_, index) => index) : [])
 function columnSchemas(names: readonly string[]): readonly ColumnSchema[] {
   return names.map((name) => engine.dataset.columnSchema(name))
@@ -161,6 +160,11 @@ const scatterXColumns = computed(() => {
   return preparedPlots.value.length ? engine.dataset.schema.filter(({ name }) => name !== engine.dataset.rowIdColumn) : []
 })
 const categoricalColumns = computed(() => { revision.value; return preparedPlots.value.length ? columnSchemas(engine.dataset.categoricalColumns()) : [] })
+const availableCategoricalColumns = computed(() => {
+  if (plotState.value?.dataLevel !== 'aggregate' || !engine.dataset.aggregation) return categoricalColumns.value
+  const available = new Set([engine.dataset.aggregation.groupByColumn, ...engine.dataset.aggregation.preserveColumns])
+  return categoricalColumns.value.filter(({ name }) => available.has(name))
+})
 const filterColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.preFilterColumns() : [] })
 const isHistogram = computed(() => plotState.value?.plotType === 'histogram' || plotState.value?.plotType === 'cumulativeHistogram')
 const isDistribution = computed(() => plotState.value?.plotType === 'swarm' || plotState.value?.plotType === 'box' || plotState.value?.plotType === 'violin')
@@ -168,15 +172,17 @@ const supportsPointSize = computed(() => plotState.value?.plotType === 'scatter'
 const showsQuartiles = computed(() => activeSummary.value?.plotType === 'box' || activeSummary.value?.plotType === 'violin')
 const availableXColumns = computed(() => isHistogram.value ? numericColumns.value : scatterXColumns.value)
 const rawTableColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.schema : [] })
+const aggregateTableColumns = computed(() => activeAggregate.value?.dataset.schema ?? [])
+const selectionTableDataset = computed(() => activeAggregate.value?.dataset ?? (preparedPlots.value.length ? engine.dataset : null))
 const selectedRows = computed(() => {
   revision.value
-  if (!preparedPlots.value.length) return []
+  if (!selectionTableDataset.value) return []
   const selected = new Set(selection.value.selectedRowIds)
-  return engine.dataset.rows.filter((row) => selected.has(String(row[engine.dataset.rowIdColumn])))
+  return selectionTableDataset.value.rows.filter((row) => selected.has(String(row[selectionTableDataset.value!.rowIdColumn])))
 })
 
 function emptyPlotMessage(prepared: PreparedPlot): string | null {
-  return describeEmptyPlot(engine.dataset, prepared.data.state, prepared.data)
+  return describeEmptyPlot(prepared.aggregate?.dataset ?? engine.dataset, prepared.data.state, prepared.data)
 }
 
 function refresh(): void {
@@ -249,18 +255,28 @@ function updatePlotState(patch: Partial<PlotState>): void {
   emit('state-change', getState())
 }
 
+function changeDataLevel(dataLevel: DataLevel): void {
+  if (!plotState.value || dataLevel === plotState.value.dataLevel) return
+  engine.clearSelection()
+  engine.setPlotState({ ...plotState.value, dataLevel })
+  refresh()
+  emit('selection-change', engine.selection)
+  emit('state-change', getState())
+}
+
 function changePlotType(plotType: PlotState['plotType']): void {
   const requiresGroup = ['swarm', 'box', 'violin'].includes(plotType)
   const histogram = ['histogram', 'cumulativeHistogram'].includes(plotType)
   const groupColumn = requiresGroup && plotState.value?.groupColumn === null
-    ? categoricalColumns.value[0]?.name ?? null
+    ? availableCategoricalColumns.value[0]?.name ?? null
     : histogram
       ? null
       : plotState.value?.groupColumn
   const xColumn = histogram && plotState.value && !numericColumns.value.some(({ name }) => name === plotState.value?.xColumn)
     ? numericColumns.value[0]?.name ?? plotState.value.xColumn
     : plotState.value?.xColumn
-  updatePlotState({ plotType, ...(groupColumn !== undefined ? { groupColumn } : {}), ...(xColumn !== undefined ? { xColumn } : {}) })
+  const dataLevel = plotType === 'swarm' ? plotState.value?.dataLevel ?? 'source' : 'source'
+  updatePlotState({ plotType, dataLevel, ...(groupColumn !== undefined ? { groupColumn } : {}), ...(xColumn !== undefined ? { xColumn } : {}) })
 }
 
 function updateFilter(column: string, value: string): void {
@@ -395,13 +411,16 @@ onBeforeUnmount(() => {
       <label>Plot type<select :value="plotState.plotType" @change="changePlotType(($event.target as HTMLSelectElement).value as PlotState['plotType'])">
         <option value="scatter">Scatter</option><option value="swarm">Swarm</option><option value="box">Box</option><option value="violin">Violin</option><option value="histogram">Histogram</option><option value="cumulativeHistogram">Cumulative histogram</option>
       </select></label>
+      <label :class="{ 'nicepool-control-disabled': !engine.dataset.aggregation || plotState.plotType !== 'swarm' }">Data level<select :value="plotState.dataLevel" :disabled="!engine.dataset.aggregation || plotState.plotType !== 'swarm'" @change="changeDataLevel(($event.target as HTMLSelectElement).value as DataLevel)">
+        <option value="source">Source rows</option><option value="aggregate">Aggregated groups</option>
+      </select></label>
       <div class="nicepool-selector-pair">
         <ColumnSelectionTable title="X column" :columns="availableXColumns" :selected-name="plotState.xColumn" :disabled="isDistribution" :allow-none="false" @select="updatePlotState({ xColumn: $event! })" />
         <ColumnSelectionTable title="Y column" :columns="numericColumns" :selected-name="plotState.yColumn" :disabled="isHistogram" :allow-none="false" @select="updatePlotState({ yColumn: $event! })" />
       </div>
       <div class="nicepool-selector-pair">
-        <ColumnSelectionTable title="Group" :columns="categoricalColumns" :selected-name="plotState.groupColumn" :disabled="plotState.plotType === 'scatter'" :allow-none="true" @select="updatePlotState({ groupColumn: $event })" />
-        <ColumnSelectionTable title="Color by" :columns="categoricalColumns" :selected-name="plotState.colorColumn" :disabled="false" :allow-none="true" @select="updatePlotState({ colorColumn: $event })" />
+        <ColumnSelectionTable title="Group" :columns="availableCategoricalColumns" :selected-name="plotState.groupColumn" :disabled="plotState.plotType === 'scatter'" :allow-none="true" @select="updatePlotState({ groupColumn: $event })" />
+        <ColumnSelectionTable title="Color by" :columns="availableCategoricalColumns" :selected-name="plotState.colorColumn" :disabled="false" :allow-none="true" @select="updatePlotState({ colorColumn: $event })" />
       </div>
       <label><span>Absolute values</span><input type="checkbox" :checked="plotState.useAbsoluteValue" @change="updatePlotState({ useAbsoluteValue: ($event.target as HTMLInputElement).checked })" /></label>
       <label>Keep within ±<span class="nicepool-inline-option"><input type="checkbox" aria-label="Exclude extreme values" :checked="plotState.removeValuesThreshold !== null" @change="updatePlotState({ removeValuesThreshold: ($event.target as HTMLInputElement).checked ? 10 : null })" /><input type="number" min="0" step="0.5" aria-label="Extreme-value threshold" :disabled="plotState.removeValuesThreshold === null" :value="plotState.removeValuesThreshold ?? 10" @change="updatePlotState({ removeValuesThreshold: Number(($event.target as HTMLInputElement).value) })" /></span></label>
@@ -452,11 +471,13 @@ onBeforeUnmount(() => {
         <div class="nicepool-summary-content">
           <div class="nicepool-table-tabs" role="tablist" aria-label="NicePool tables">
             <button type="button" role="tab" :aria-selected="activeTableTab === 'data'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'data' }" @click="activeTableTab = 'data'">Data</button>
+            <button type="button" role="tab" :disabled="!activeAggregate" :aria-selected="activeTableTab === 'aggregate'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'aggregate' }" @click="activeTableTab = 'aggregate'">Aggregate</button>
             <button type="button" role="tab" :aria-selected="activeTableTab === 'selection'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'selection' }" @click="activeTableTab = 'selection'">Selection</button>
             <button type="button" role="tab" :aria-selected="activeTableTab === 'summary'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'summary' }" @click="activeTableTab = 'summary'">Plot {{ state!.activePlotIndex + 1 }} summary</button>
           </div>
           <NicePoolTable v-if="activeTableTab === 'data'" role="tabpanel" label="Data" :rows="engine.dataset.rows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
-          <NicePoolTable v-else-if="activeTableTab === 'selection'" role="tabpanel" label="Selection" :rows="selectedRows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
+          <NicePoolTable v-else-if="activeTableTab === 'aggregate' && activeAggregate" role="tabpanel" :label="`Plot ${state!.activePlotIndex + 1} aggregate`" :rows="activeAggregate.dataset.rows" :columns="aggregateTableColumns" :row-id-column="activeAggregate.dataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
+          <NicePoolTable v-else-if="activeTableTab === 'selection' && selectionTableDataset" role="tabpanel" label="Selection" :rows="selectedRows" :columns="selectionTableDataset.schema" :row-id-column="selectionTableDataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
           <div v-else class="nicepool-summary-report" role="tabpanel">
           <div class="nicepool-summary-actions">
             <button type="button" @click="copySummary">Copy Summary</button>

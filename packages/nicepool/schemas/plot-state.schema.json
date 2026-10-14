@@ -7,6 +7,7 @@
   "required": ["plotType", "preFilters", "xColumn", "yColumn", "groupColumn", "colorColumn", "useAbsoluteValue", "removeValuesThreshold", "swarmJitterAmount", "swarmGroupOffset", "jitterSeed", "histogramBins", "showRaw", "showMean", "showErrorBars", "errorBarType", "pointSize", "showLegend", "legendPosition", "showPlotlyToolbar", "showHover", "showAxes", "showHorizontalGrid", "showVerticalGrid", "cvEpsilon"],
   "properties": {
     "plotType": { "enum": ["scatter", "swarm", "box", "violin", "histogram", "cumulativeHistogram"] },
+    "dataLevel": { "enum": ["source", "aggregate"], "default": "source" },
     "preFilters": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } },
     "xColumn": { "type": "string", "minLength": 1 },
     "yColumn": { "type": "string", "minLength": 1 },

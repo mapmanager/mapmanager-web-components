@@ -15,12 +15,21 @@ export interface ColumnSchema {
   categorical?: boolean
 }
 
+/** Caller-authored recipe for deriving one row per group from source rows. */
+export interface AggregationConfig {
+  /** Source column whose distinct values define aggregate rows. */
+  groupByColumn: string
+  /** Source columns copied only when constant within every aggregate group. */
+  preserveColumns: readonly string[]
+}
+
 /** Complete table payload accepted by dataset reset and state-preserving replacement APIs. */
 export interface DatasetInput {
   rows: readonly NicePoolRow[]
   rowIdColumn: string
   schema?: readonly ColumnSchema[]
   preFilterColumns?: readonly string[]
+  aggregation?: AggregationConfig
 }
 
 /** Stable external row identity. */
@@ -37,10 +46,12 @@ export type ErrorBarType = 'std' | 'sem'
 export type PlotLayout = '1x1' | '1x2' | '2x1' | '2x2'
 export type LegendPosition = 'bottom' | 'right' | 'top' | 'left'
 export type NicePoolTheme = 'dark' | 'light'
+export type DataLevel = 'source' | 'aggregate'
 
 /** Serializable configuration for one Slice 1 plot. */
 export interface PlotState {
   plotType: PlotType
+  dataLevel: DataLevel
   preFilters: Readonly<Record<string, NicePoolValue>>
   xColumn: string
   yColumn: string
