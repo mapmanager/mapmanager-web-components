@@ -17,7 +17,7 @@ const LAYOUT_COUNTS: Readonly<Record<PlotLayout, number>> = {
   '2x2': 4,
 }
 const PLOT_STATE_KEYS = new Set([
-  'plotType', 'dataLevel', 'preFilters', 'xColumn', 'yColumn', 'groupColumn', 'colorColumn',
+  'plotType', 'dataLevel', 'aggregateStatistic', 'preFilters', 'xColumn', 'yColumn', 'groupColumn', 'colorColumn',
   'useAbsoluteValue', 'removeValuesThreshold', 'swarmJitterAmount', 'swarmGroupOffset',
   'jitterSeed', 'histogramBins', 'showRaw', 'showMean', 'showErrorBars', 'errorBarType', 'pointSize',
   'showLegend', 'legendPosition', 'showPlotlyToolbar', 'showHover', 'showAxes',
@@ -39,6 +39,7 @@ export function defaultPlotState(dataset: DatasetStore): PlotState {
   return {
     plotType: 'scatter',
     dataLevel: 'source',
+    aggregateStatistic: 'mean',
     preFilters: {},
     xColumn,
     yColumn,
@@ -55,13 +56,13 @@ export function defaultPlotState(dataset: DatasetStore): PlotState {
     showErrorBars: false,
     errorBarType: 'sem',
     pointSize: 7,
-    showLegend: true,
+    showLegend: false,
     legendPosition: 'bottom',
     showPlotlyToolbar: true,
     showHover: false,
     showAxes: true,
     showHorizontalGrid: true,
-    showVerticalGrid: true,
+    showVerticalGrid: false,
     cvEpsilon: 0.01,
   }
 }
@@ -135,6 +136,7 @@ export function validatePlotState(dataset: DatasetStore, state: PlotState): Plot
   const candidate = structuredClone(state) as PlotState
   // Version 1 states created before data levels existed remain source-level states.
   candidate.dataLevel ??= 'source'
+  candidate.aggregateStatistic ??= 'mean'
   for (const field of [
     'useAbsoluteValue', 'showRaw', 'showMean', 'showErrorBars', 'showLegend',
     'showPlotlyToolbar', 'showHover', 'showAxes', 'showHorizontalGrid', 'showVerticalGrid',
@@ -146,9 +148,12 @@ export function validatePlotState(dataset: DatasetStore, state: PlotState): Plot
   }
   if (!['scatter', 'swarm', 'box', 'violin', 'histogram', 'cumulativeHistogram'].includes(candidate.plotType)) throw new StateValidationError(`Unsupported plot type ${JSON.stringify(candidate.plotType)}`)
   if (!['source', 'aggregate'].includes(candidate.dataLevel)) throw new StateValidationError('dataLevel must be source or aggregate')
+  if (!['mean', 'median', 'std', 'sem', 'min', 'max', 'cv', 'count'].includes(candidate.aggregateStatistic)) {
+    throw new StateValidationError('aggregateStatistic must be mean, median, std, sem, min, max, cv, or count')
+  }
   if (candidate.dataLevel === 'aggregate' && !dataset.aggregation) throw new StateValidationError('Dataset does not define aggregation')
-  if (candidate.dataLevel === 'aggregate' && candidate.plotType !== 'swarm') {
-    throw new StateValidationError('Aggregate data level currently supports swarm plots only')
+  if (candidate.dataLevel === 'aggregate' && !['scatter', 'swarm', 'box', 'violin'].includes(candidate.plotType)) {
+    throw new StateValidationError('Aggregate data level supports scatter, swarm, box, and violin plots')
   }
   requiredColumn(dataset, candidate.xColumn, 'xColumn')
   requiredColumn(dataset, candidate.yColumn, 'yColumn')
@@ -157,6 +162,18 @@ export function validatePlotState(dataset: DatasetStore, state: PlotState): Plot
   if (candidate.groupColumn !== null) requiredColumn(dataset, candidate.groupColumn, 'groupColumn')
   if (['swarm', 'box', 'violin'].includes(candidate.plotType) && candidate.groupColumn === null) throw new StateValidationError(`${candidate.plotType} requires groupColumn`)
   if (candidate.colorColumn !== null) requiredColumn(dataset, candidate.colorColumn, 'colorColumn')
+  if (candidate.dataLevel === 'aggregate' && dataset.aggregation) {
+    const derivedColumns = new Set([dataset.aggregation.groupByColumn, ...dataset.aggregation.preserveColumns])
+    if (candidate.plotType === 'scatter' && !derivedColumns.has(candidate.xColumn)) {
+      throw new StateValidationError('Aggregate scatter xColumn must be the aggregation group column or a preserved column')
+    }
+    if (candidate.groupColumn !== null && !derivedColumns.has(candidate.groupColumn)) {
+      throw new StateValidationError('Aggregate groupColumn must be the aggregation group column or a preserved column')
+    }
+    if (candidate.colorColumn !== null && !derivedColumns.has(candidate.colorColumn)) {
+      throw new StateValidationError('Aggregate colorColumn must be the aggregation group column or a preserved column')
+    }
+  }
   const categorical = new Set(dataset.categoricalColumns())
   if (candidate.groupColumn !== null && !categorical.has(candidate.groupColumn)) throw new StateValidationError('groupColumn must be categorical')
   if (candidate.colorColumn !== null && !categorical.has(candidate.colorColumn)) throw new StateValidationError('colorColumn must be categorical')

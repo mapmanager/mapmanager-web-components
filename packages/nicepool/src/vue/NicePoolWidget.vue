@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NicePoolEngine } from '../core/engine'
 import { createNicePoolPresets, validateNicePoolPreset, validateNicePoolPresets, visiblePlotCount } from '../core/state'
-import type { ColumnSchema, DataLevel, DatasetInput, NicePoolPreset, NicePoolPresetDefinition, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
+import type { AggregateStatistic, ColumnSchema, DataLevel, DatasetInput, NicePoolPreset, NicePoolPresetDefinition, NicePoolSelection, NicePoolState, NicePoolTheme, NicePoolValue, PlotLayout, PlotState, RowId } from '../core/types'
 import type { PreparedPlot, PlotSummary } from '../plots/types'
 import { describeEmptyPlot } from '../plots/diagnostics'
 import { formatPlotSummaryToTsv } from '../plots/summary-format'
@@ -159,18 +159,28 @@ const scatterXColumns = computed(() => {
   revision.value
   return preparedPlots.value.length ? engine.dataset.schema.filter(({ name }) => name !== engine.dataset.rowIdColumn) : []
 })
+const aggregateSourceColumns = computed(() => {
+  if (!engine.dataset.aggregation) return new Set<string>()
+  return new Set([engine.dataset.aggregation.groupByColumn, ...engine.dataset.aggregation.preserveColumns])
+})
 const categoricalColumns = computed(() => { revision.value; return preparedPlots.value.length ? columnSchemas(engine.dataset.categoricalColumns()) : [] })
+const aggregateCategoricalColumns = computed(() => categoricalColumns.value.filter(({ name }) => aggregateSourceColumns.value.has(name)))
 const availableCategoricalColumns = computed(() => {
   if (plotState.value?.dataLevel !== 'aggregate' || !engine.dataset.aggregation) return categoricalColumns.value
-  const available = new Set([engine.dataset.aggregation.groupByColumn, ...engine.dataset.aggregation.preserveColumns])
-  return categoricalColumns.value.filter(({ name }) => available.has(name))
+  return aggregateCategoricalColumns.value
 })
 const filterColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.preFilterColumns() : [] })
 const isHistogram = computed(() => plotState.value?.plotType === 'histogram' || plotState.value?.plotType === 'cumulativeHistogram')
 const isDistribution = computed(() => plotState.value?.plotType === 'swarm' || plotState.value?.plotType === 'box' || plotState.value?.plotType === 'violin')
 const supportsPointSize = computed(() => plotState.value?.plotType === 'scatter' || plotState.value?.plotType === 'swarm')
 const showsQuartiles = computed(() => activeSummary.value?.plotType === 'box' || activeSummary.value?.plotType === 'violin')
-const availableXColumns = computed(() => isHistogram.value ? numericColumns.value : scatterXColumns.value)
+const availableXColumns = computed(() => {
+  if (isHistogram.value) return numericColumns.value
+  if (plotState.value?.dataLevel === 'aggregate') {
+    return scatterXColumns.value.filter(({ name }) => aggregateSourceColumns.value.has(name))
+  }
+  return scatterXColumns.value
+})
 const rawTableColumns = computed(() => { revision.value; return preparedPlots.value.length ? engine.dataset.schema : [] })
 const aggregateTableColumns = computed(() => activeAggregate.value?.dataset.schema ?? [])
 const selectionTableDataset = computed(() => activeAggregate.value?.dataset ?? (preparedPlots.value.length ? engine.dataset : null))
@@ -258,7 +268,20 @@ function updatePlotState(patch: Partial<PlotState>): void {
 function changeDataLevel(dataLevel: DataLevel): void {
   if (!plotState.value || dataLevel === plotState.value.dataLevel) return
   engine.clearSelection()
-  engine.setPlotState({ ...plotState.value, dataLevel })
+  const aggregate = engine.dataset.aggregation
+  const next = { ...plotState.value, dataLevel }
+  if (dataLevel === 'aggregate' && aggregate) {
+    if (next.plotType === 'scatter' && !aggregateSourceColumns.value.has(next.xColumn)) {
+      next.xColumn = aggregate.groupByColumn
+    }
+    if (next.groupColumn !== null && !aggregateSourceColumns.value.has(next.groupColumn)) {
+      next.groupColumn = ['swarm', 'box', 'violin'].includes(next.plotType)
+        ? aggregateCategoricalColumns.value[0]?.name ?? null
+        : null
+    }
+    if (next.colorColumn !== null && !aggregateSourceColumns.value.has(next.colorColumn)) next.colorColumn = null
+  }
+  engine.setPlotState(next)
   refresh()
   emit('selection-change', engine.selection)
   emit('state-change', getState())
@@ -275,8 +298,13 @@ function changePlotType(plotType: PlotState['plotType']): void {
   const xColumn = histogram && plotState.value && !numericColumns.value.some(({ name }) => name === plotState.value?.xColumn)
     ? numericColumns.value[0]?.name ?? plotState.value.xColumn
     : plotState.value?.xColumn
-  const dataLevel = plotType === 'swarm' ? plotState.value?.dataLevel ?? 'source' : 'source'
-  updatePlotState({ plotType, dataLevel, ...(groupColumn !== undefined ? { groupColumn } : {}), ...(xColumn !== undefined ? { xColumn } : {}) })
+  const supportsAggregate = ['scatter', 'swarm', 'box', 'violin'].includes(plotType)
+  const dataLevel = supportsAggregate ? plotState.value?.dataLevel ?? 'source' : 'source'
+  const aggregateXColumn = dataLevel === 'aggregate' && plotType === 'scatter'
+    && xColumn !== undefined && !aggregateSourceColumns.value.has(xColumn)
+      ? engine.dataset.aggregation?.groupByColumn ?? xColumn
+      : xColumn
+  updatePlotState({ plotType, dataLevel, ...(groupColumn !== undefined ? { groupColumn } : {}), ...(aggregateXColumn !== undefined ? { xColumn: aggregateXColumn } : {}) })
 }
 
 function updateFilter(column: string, value: string): void {
@@ -411,9 +439,14 @@ onBeforeUnmount(() => {
       <label>Plot type<select :value="plotState.plotType" @change="changePlotType(($event.target as HTMLSelectElement).value as PlotState['plotType'])">
         <option value="scatter">Scatter</option><option value="swarm">Swarm</option><option value="box">Box</option><option value="violin">Violin</option><option value="histogram">Histogram</option><option value="cumulativeHistogram">Cumulative histogram</option>
       </select></label>
-      <label :class="{ 'nicepool-control-disabled': !engine.dataset.aggregation || plotState.plotType !== 'swarm' }">Data level<select :value="plotState.dataLevel" :disabled="!engine.dataset.aggregation || plotState.plotType !== 'swarm'" @change="changeDataLevel(($event.target as HTMLSelectElement).value as DataLevel)">
-        <option value="source">Source rows</option><option value="aggregate">Aggregated groups</option>
-      </select></label>
+      <div class="nicepool-control-row">
+        <label :class="{ 'nicepool-control-disabled': !engine.dataset.aggregation || !['scatter', 'swarm', 'box', 'violin'].includes(plotState.plotType) }">Data level<select :value="plotState.dataLevel" :disabled="!engine.dataset.aggregation || !['scatter', 'swarm', 'box', 'violin'].includes(plotState.plotType)" @change="changeDataLevel(($event.target as HTMLSelectElement).value as DataLevel)">
+          <option value="source">Source rows</option><option value="aggregate">Aggregated groups</option>
+        </select></label>
+        <label :class="{ 'nicepool-control-disabled': plotState.dataLevel !== 'aggregate' }">Aggregate value<select :value="plotState.aggregateStatistic" :disabled="plotState.dataLevel !== 'aggregate'" @change="updatePlotState({ aggregateStatistic: ($event.target as HTMLSelectElement).value as AggregateStatistic })">
+          <option value="mean">Mean</option><option value="median">Median</option><option value="std">SD</option><option value="sem">SE</option><option value="min">Min</option><option value="max">Max</option><option value="cv">CV</option><option value="count">Count</option>
+        </select></label>
+      </div>
       <div class="nicepool-selector-pair">
         <ColumnSelectionTable title="X column" :columns="availableXColumns" :selected-name="plotState.xColumn" :disabled="isDistribution" :allow-none="false" @select="updatePlotState({ xColumn: $event! })" />
         <ColumnSelectionTable title="Y column" :columns="numericColumns" :selected-name="plotState.yColumn" :disabled="isHistogram" :allow-none="false" @select="updatePlotState({ yColumn: $event! })" />
@@ -484,7 +517,7 @@ onBeforeUnmount(() => {
             <label><input v-model="showSummaryPlotState" type="checkbox" /> Plot State</label>
             <label><input v-model="showSummaryRawData" type="checkbox" /> Raw Data</label>
           </div>
-          <div class="nicepool-summary-table-scroll">
+          <div class="nicepool-summary-table-scroll" tabindex="0" :aria-label="`Plot ${state!.activePlotIndex + 1} summary data`">
             <template v-if="showSummaryPlotState">
               <h3>Plot State</h3>
               <table><tbody><tr v-for="(value, key) in activeSummary.parameters" :key="key"><th>{{ key }}</th><td>{{ displaySummaryValue(value) }}</td></tr></tbody></table>

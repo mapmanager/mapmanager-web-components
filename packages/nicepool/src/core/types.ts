@@ -47,11 +47,13 @@ export type PlotLayout = '1x1' | '1x2' | '2x1' | '2x2'
 export type LegendPosition = 'bottom' | 'right' | 'top' | 'left'
 export type NicePoolTheme = 'dark' | 'light'
 export type DataLevel = 'source' | 'aggregate'
+export type AggregateStatistic = 'mean' | 'median' | 'std' | 'sem' | 'min' | 'max' | 'cv' | 'count'
 
 /** Serializable configuration for one Slice 1 plot. */
 export interface PlotState {
   plotType: PlotType
   dataLevel: DataLevel
+  aggregateStatistic: AggregateStatistic
   preFilters: Readonly<Record<string, NicePoolValue>>
   xColumn: string
   yColumn: string

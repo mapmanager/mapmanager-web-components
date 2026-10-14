@@ -121,7 +121,7 @@ export class NicePoolEngine {
   #prepareFromState(dataset: DatasetStore, state: PlotState): PreparedPlot {
     if (state.dataLevel === 'aggregate') {
       const aggregate = aggregateForPlot(dataset, state)
-      const effectiveState: PlotState = { ...state, yColumn: aggregate.meanColumn, preFilters: {} }
+      const effectiveState: PlotState = { ...state, yColumn: aggregate.valueColumn, preFilters: {} }
       const data = preparePlotData(aggregate.dataset, effectiveState)
       return { data, summary: summarizePlot(data), aggregate }
     }

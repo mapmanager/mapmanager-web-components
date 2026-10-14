@@ -8,6 +8,7 @@
   "properties": {
     "plotType": { "enum": ["scatter", "swarm", "box", "violin", "histogram", "cumulativeHistogram"] },
     "dataLevel": { "enum": ["source", "aggregate"], "default": "source" },
+    "aggregateStatistic": { "enum": ["mean", "median", "std", "sem", "min", "max", "cv", "count"], "default": "mean" },
     "preFilters": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } },
     "xColumn": { "type": "string", "minLength": 1 },
     "yColumn": { "type": "string", "minLength": 1 },

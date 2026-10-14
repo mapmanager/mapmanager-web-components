@@ -50,7 +50,7 @@ async function copyTable(): Promise<void> {
       <button type="button" :disabled="page === 0" @click="page -= 1">Previous</button>
       <button type="button" :disabled="page + 1 >= pageCount" @click="page += 1">Next</button>
     </div>
-    <div class="nicepool-summary-table-scroll">
+    <div class="nicepool-summary-table-scroll" tabindex="0" :aria-label="`${label} table data`">
       <table :aria-label="label">
         <thead><tr><th>#</th><th v-for="column in columns" :key="column.name">{{ column.axis_label }}</th></tr></thead>
         <tbody><tr v-for="(row, rowIndex) in visibleRows" :key="String(row[rowIdColumn] ?? rowIndex)">

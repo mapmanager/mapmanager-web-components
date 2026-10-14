@@ -56,9 +56,9 @@
 .nicepool-splitter-horizontal { width: 100%; height: 7px; cursor: row-resize; }
 .nicepool-splitter-horizontal::after { inset: 2px 40%; }
 .nicepool-summary-panel { flex: 0 0 auto; min-height: 0; background: var(--np-controls); border-top: 1px solid var(--np-border); color: var(--np-text); font-size: var(--nicepool-control-font-size); }
-.nicepool-summary-panel[open] { display: flex; flex: 1 1 220px; flex-direction: column; min-height: 100px; overflow: hidden; }
+.nicepool-summary-panel[open] { display: grid; flex: 1 1 220px; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 100px; overflow: hidden; }
 .nicepool-summary-panel > summary { flex: 0 0 auto; padding: 5px 8px; cursor: pointer; user-select: none; }
-.nicepool-summary-content { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; padding: 0 8px 8px; }
+.nicepool-summary-content { display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box; overflow: hidden; padding: 0 8px 8px; }
 .nicepool-table-tabs { display: flex; gap: 4px; margin-bottom: 6px; border-bottom: 1px solid var(--np-border); }
 .nicepool-table-tabs button, .nicepool-table-pagination button { min-height: 24px; border: 1px solid var(--np-input-border); border-radius: 4px 4px 0 0; padding: 2px 7px; background: var(--np-input); color: inherit; font: inherit; }
 .nicepool-table-tabs .nicepool-table-tab-active { border-bottom-color: var(--np-active); box-shadow: inset 0 -2px var(--np-active); }
@@ -69,14 +69,13 @@
 .nicepool-summary-actions button { min-height: 24px; border: 1px solid var(--np-input-border); border-radius: 4px; padding: 2px 6px; background: var(--np-input); color: inherit; font: inherit; }
 .nicepool-summary-actions label { display: inline-flex; align-items: center; gap: 4px; }
 .nicepool-summary-actions input { margin: 0; }
-.nicepool-table-view, .nicepool-summary-report { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
-.nicepool-summary-table-scroll { flex: 1 1 auto; min-height: 0; max-height: 220px; overflow: auto; }
-.nicepool-summary-panel[open] .nicepool-summary-table-scroll { max-height: none; }
+.nicepool-table-view, .nicepool-summary-report { display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.nicepool-summary-table-scroll { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: auto; }
 .nicepool-summary-table-scroll h3 { margin: 7px 0 3px; font-size: inherit; }
-.nicepool-summary-panel table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.nicepool-summary-panel table { width: max-content; min-width: 100%; border-collapse: collapse; white-space: nowrap; }
 .nicepool-summary-panel th, .nicepool-summary-panel td { border: 1px solid var(--np-border); padding: 2px 5px; text-align: right; }
 .nicepool-summary-panel th:first-child, .nicepool-summary-panel th:nth-child(2), .nicepool-summary-panel td:first-child, .nicepool-summary-panel td:nth-child(2) { text-align: left; }
-.nicepool-summary-panel thead th { position: sticky; top: 0; background: var(--np-controls); }
+.nicepool-summary-panel thead th { position: sticky; z-index: 1; top: 0; background: var(--np-controls); }
 body.nicepool-resizing { cursor: grabbing; user-select: none; }
 .nicepool-footer { grid-column: 1 / -1; min-width: 0; box-sizing: border-box; padding: 4px 8px; border-top: 1px solid var(--np-border); overflow: hidden; color: var(--np-muted); background: var(--np-controls); font-size: var(--nicepool-control-font-size); text-overflow: ellipsis; white-space: nowrap; }
 .nicepool-controls :is(button, input, select):focus,

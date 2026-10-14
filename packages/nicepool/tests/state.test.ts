@@ -26,18 +26,35 @@ describe('versioned state contracts', () => {
     expect(state).toMatchObject({ schemaVersion: 1, layout: '1x1', activePlotIndex: 0 })
     expect(state.plots[0].groupColumn).toBeNull()
     expect(state.plots[0]).toMatchObject({
-      showLegend: true,
+      dataLevel: 'source',
+      aggregateStatistic: 'mean',
+      showLegend: false,
       legendPosition: 'bottom',
       showPlotlyToolbar: true,
       showHover: false,
       showAxes: true,
       showHorizontalGrid: true,
-      showVerticalGrid: true,
+      showVerticalGrid: false,
       histogramBins: 50,
     })
     expect(state.plots).toHaveLength(4)
     state.plots[0].pointSize = 12
     expect(state.plots[1].pointSize).toBe(7)
+  })
+
+  it('migrates version-one plot states without aggregate fields to source means', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const state = defaultNicePoolState(dataset)
+    const legacy = { ...state.plots[0] } as Record<string, unknown>
+    delete legacy.dataLevel
+    delete legacy.aggregateStatistic
+
+    const validated = validateNicePoolState(dataset, {
+      ...state,
+      plots: [legacy, ...state.plots.slice(1)],
+    } as never)
+
+    expect(validated.plots[0]).toMatchObject({ dataLevel: 'source', aggregateStatistic: 'mean' })
   })
 
   it('builds presets when a numeric prefilter is not a group column', () => {

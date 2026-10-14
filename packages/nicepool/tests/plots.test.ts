@@ -189,6 +189,52 @@ describe('plot preparation and summaries', () => {
     expect(buildPlotlySpecification(violin, { primaryRowId: null, selectedRowIds: [] }, 'dark', 'scattergl').traces[0]).toMatchObject({ type: 'violin', pointpos: 0 })
   })
 
+  it.each(['box', 'violin'] as const)('applies the Hover option to the complete %s trace', (plotType) => {
+    const dataset = new DatasetStore(edgeDataset)
+    const state = {
+      ...defaultPlotState(dataset), plotType,
+      groupColumn: 'condition', colorColumn: null, yColumn: 'y',
+    }
+    const hidden = buildPlotlySpecification(
+      prepareDistribution(dataset, state),
+      { primaryRowId: null, selectedRowIds: [] },
+      'dark',
+      'scattergl',
+    ).traces[0] as { hoverinfo?: unknown; hovertemplate?: unknown; hoveron?: unknown }
+    const shown = buildPlotlySpecification(
+      prepareDistribution(dataset, { ...state, showHover: true }),
+      { primaryRowId: null, selectedRowIds: [] },
+      'dark',
+      'scattergl',
+    ).traces[0] as { hoverinfo?: unknown; hovertemplate?: unknown; hoveron?: unknown }
+
+    expect(hidden.hoveron).toBe('points')
+    expect(hidden.hoverinfo).toBe('none')
+    expect(hidden.hovertemplate).toBeUndefined()
+    expect(shown.hovertemplate).toContain('row=%{customdata[0]}')
+    expect(shown.hoverinfo).toBeUndefined()
+    expect(shown.hoveron).toBe('points')
+  })
+
+  it('does not render a numeric zero line through the first swarm category', () => {
+    const dataset = new DatasetStore(edgeDataset)
+    const data = prepareSwarm(dataset, {
+      ...defaultPlotState(dataset),
+      plotType: 'swarm',
+      yColumn: 'y',
+      groupColumn: 'condition',
+      showVerticalGrid: false,
+    })
+    const specification = buildPlotlySpecification(
+      data,
+      { primaryRowId: null, selectedRowIds: [] },
+      'dark',
+      'scattergl',
+    )
+
+    expect(specification.layout.xaxis).toMatchObject({ showgrid: false, zeroline: false })
+  })
+
   it('uses shared histogram edges and deterministic cumulative proportions', () => {
     const dataset = new DatasetStore(edgeDataset)
     const histogramState = {
@@ -244,7 +290,7 @@ describe('plot preparation and summaries', () => {
     const overlay = specification.traces.at(-1)
 
     expect(overlay).toMatchObject({
-      type: 'scatter',
+      type: 'scattergl',
       mode: 'markers',
       name: 'Selected',
       showlegend: false,
@@ -252,6 +298,11 @@ describe('plot preparation and summaries', () => {
       marker: { color: '#f97316' },
     })
     expect(specification.traces.at(-2)).toMatchObject({ name: 'mean ± sem' })
+    expect(specification.traces.at(-2)).toMatchObject({
+      marker: { color: '#6b7280', line: { color: '#6b7280', width: 3 }, size: 18 },
+      error_y: { color: '#6b7280', thickness: 2, width: 6 },
+    })
+    expect(specification.traces.every(({ type }) => type === 'scattergl')).toBe(true)
   })
 
   it('ignores row identities reported by the display-only selection overlay', () => {

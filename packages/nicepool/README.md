@@ -40,8 +40,13 @@ count, min, max, mean, median, sample SD, SEM, and CV while ignoring missing
 numeric values. SD, SEM, and CV remain missing for groups with fewer than two
 valid observations.
 
-The initial UI supports aggregation for swarm plots and plots the generated
-`<y>_mean` column, labeled `<Y label> (mean)`. Aggregate rows have their own
+The UI supports aggregation for scatter, swarm, box, and violin plots. Each
+plot selects one already-generated aggregate column: mean, median, SD, SE, min,
+max, CV, or count. The axis label identifies that statistic, for example
+`<Y label> (mean)`. Aggregate scatter X choices are limited to the configured
+grouping column and preserved columns; the grouping column is the fallback when
+the source-level X column is unavailable in the derived table. Histogram and
+cumulative-histogram aggregation are intentionally deferred. Aggregate rows have their own
 stable identities and retain separate source-row membership metadata; changing
 data level clears selection rather than implicitly linking identities. The
 Data table always remains the complete authoritative source table. The

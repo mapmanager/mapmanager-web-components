@@ -1,6 +1,6 @@
 import { DatasetStore, filteredRowIndices, finiteNumber } from './dataset'
 import { descriptiveStatistics } from './statistics'
-import { DatasetValidationError, type ColumnSchema, type NicePoolRow, type NicePoolValue, type PlotState, type RowId } from './types'
+import { DatasetValidationError, type AggregateStatistic, type ColumnSchema, type NicePoolRow, type NicePoolValue, type PlotState, type RowId } from './types'
 
 const STATISTICS = ['count', 'min', 'max', 'mean', 'median', 'std', 'sem', 'cv'] as const
 
@@ -8,7 +8,8 @@ const STATISTICS = ['count', 'min', 'max', 'mean', 'median', 'std', 'sem', 'cv']
 export interface AggregateTable {
   dataset: DatasetStore
   sourceYColumn: string
-  meanColumn: string
+  statistic: AggregateStatistic
+  valueColumn: string
   sourceRowIdsByAggregateId: ReadonlyMap<RowId, readonly RowId[]>
 }
 
@@ -43,7 +44,7 @@ export function aggregateForPlot(source: DatasetStore, state: PlotState): Aggreg
   }
 
   const rowIdColumn = '__nicepool_aggregate_id'
-  const meanColumn = `${state.yColumn}_mean`
+  const valueColumn = `${state.yColumn}_${state.aggregateStatistic}`
   const rows: NicePoolRow[] = []
   const membership = new Map<RowId, readonly RowId[]>()
   for (const { value, indices } of grouped.values()) {
@@ -80,5 +81,11 @@ export function aggregateForPlot(source: DatasetStore, state: PlotState): Aggreg
     })),
   ]
   const dataset = new DatasetStore({ rows, rowIdColumn, schema })
-  return Object.freeze({ dataset, sourceYColumn: state.yColumn, meanColumn, sourceRowIdsByAggregateId: membership })
+  return Object.freeze({
+    dataset,
+    sourceYColumn: state.yColumn,
+    statistic: state.aggregateStatistic,
+    valueColumn,
+    sourceRowIdsByAggregateId: membership,
+  })
 }

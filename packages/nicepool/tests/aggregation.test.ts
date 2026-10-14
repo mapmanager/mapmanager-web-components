@@ -62,4 +62,38 @@ describe('plot-specific aggregation', () => {
     engine.setPlotState({ ...engine.plotState, dataLevel: 'source' })
     expect(engine.selection).toEqual({ primaryRowId: null, selectedRowIds: [] })
   })
+
+  it.each([
+    ['mean', [2, 8]],
+    ['median', [2, 8]],
+    ['std', [Math.SQRT2]],
+    ['sem', [1]],
+    ['min', [1, 8]],
+    ['max', [3, 8]],
+    ['cv', [Math.SQRT2 / 2]],
+    ['count', [2, 1]],
+  ] as const)('plots the selected %s aggregate column', (statistic, expected) => {
+    const engine = new NicePoolEngine()
+    engine.setData(input)
+    engine.setPlotState({ ...aggregateState(engine.dataset), aggregateStatistic: statistic })
+
+    const prepared = engine.preparePlot()
+    expect(prepared.data.axisLabels.y).toBe(`value (${statistic})`)
+    expect(prepared.data.points.map(({ y }) => y)).toEqual(expected)
+  })
+
+  it.each(['scatter', 'box', 'violin'] as const)('supports aggregate %s plots', (plotType) => {
+    const engine = new NicePoolEngine()
+    engine.setData(input)
+    engine.setPlotState({
+      ...aggregateState(engine.dataset),
+      plotType,
+      xColumn: plotType === 'scatter' ? 'unit' : 'condition',
+    })
+
+    const prepared = engine.preparePlot()
+    expect(prepared.data.type).toBe(plotType)
+    expect(prepared.data.points).toHaveLength(2)
+    expect(prepared.data.axisLabels.y).toBe('value (mean)')
+  })
 })

@@ -57,12 +57,13 @@ function selectedPointOverlay(
   points: readonly PreparedPoint[],
   selection: NicePoolSelection,
   pointSize: number,
+  pointTraceType: PointTraceType,
 ): Plotly.Data | null {
   const selected = new Set(selection.selectedRowIds)
   const selectedPoints = points.filter(({ rowId }) => selected.has(rowId))
   if (!selectedPoints.length) return null
   return {
-    type: 'scatter',
+    type: pointTraceType,
     mode: 'markers',
     name: 'Selected',
     x: selectedPoints.map(({ x }) => x),
@@ -74,7 +75,9 @@ function selectedPointOverlay(
   } as unknown as Plotly.Data
 }
 
-function swarmOverlays(data: PreparedSwarmData, theme: NicePoolTheme): Plotly.Data[] {
+const SUMMARY_OVERLAY_COLOR = '#6b7280'
+
+function swarmOverlays(data: PreparedSwarmData, pointTraceType: PointTraceType): Plotly.Data[] {
   if (!data.state.showMean && !data.state.showErrorBars) return []
   const groups = new Map<string, { centerX: number; values: number[] }>()
   for (const point of data.points) {
@@ -97,18 +100,18 @@ function swarmOverlays(data: PreparedSwarmData, theme: NicePoolTheme): Plotly.Da
     error.push(data.state.errorBarType === 'sem' ? std / Math.sqrt(values.length) : std)
   }
   const trace: Plotly.Data = {
-    type: 'scatter',
+    type: pointTraceType,
     mode: data.state.showMean || data.state.showErrorBars ? 'markers' : 'none',
     name: `mean ± ${data.state.errorBarType}`,
     x,
     y,
     marker: data.state.showMean
-      ? { symbol: 'line-ew', size: 18, color: theme === 'dark' ? '#f8fafc' : '#111827', line: { width: 3 } }
+      ? { symbol: 'line-ew', size: 18, color: SUMMARY_OVERLAY_COLOR, line: { color: SUMMARY_OVERLAY_COLOR, width: 3 } }
       : { size: 1, color: 'rgba(0,0,0,0)' },
     hoverinfo: 'skip',
     showlegend: false,
     ...(data.state.showErrorBars
-      ? { error_y: { type: 'data' as const, array: error, visible: true } }
+      ? { error_y: { type: 'data' as const, array: error, visible: true, color: SUMMARY_OVERLAY_COLOR, thickness: 2, width: 6 } }
       : {}),
   }
   return [trace]
@@ -122,10 +125,15 @@ function distributionTraces(data: PreparedDistributionData): Plotly.Data[] {
     y: points.map(({ y }) => y),
     customdata: points.map(({ rowId }) => [rowId]),
     showlegend: data.state.showLegend,
+    // Distribution shapes remain visual context; the shared Hover option
+    // controls only caller-owned observations.
+    hoveron: 'points',
     ...(data.type === 'box'
       ? { boxpoints: data.state.showRaw ? 'all' : false, jitter: 0.3, pointpos: 0 }
       : { points: data.state.showRaw ? 'all' : false, pointpos: 0, jitter: 0.3, box: { visible: true }, meanline: { visible: true } }),
-    hovertemplate: 'row=%{customdata[0]}<br>group=%{x}<br>y=%{y}<extra>%{fullData.name}</extra>',
+    ...(data.state.showHover
+      ? { hovertemplate: 'row=%{customdata[0]}<br>group=%{x}<br>y=%{y}<extra>%{fullData.name}</extra>' }
+      : { hoverinfo: 'none' }),
   } as unknown as Plotly.Data))
 }
 
@@ -173,16 +181,20 @@ export function buildPlotlySpecification(
   if (data.type === 'box' || data.type === 'violin') traces = distributionTraces(data)
   else if (data.type === 'histogram' || data.type === 'cumulativeHistogram') traces = histogramTraces(data)
   else {
+    // Plotly renders WebGL canvases above SVG traces regardless of trace-array
+    // order. Keep raw, summary, and selection point layers in the same renderer
+    // family so their declared order is honored without giving up WebGL for
+    // large datasets. SVG remains the existing fallback when WebGL is absent.
     traces = data.state.showRaw
       ? groupedPoints(data.points).map(([name, points]) => pointTrace(
           name, points, selection, data.state.pointSize, data.state.showHover,
           pointTraceType,
         ))
       : []
-    if (data.type === 'swarm') traces.push(...swarmOverlays(data, theme))
+    if (data.type === 'swarm') traces.push(...swarmOverlays(data, pointTraceType))
     if (data.state.showRaw) {
       const overlay = selectedPointOverlay(
-        data.points, selection, data.state.pointSize,
+        data.points, selection, data.state.pointSize, pointTraceType,
       )
       if (overlay) traces.push(overlay)
     }
@@ -220,6 +232,10 @@ export function buildPlotlySpecification(
     xaxis: data.type === 'swarm'
       ? {
           ...axisStyle,
+          // Swarm categories use numeric positions starting at zero. A numeric
+          // zero line would otherwise look like an unrequested grid line through
+          // the first category.
+          zeroline: false,
           title: { text: data.state.showAxes ? data.axisLabels.x : '' },
           showgrid: data.state.showVerticalGrid,
           tickmode: 'array',
