@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import type { NicePoolSelection, NicePoolTheme, RowId } from '../core/types'
-import { buildPlotlySpecification, rowIdsFromPlotlyEvent, type PointTraceType } from '../plots/plotly'
+import { buildPlotlySpecification, isSelectionOverlayEvent, rowIdsFromPlotlyEvent, type PointTraceType } from '../plots/plotly'
 import type { PreparedPlotData } from '../plots/types'
 
 const props = defineProps<{ data: PreparedPlotData; selection: NicePoolSelection; theme: NicePoolTheme }>()
@@ -46,6 +46,7 @@ function installPlotlyShadowStyles(): void {
 
 function selectionHandler(event: unknown): void {
   if (specificationUpdates > 0) return
+  if (isSelectionOverlayEvent(event as never)) return
   const rowIds = rowIdsFromPlotlyEvent(event as never)
   if (!rowIds.length) {
     if (pendingClear !== null) clearTimeout(pendingClear)
@@ -68,6 +69,7 @@ function clickHandler(event: unknown): void {
     clearTimeout(pendingClear)
     pendingClear = null
   }
+  if (isSelectionOverlayEvent(event as never)) return
   const rowIds = rowIdsFromPlotlyEvent(event as never)
   const primary = rowIds[0] ?? null
   emit('selection', primary ? [primary] : [], primary, shiftPressed)

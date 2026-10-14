@@ -44,6 +44,7 @@ export class NicePoolElement extends HTMLElement {
     const style = document.createElement('style')
     style.textContent = widgetStyles
     const mount = document.createElement('div')
+    mount.className = 'nicepool-element-mount'
     shadow.replaceChildren(style, mount)
     this.#app = createApp({
       render: () => h(NicePoolWidget, {

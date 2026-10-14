@@ -57,7 +57,6 @@ function selectedPointOverlay(
   points: readonly PreparedPoint[],
   selection: NicePoolSelection,
   pointSize: number,
-  showHover: boolean,
 ): Plotly.Data | null {
   const selected = new Set(selection.selectedRowIds)
   const selectedPoints = points.filter(({ rowId }) => selected.has(rowId))
@@ -68,12 +67,10 @@ function selectedPointOverlay(
     name: 'Selected',
     x: selectedPoints.map(({ x }) => x),
     y: selectedPoints.map(({ y }) => y),
-    customdata: selectedPoints.map(({ rowId }) => [rowId]),
     marker: { size: pointSize + 4, color: '#f97316' },
+    meta: { nicepoolSelectionOverlay: true },
     showlegend: false,
-    ...(showHover
-      ? { hovertemplate: 'row=%{customdata[0]}<br>x=%{x}<br>y=%{y}<extra></extra>' }
-      : { hoverinfo: 'none' }),
+    hoverinfo: 'skip',
   } as unknown as Plotly.Data
 }
 
@@ -185,7 +182,7 @@ export function buildPlotlySpecification(
     if (data.type === 'swarm') traces.push(...swarmOverlays(data, theme))
     if (data.state.showRaw) {
       const overlay = selectedPointOverlay(
-        data.points, selection, data.state.pointSize, data.state.showHover,
+        data.points, selection, data.state.pointSize,
       )
       if (overlay) traces.push(overlay)
     }
@@ -251,6 +248,7 @@ export function buildPlotlySpecification(
 
 interface PlotlySelectedPoint {
   customdata?: unknown
+  data?: { meta?: unknown }
 }
 
 interface PlotlySelectionEvent {
@@ -262,9 +260,21 @@ function rowIdFromCustomData(value: unknown): RowId | null {
   return value == null ? null : String(value)
 }
 
+function isSelectionOverlayPoint(point: PlotlySelectedPoint): boolean {
+  const meta = point.data?.meta
+  return !!meta && typeof meta === 'object'
+    && (meta as { nicepoolSelectionOverlay?: unknown }).nicepoolSelectionOverlay === true
+}
+
+/** Return whether every reported Plotly point belongs to the display-only selection overlay. */
+export function isSelectionOverlayEvent(event: PlotlySelectionEvent | null | undefined): boolean {
+  const points = event?.points ?? []
+  return points.length > 0 && points.every(isSelectionOverlayPoint)
+}
+
 /** Decode stable row IDs from Plotly click or area-selection event data. */
 export function rowIdsFromPlotlyEvent(event: PlotlySelectionEvent | null | undefined): RowId[] {
-  const ids = (event?.points ?? []).flatMap(({ customdata }) => {
+  const ids = (event?.points ?? []).filter((point) => !isSelectionOverlayPoint(point)).flatMap(({ customdata }) => {
     const rowId = rowIdFromCustomData(customdata)
     return rowId === null ? [] : [rowId]
   })

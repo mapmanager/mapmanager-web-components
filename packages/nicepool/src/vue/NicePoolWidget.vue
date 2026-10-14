@@ -40,11 +40,30 @@ const maximumControlsWidth = 720
 const controlsWidth = ref(props.controlsCollapsed ? 0 : defaultControlsWidth)
 const expandedControlsWidth = ref(defaultControlsWidth)
 const plotHeight = ref(620)
-const summaryCopyStatus = ref('')
+const widgetStatus = ref('')
 const showSummaryPlotState = ref(true)
 const showSummaryRawData = ref(true)
 const activeTableTab = ref<'data' | 'selection' | 'summary'>('data')
 let stopPointerResize: (() => void) | null = null
+let statusTimeout: ReturnType<typeof setTimeout> | null = null
+
+function showStatus(message: string): void {
+  widgetStatus.value = message
+  if (statusTimeout !== null) clearTimeout(statusTimeout)
+  statusTimeout = setTimeout(() => {
+    widgetStatus.value = ''
+    statusTimeout = null
+  }, 3_000)
+}
+
+function showCopyStatus(label: string, rowCount: number): void {
+  showStatus(`Copied ${label} (${rowCount.toLocaleString()} ${rowCount === 1 ? 'row' : 'rows'})`)
+}
+
+function handleActionError(message: string): void {
+  error.value = message
+  showStatus('Copy failed')
+}
 
 function jsonClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -328,9 +347,9 @@ async function copySummary(): Promise<void> {
       groupLabel: summaryGroupLabel.value,
       colorLabel: summaryColorLabel.value,
     }))
-    summaryCopyStatus.value = 'Copied'
+    showStatus(`Copied Plot ${engine.state.activePlotIndex + 1} summary`)
   } catch (reason) {
-    summaryCopyStatus.value = 'Copy failed'
+    showStatus('Copy failed')
     error.value = reason instanceof Error ? reason.message : String(reason)
   }
 }
@@ -352,6 +371,7 @@ watch(() => props.controlsCollapsed, (collapsed) => setControlsCollapsed(collaps
 onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onBeforeUnmount(() => {
   stopPointerResize?.()
+  if (statusTimeout !== null) clearTimeout(statusTimeout)
   window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
@@ -435,14 +455,13 @@ onBeforeUnmount(() => {
             <button type="button" role="tab" :aria-selected="activeTableTab === 'selection'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'selection' }" @click="activeTableTab = 'selection'">Selection</button>
             <button type="button" role="tab" :aria-selected="activeTableTab === 'summary'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'summary' }" @click="activeTableTab = 'summary'">Plot {{ state!.activePlotIndex + 1 }} summary</button>
           </div>
-          <NicePoolTable v-if="activeTableTab === 'data'" role="tabpanel" label="Data" :rows="engine.dataset.rows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @error="error = $event" />
-          <NicePoolTable v-else-if="activeTableTab === 'selection'" role="tabpanel" label="Selection" :rows="selectedRows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @error="error = $event" />
-          <div v-else role="tabpanel">
+          <NicePoolTable v-if="activeTableTab === 'data'" role="tabpanel" label="Data" :rows="engine.dataset.rows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
+          <NicePoolTable v-else-if="activeTableTab === 'selection'" role="tabpanel" label="Selection" :rows="selectedRows" :columns="rawTableColumns" :row-id-column="engine.dataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
+          <div v-else class="nicepool-summary-report" role="tabpanel">
           <div class="nicepool-summary-actions">
             <button type="button" @click="copySummary">Copy Summary</button>
             <label><input v-model="showSummaryPlotState" type="checkbox" /> Plot State</label>
             <label><input v-model="showSummaryRawData" type="checkbox" /> Raw Data</label>
-            <span role="status">{{ summaryCopyStatus }}</span>
           </div>
           <div class="nicepool-summary-table-scroll">
             <template v-if="showSummaryPlotState">
@@ -475,5 +494,6 @@ onBeforeUnmount(() => {
         </div>
       </details>
     </section>
+    <footer class="nicepool-footer" role="status" aria-live="polite">{{ widgetStatus }}</footer>
   </section>
 </template>

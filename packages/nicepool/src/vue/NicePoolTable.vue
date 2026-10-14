@@ -12,9 +12,11 @@ const props = withDefaults(defineProps<{
   label: string
 }>(), { pageSize: 100 })
 
-const emit = defineEmits<{ error: [message: string] }>()
+const emit = defineEmits<{
+  copied: [label: string, rowCount: number]
+  error: [message: string]
+}>()
 const page = ref(0)
-const copyStatus = ref('')
 const pageCount = computed(() => Math.max(1, Math.ceil(props.rows.length / props.pageSize)))
 const visibleRows = computed(() => {
   const start = page.value * props.pageSize
@@ -33,9 +35,8 @@ function displayValue(value: unknown): string {
 async function copyTable(): Promise<void> {
   try {
     await navigator.clipboard.writeText(formatTableToTsv(props.rows, props.columns))
-    copyStatus.value = 'Copied'
+    emit('copied', props.label, props.rows.length)
   } catch (reason) {
-    copyStatus.value = 'Copy failed'
     emit('error', reason instanceof Error ? reason.message : String(reason))
   }
 }
@@ -46,7 +47,6 @@ async function copyTable(): Promise<void> {
     <div class="nicepool-table-pagination">
       <span>Rows {{ firstVisibleRow }}–{{ lastVisibleRow }} of {{ rows.length }}</span>
       <button type="button" @click="copyTable">Copy Table</button>
-      <span class="nicepool-copy-status" role="status">{{ copyStatus }}</span>
       <button type="button" :disabled="page === 0" @click="page -= 1">Previous</button>
       <button type="button" :disabled="page + 1 >= pageCount" @click="page += 1">Next</button>
     </div>

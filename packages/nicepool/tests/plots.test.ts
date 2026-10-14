@@ -248,10 +248,21 @@ describe('plot preparation and summaries', () => {
       mode: 'markers',
       name: 'Selected',
       showlegend: false,
-      customdata: [['a'], ['c']],
+      meta: { nicepoolSelectionOverlay: true },
       marker: { color: '#f97316' },
     })
     expect(specification.traces.at(-2)).toMatchObject({ name: 'mean ± sem' })
+  })
+
+  it('ignores row identities reported by the display-only selection overlay', () => {
+    const overlayData = { meta: { nicepoolSelectionOverlay: true } }
+    expect(rowIdsFromPlotlyEvent({
+      points: [
+        { customdata: ['a'], data: overlayData },
+        { customdata: ['a'] },
+        { customdata: ['b'], data: overlayData },
+      ],
+    })).toEqual(['a'])
   })
 
   it('omits the selected overlay when points are hidden or no plotted rows are selected', () => {
