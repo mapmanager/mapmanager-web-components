@@ -40,9 +40,9 @@ const maximumControlsWidth = 720
 const controlsWidth = ref(props.controlsCollapsed ? 0 : defaultControlsWidth)
 const expandedControlsWidth = ref(defaultControlsWidth)
 const plotHeight = ref(620)
+const minimumPlotHeight = 80
+const maximumPlotHeight = 1400
 const widgetStatus = ref('')
-const showSummaryPlotState = ref(true)
-const showSummaryRawData = ref(true)
 const activeTableTab = ref<'data' | 'aggregate' | 'selection' | 'summary'>('data')
 let stopPointerResize: (() => void) | null = null
 let statusTimeout: ReturnType<typeof setTimeout> | null = null
@@ -106,7 +106,7 @@ function startResize(axis: 'horizontal' | 'vertical', event: PointerEvent): void
     const position = axis === 'vertical' ? moveEvent.clientX : moveEvent.clientY
     const next = startValue + position - startPosition
     if (axis === 'vertical') setControlsWidth(next)
-    else plotHeight.value = Math.min(1400, Math.max(0, next))
+    else plotHeight.value = Math.min(maximumPlotHeight, Math.max(minimumPlotHeight, next))
   }
   const stop = (): void => {
     window.removeEventListener('pointermove', onMove)
@@ -130,7 +130,7 @@ function resizeWithKeyboard(axis: 'horizontal' | 'vertical', event: KeyboardEven
   }
   if (axis === 'horizontal' && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
     event.preventDefault()
-    plotHeight.value = Math.min(1400, Math.max(0, plotHeight.value + (event.key === 'ArrowDown' ? step : -step)))
+    plotHeight.value = Math.min(maximumPlotHeight, Math.max(minimumPlotHeight, plotHeight.value + (event.key === 'ArrowDown' ? step : -step)))
   }
 }
 
@@ -384,8 +384,8 @@ async function copySummary(): Promise<void> {
   if (!activeSummary.value) return
   try {
     await navigator.clipboard.writeText(formatPlotSummaryToTsv(activeSummary.value, {
-      includeParameters: showSummaryPlotState.value,
-      includeRepresentedRows: showSummaryRawData.value,
+      includeParameters: true,
+      includeRepresentedRows: true,
       xLabel: summaryXLabel.value,
       yLabel: summaryYLabel.value,
       groupLabel: summaryGroupLabel.value,
@@ -499,8 +499,7 @@ onBeforeUnmount(() => {
       </main>
       <main v-else class="nicepool-main"><p class="nicepool-empty">Set a dataset to begin.</p></main>
       <div class="nicepool-splitter nicepool-splitter-horizontal" role="separator" aria-label="Resize plots" aria-orientation="horizontal" tabindex="0" @pointerdown="startResize('horizontal', $event)" @keydown="resizeWithKeyboard('horizontal', $event)" />
-      <details v-if="activeSummary" class="nicepool-summary-panel">
-        <summary>Tables</summary>
+      <section v-if="activeSummary" class="nicepool-summary-panel" aria-label="Tables">
         <div class="nicepool-summary-content">
           <div class="nicepool-table-tabs" role="tablist" aria-label="NicePool tables">
             <button type="button" role="tab" :aria-selected="activeTableTab === 'data'" :class="{ 'nicepool-table-tab-active': activeTableTab === 'data' }" @click="activeTableTab = 'data'">Data</button>
@@ -512,16 +511,15 @@ onBeforeUnmount(() => {
           <NicePoolTable v-else-if="activeTableTab === 'aggregate' && activeAggregate" role="tabpanel" :label="`Plot ${state!.activePlotIndex + 1} aggregate`" :rows="activeAggregate.dataset.rows" :columns="aggregateTableColumns" :row-id-column="activeAggregate.dataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
           <NicePoolTable v-else-if="activeTableTab === 'selection' && selectionTableDataset" role="tabpanel" label="Selection" :rows="selectedRows" :columns="selectionTableDataset.schema" :row-id-column="selectionTableDataset.rowIdColumn" @copied="showCopyStatus" @error="handleActionError" />
           <div v-else class="nicepool-summary-report" role="tabpanel">
-          <div class="nicepool-summary-actions">
-            <button type="button" @click="copySummary">Copy Summary</button>
-            <label><input v-model="showSummaryPlotState" type="checkbox" /> Plot State</label>
-            <label><input v-model="showSummaryRawData" type="checkbox" /> Raw Data</label>
+          <div class="nicepool-table-pagination">
+            <span>Complete plot report</span>
+            <button type="button" @click="copySummary">Copy Table</button>
+            <button type="button" disabled>Previous</button>
+            <button type="button" disabled>Next</button>
           </div>
           <div class="nicepool-summary-table-scroll" tabindex="0" :aria-label="`Plot ${state!.activePlotIndex + 1} summary data`">
-            <template v-if="showSummaryPlotState">
-              <h3>Plot State</h3>
-              <table><tbody><tr v-for="(value, key) in activeSummary.parameters" :key="key"><th>{{ key }}</th><td>{{ displaySummaryValue(value) }}</td></tr></tbody></table>
-            </template>
+            <h3>Plot State</h3>
+            <table><tbody><tr v-for="(value, key) in activeSummary.parameters" :key="key"><th>{{ key }}</th><td>{{ displaySummaryValue(value) }}</td></tr></tbody></table>
             <h3>Summary</h3>
             <table aria-label="Summary">
               <thead><tr><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th><th>Count</th><th>Min</th><th v-if="showsQuartiles">Q1</th><th>Median</th><th v-if="showsQuartiles">Q3</th><th>Max</th><th v-if="showsQuartiles">IQR</th><th>Mean</th><th>SD</th><th>SE</th><th>CV</th></tr></thead>
@@ -536,17 +534,15 @@ onBeforeUnmount(() => {
                 <tbody><tr v-for="(bin, index) in activeSummary.bins" :key="index"><td v-if="summaryGroupColumn">{{ bin.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ bin.colorValue ?? '' }}</td><td>{{ displayStatistic(bin.lower) }}</td><td>{{ displayStatistic(bin.upper) }}</td><td>{{ displayStatistic(bin.center) }}</td><td>{{ bin.count }}</td><td>{{ bin.cumulativeCount }}</td><td>{{ displayStatistic(bin.cumulativeProportion) }}</td></tr></tbody>
               </table>
             </template>
-            <template v-if="showSummaryRawData">
-              <h3>Raw Data</h3>
-              <table aria-label="Raw Data">
-                <thead><tr><th>Row ID</th><th>{{ summaryXLabel }}</th><th>{{ summaryYLabel }}</th><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th></tr></thead>
-                <tbody><tr v-for="row in activeSummary.representedRows" :key="row.rowId"><td>{{ row.rowId }}</td><td>{{ displaySummaryValue(row.x) }}</td><td>{{ displayStatistic(row.y) }}</td><td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td></tr></tbody>
-              </table>
-            </template>
+            <h3>Raw Data</h3>
+            <table aria-label="Raw Data">
+              <thead><tr><th>Row ID</th><th>{{ summaryXLabel }}</th><th>{{ summaryYLabel }}</th><th v-if="summaryGroupColumn">{{ summaryGroupLabel }}</th><th v-if="summaryColorColumn">{{ summaryColorLabel }}</th></tr></thead>
+              <tbody><tr v-for="row in activeSummary.representedRows" :key="row.rowId"><td>{{ row.rowId }}</td><td>{{ displaySummaryValue(row.x) }}</td><td>{{ displayStatistic(row.y) }}</td><td v-if="summaryGroupColumn">{{ row.groupValue ?? '' }}</td><td v-if="summaryColorColumn">{{ row.colorValue ?? '' }}</td></tr></tbody>
+            </table>
           </div>
           </div>
         </div>
-      </details>
+      </section>
     </section>
     <footer class="nicepool-footer" role="status" aria-live="polite">{{ widgetStatus }}</footer>
   </section>
