@@ -29,6 +29,7 @@ packages = ["src/nicepool_pyqt5"]
 "src/nicepool_pyqt5/static/index.html" = "nicepool_pyqt5/static/index.html"
 "src/nicepool_pyqt5/static/nicepool-pyqt5.js" = "nicepool_pyqt5/static/nicepool-pyqt5.js"
 "src/nicepool_pyqt5/static/nicepool-pyqt5.css" = "nicepool_pyqt5/static/nicepool-pyqt5.css"
+"src/nicepool_pyqt5/static/nicepool-build-info.json" = "nicepool_pyqt5/static/nicepool-build-info.json"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

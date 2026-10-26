@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 src/nicepool_pyqt5/static/nicepool-pyqt5.js
 src/nicepool_pyqt5/static/nicepool-pyqt5.css
+src/nicepool_pyqt5/static/nicepool-build-info.json

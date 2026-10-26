@@ -18,8 +18,11 @@ npm ci
 npm run build --workspace @mapmanager/nicepool-pyqt5-frontend
 ```
 
-The generated `nicepool-pyqt5.js` and `nicepool-pyqt5.css` are intentionally
-not tracked. Build them before running the example, testing the WebEngine
+The generated `nicepool-pyqt5.js`, `nicepool-pyqt5.css`, and
+`nicepool-build-info.json` are intentionally not tracked. The build information
+records the repository commit and frontend package version so downstream
+applications can reject stale generated assets. Build them from a clean,
+committed checkout before running the example, testing the WebEngine
 integration, or building a wheel.
 
 Use `set_dataframe()` / `set_records()` for initialization or a full reset.
@@ -97,5 +100,6 @@ Build the frontend first, then run:
 uv build --project integrations/nicepool-pyqt5 --wheel
 ```
 
-The wheel contains `index.html` and the built NicePool JavaScript and CSS
-assets. Applications installing the wheel do not need Node.
+The wheel contains `index.html`, the built NicePool JavaScript and CSS assets,
+and their build information. Applications installing the wheel do not need
+Node.
